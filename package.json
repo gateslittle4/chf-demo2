@@ -1,0 +1,17 @@
+{
+  "name": "chf-app",
+  "version": "1.0.0",
+  "description": "CHF - Système Hospitalier (modules CommonJS + Express)",
+  "main": "server.js",
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "esbuild": "^0.23.0"
+  }
+}

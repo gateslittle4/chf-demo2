@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://chf-backend.onrender.com https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com; frame-src 'self';">
+  <title>CHF — Système Hospitalier (Supabase)</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- Firebase Auth + Firestore (rôles utilisateurs) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    .floating-btn { transition: all 0.2s ease-in-out; }
+    .floating-btn:hover { transform: scale(1.1); }
+    .zebra-row:nth-child(even) { background-color: rgba(243, 244, 246, 0.6); }
+    .role-admin { color: #b91c1c; }
+    .role-comptable { color: #1d4ed8; }
+    .role-auditeur { color: #047857; }
+    .role-lecteur { color: #4b5563; }
+    .stock-alert { background: #fee2e2; border-left: 4px solid #dc2626; padding: 8px 12px; font-size: 12px; color: #991b1b; }
+    .toast { transition: all 0.3s ease; }
+    .toast-enter { opacity: 0; transform: translateY(-20px); }
+    .toast-enter-active { opacity: 1; transform: translateY(0); }
+  </style>
+</head>
+<body class="bg-[#F7F5F0]">
+  <div id="root"></div>
+  <!-- Bundle généré par esbuild à partir de app/AppHospitaliere.js (voir build.js) -->
+  <script src="./bundle.js"></script>
+</body>
+</html>
