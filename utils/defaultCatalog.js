@@ -1,0 +1,1858 @@
+// utils/defaultCatalog.js
+// Catalogue officiel du Centre Hospitalier de Fontaine — sert à pré-remplir
+// les tarifs Pharmacie/Actes si la base est vide (premier démarrage).
+
+const MEDICAMENTS_PAR_DEFAUT = [
+  {
+    "id": "m275",
+    "nom": "Acide folique",
+    "prix": 15
+  },
+  {
+    "id": "m2",
+    "nom": "Adrénaline",
+    "prix": 350
+  },
+  {
+    "id": "m3",
+    "nom": "Ambroxol",
+    "prix": 350
+  },
+  {
+    "id": "m1",
+    "nom": "Amd",
+    "prix": 50
+  },
+  {
+    "id": "m4",
+    "nom": "Amicacine",
+    "prix": 1500
+  },
+  {
+    "id": "m5",
+    "nom": "Aminophilline",
+    "prix": 1500
+  },
+  {
+    "id": "m276",
+    "nom": "Amlodipine",
+    "prix": 15
+  },
+  {
+    "id": "m6",
+    "nom": "Amoxicilline Co 250mg",
+    "prix": 15
+  },
+  {
+    "id": "m7",
+    "nom": "Amoxicilline Sp 125mg",
+    "prix": 500
+  },
+  {
+    "id": "m8",
+    "nom": "AmoxiClav Sp 457mg/5ml",
+    "prix": 1250
+  },
+  {
+    "id": "m9",
+    "nom": "Ampicilline 2g",
+    "prix": 350
+  },
+  {
+    "id": "m10",
+    "nom": "Aspirin 325mg",
+    "prix": 10
+  },
+  {
+    "id": "m11",
+    "nom": "Aspirin Bayer 100mg",
+    "prix": 10
+  },
+  {
+    "id": "m12",
+    "nom": "Azithromycine",
+    "prix": 350
+  },
+  {
+    "id": "m13",
+    "nom": "B-Stress",
+    "prix": 25
+  },
+  {
+    "id": "m14",
+    "nom": "Babina 1",
+    "prix": 650
+  },
+  {
+    "id": "m15",
+    "nom": "Bandage élastique",
+    "prix": 125
+  },
+  {
+    "id": "m16",
+    "nom": "Beclometasone 100",
+    "prix": 450
+  },
+  {
+    "id": "m17",
+    "nom": "Beclometasone 200",
+    "prix": 450
+  },
+  {
+    "id": "m18",
+    "nom": "Beclometasone 50",
+    "prix": 450
+  },
+  {
+    "id": "m19",
+    "nom": "Bella Phen Sp",
+    "prix": 600
+  },
+  {
+    "id": "m20",
+    "nom": "Benadryl Sp 1mg/ml",
+    "prix": 250
+  },
+  {
+    "id": "m21",
+    "nom": "Betacid/Litacid Sp",
+    "prix": 650
+  },
+  {
+    "id": "m22",
+    "nom": "Bledilait 900g 3ème âge",
+    "prix": 1250
+  },
+  {
+    "id": "m23",
+    "nom": "Bronal Co",
+    "prix": 50
+  },
+  {
+    "id": "m24",
+    "nom": "Bronchomax Sp",
+    "prix": 350
+  },
+  {
+    "id": "m25",
+    "nom": "Buretrol",
+    "prix": 500
+  },
+  {
+    "id": "m26",
+    "nom": "Buscopan Ampoule",
+    "prix": 250
+  },
+  {
+    "id": "m27",
+    "nom": "Buscopan comprimé 10mg",
+    "prix": 75
+  },
+  {
+    "id": "m28",
+    "nom": "Calamine lotion 120ml",
+    "prix": 250
+  },
+  {
+    "id": "m29",
+    "nom": "Calcium gluconate Amp 10ml",
+    "prix": 500
+  },
+  {
+    "id": "m30",
+    "nom": "Canule O2",
+    "prix": 500
+  },
+  {
+    "id": "m31",
+    "nom": "Captopril Co 25mg",
+    "prix": 15
+  },
+  {
+    "id": "m32",
+    "nom": "Cardicor Co 10mg",
+    "prix": 20
+  },
+  {
+    "id": "m33",
+    "nom": "Cardicor Co 5mg",
+    "prix": 20
+  },
+  {
+    "id": "m34",
+    "nom": "Catheter Foley 14",
+    "prix": 500
+  },
+  {
+    "id": "m35",
+    "nom": "Catheter Foley 16",
+    "prix": 500
+  },
+  {
+    "id": "m36",
+    "nom": "Catheter Foley 18",
+    "prix": 500
+  },
+  {
+    "id": "m37",
+    "nom": "Catheter Foley 20",
+    "prix": 500
+  },
+  {
+    "id": "m38",
+    "nom": "Catheter Foley 22",
+    "prix": 500
+  },
+  {
+    "id": "m39",
+    "nom": "Catheter Foley 24",
+    "prix": 500
+  },
+  {
+    "id": "m40",
+    "nom": "Cefotaxime",
+    "prix": 1250
+  },
+  {
+    "id": "m41",
+    "nom": "Cefotaxime Vial 1gr",
+    "prix": 1250
+  },
+  {
+    "id": "m42",
+    "nom": "Ceftazidime",
+    "prix": 1500
+  },
+  {
+    "id": "m43",
+    "nom": "Ceftriaxone Vial 1gr",
+    "prix": 400
+  },
+  {
+    "id": "m44",
+    "nom": "Cephalexin Comprimé 500mg",
+    "prix": 15
+  },
+  {
+    "id": "m45",
+    "nom": "Cetirizine HCL",
+    "prix": 5
+  },
+  {
+    "id": "m46",
+    "nom": "Chlorhexidine Gluconate 0.12%",
+    "prix": 500
+  },
+  {
+    "id": "m47",
+    "nom": "Citrate de caféine",
+    "prix": 7000
+  },
+  {
+    "id": "m48",
+    "nom": "Clindamycin",
+    "prix": 150
+  },
+  {
+    "id": "m49",
+    "nom": "Clotrimazol crème",
+    "prix": 350
+  },
+  {
+    "id": "m50",
+    "nom": "Clotrimazol Ovule",
+    "prix": 35
+  },
+  {
+    "id": "m51",
+    "nom": "Cotrimoxazole Co 480",
+    "prix": 15
+  },
+  {
+    "id": "m52",
+    "nom": "Cotrimoxazole Co 960",
+    "prix": 15
+  },
+  {
+    "id": "m53",
+    "nom": "Cotrimoxazole Suspension 240mg",
+    "prix": 500
+  },
+  {
+    "id": "m272",
+    "nom": "Creatine serum",
+    "prix": 500
+  },
+  {
+    "id": "m273",
+    "nom": "Creatine urine",
+    "prix": 500
+  },
+  {
+    "id": "m54",
+    "nom": "D/W 10% fl 500cc",
+    "prix": 750
+  },
+  {
+    "id": "m55",
+    "nom": "Daktarin 2%",
+    "prix": 150
+  },
+  {
+    "id": "m56",
+    "nom": "Daktarin Oral (gel)",
+    "prix": 250
+  },
+  {
+    "id": "m57",
+    "nom": "Dexamethasone Amp 8mg/2ml",
+    "prix": 200
+  },
+  {
+    "id": "m58",
+    "nom": "Dextrose 5% fl 1000cc",
+    "prix": 750
+  },
+  {
+    "id": "m59",
+    "nom": "Di gas (goutte)",
+    "prix": 500
+  },
+  {
+    "id": "m60",
+    "nom": "Diaper",
+    "prix": 100
+  },
+  {
+    "id": "m61",
+    "nom": "Diaper Enfant",
+    "prix": 50
+  },
+  {
+    "id": "m62",
+    "nom": "Diclofenac 50mg",
+    "prix": 15
+  },
+  {
+    "id": "m63",
+    "nom": "Diclofenac Amp 75mg/3ml",
+    "prix": 125
+  },
+  {
+    "id": "m64",
+    "nom": "Diclofenac Co 100mg",
+    "prix": 15
+  },
+  {
+    "id": "m65",
+    "nom": "Diclofenac gel",
+    "prix": 250
+  },
+  {
+    "id": "m66",
+    "nom": "Diphenhydramine Co",
+    "prix": 15
+  },
+  {
+    "id": "m67",
+    "nom": "Diphenhydramine Sp",
+    "prix": 250
+  },
+  {
+    "id": "m68",
+    "nom": "Dipirone Amp 1g/2ml",
+    "prix": 350
+  },
+  {
+    "id": "m69",
+    "nom": "DNS 0.225% fl 1000cc",
+    "prix": 750
+  },
+  {
+    "id": "m70",
+    "nom": "DNS 0.33% fl 1000cc",
+    "prix": 750
+  },
+  {
+    "id": "m71",
+    "nom": "DNS 5%/0.45% fl 1000cc",
+    "prix": 750
+  },
+  {
+    "id": "m72",
+    "nom": "DNS 5%/0.9% fl 1000cc",
+    "prix": 750
+  },
+  {
+    "id": "m73",
+    "nom": "Dopamine",
+    "prix": 1000
+  },
+  {
+    "id": "m74",
+    "nom": "Doxicicline",
+    "prix": 15
+  },
+  {
+    "id": "m75",
+    "nom": "Dramanol Amp 50mg/ml",
+    "prix": 300
+  },
+  {
+    "id": "m76",
+    "nom": "Ear dry instant goutte auriculaire 15ml",
+    "prix": 100
+  },
+  {
+    "id": "m77",
+    "nom": "Eau sterile",
+    "prix": 100
+  },
+  {
+    "id": "m78",
+    "nom": "Eletriptan Co",
+    "prix": 400
+  },
+  {
+    "id": "m79",
+    "nom": "Enalapril Co 10mg",
+    "prix": 15
+  },
+  {
+    "id": "m80",
+    "nom": "Ephedrine Amp 50mg",
+    "prix": 300
+  },
+  {
+    "id": "m81",
+    "nom": "Ephedrine gtte nasal",
+    "prix": 250
+  },
+  {
+    "id": "m82",
+    "nom": "Ergotrate Amp 0.2mg",
+    "prix": 300
+  },
+  {
+    "id": "m83",
+    "nom": "Erithromycine Co 500mg",
+    "prix": 15
+  },
+  {
+    "id": "m84",
+    "nom": "Erithromycine Susp 125mg/5ml",
+    "prix": 500
+  },
+  {
+    "id": "m85",
+    "nom": "Feet enema adult",
+    "prix": 500
+  },
+  {
+    "id": "m86",
+    "nom": "Feet enema enfant",
+    "prix": 400
+  },
+  {
+    "id": "m87",
+    "nom": "Fentanyl Amp 2ml",
+    "prix": 500
+  },
+  {
+    "id": "m88",
+    "nom": "Fer Dextran Amp 50mg/ml",
+    "prix": 300
+  },
+  {
+    "id": "m89",
+    "nom": "Fer Folate Co",
+    "prix": 15
+  },
+  {
+    "id": "m90",
+    "nom": "Ferobeta Co",
+    "prix": 15
+  },
+  {
+    "id": "m91",
+    "nom": "Ferobeta Sp",
+    "prix": 500
+  },
+  {
+    "id": "m92",
+    "nom": "Ferrup sirop",
+    "prix": 600
+  },
+  {
+    "id": "m93",
+    "nom": "Fil suture",
+    "prix": 150
+  },
+  {
+    "id": "m94",
+    "nom": "Fluconazole Co 150mg",
+    "prix": 75
+  },
+  {
+    "id": "m95",
+    "nom": "Fluconazole Co 50mg",
+    "prix": 25
+  },
+  {
+    "id": "m96",
+    "nom": "Fricilicont Gel Analgesic",
+    "prix": 250
+  },
+  {
+    "id": "m97",
+    "nom": "Furosemide Amp 20mg",
+    "prix": 200
+  },
+  {
+    "id": "m98",
+    "nom": "Furosemide Co 40mg",
+    "prix": 15
+  },
+  {
+    "id": "m99",
+    "nom": "Gabapentin Co 300mg",
+    "prix": 5
+  },
+  {
+    "id": "m100",
+    "nom": "Gallia 1er âge",
+    "prix": 1250
+  },
+  {
+    "id": "m101",
+    "nom": "Gallia 1er âge 900g",
+    "prix": 1600
+  },
+  {
+    "id": "m102",
+    "nom": "Gallia 2ème âge",
+    "prix": 1250
+  },
+  {
+    "id": "m103",
+    "nom": "Gallia 2ème âge 900",
+    "prix": 1600
+  },
+  {
+    "id": "m104",
+    "nom": "Gallia 400g 2ème âge",
+    "prix": 750
+  },
+  {
+    "id": "m105",
+    "nom": "Galocur lotion",
+    "prix": 250
+  },
+  {
+    "id": "m106",
+    "nom": "Gel Lubrifiant",
+    "prix": 150
+  },
+  {
+    "id": "m107",
+    "nom": "Gencloben crème",
+    "prix": 600
+  },
+  {
+    "id": "m108",
+    "nom": "Gentamycine Ampoule 40mg/2ml",
+    "prix": 200
+  },
+  {
+    "id": "m109",
+    "nom": "Gerber",
+    "prix": 50
+  },
+  {
+    "id": "m110",
+    "nom": "Globugen",
+    "prix": 1500
+  },
+  {
+    "id": "m111",
+    "nom": "Gluconate de Calcium",
+    "prix": 500
+  },
+  {
+    "id": "m112",
+    "nom": "Glyburide Co 5mg",
+    "prix": 15
+  },
+  {
+    "id": "m113",
+    "nom": "Glycémie",
+    "prix": 300
+  },
+  {
+    "id": "m274",
+    "nom": "Gouttes nasale",
+    "prix": 500
+  },
+  {
+    "id": "m115",
+    "nom": "HCTZ Co 25mg",
+    "prix": 15
+  },
+  {
+    "id": "m116",
+    "nom": "Heamaplex Sp",
+    "prix": 300
+  },
+  {
+    "id": "m117",
+    "nom": "Heparine Na vial",
+    "prix": 1000
+  },
+  {
+    "id": "m118",
+    "nom": "Hidrocortisone 1% crème",
+    "prix": 250
+  },
+  {
+    "id": "m119",
+    "nom": "Histinol Sp",
+    "prix": 300
+  },
+  {
+    "id": "m120",
+    "nom": "Huile Foie de Morrue Sirop",
+    "prix": 250
+  },
+  {
+    "id": "m121",
+    "nom": "Hydralazine Co 25mg",
+    "prix": 15
+  },
+  {
+    "id": "m122",
+    "nom": "Hydralazine Vial 20mg",
+    "prix": 600
+  },
+  {
+    "id": "m123",
+    "nom": "Ibumax Sp",
+    "prix": 300
+  },
+  {
+    "id": "m124",
+    "nom": "Ibuprofen Co 200mg",
+    "prix": 15
+  },
+  {
+    "id": "m125",
+    "nom": "Ibuprofen Co 400mg",
+    "prix": 15
+  },
+  {
+    "id": "m126",
+    "nom": "Ibuprofen Co 600mg",
+    "prix": 15
+  },
+  {
+    "id": "m127",
+    "nom": "Ibuprofen Co 800mg",
+    "prix": 15
+  },
+  {
+    "id": "m128",
+    "nom": "Imoderm savon",
+    "prix": 150
+  },
+  {
+    "id": "m129",
+    "nom": "Insuline NPH",
+    "prix": 25
+  },
+  {
+    "id": "m130",
+    "nom": "Insuline Rapid",
+    "prix": 25
+  },
+  {
+    "id": "m131",
+    "nom": "Intracath 16",
+    "prix": 125
+  },
+  {
+    "id": "m132",
+    "nom": "Intracath 18",
+    "prix": 125
+  },
+  {
+    "id": "m133",
+    "nom": "Intracath 20",
+    "prix": 125
+  },
+  {
+    "id": "m134",
+    "nom": "Intracath 22",
+    "prix": 125
+  },
+  {
+    "id": "m135",
+    "nom": "Intracath 24",
+    "prix": 125
+  },
+  {
+    "id": "m136",
+    "nom": "Ipatropium Co 3mg",
+    "prix": 150
+  },
+  {
+    "id": "m137",
+    "nom": "KCL",
+    "prix": 1250
+  },
+  {
+    "id": "m138",
+    "nom": "Ketoconazole Co 400mg",
+    "prix": 15
+  },
+  {
+    "id": "m139",
+    "nom": "Ketoconazole crème",
+    "prix": 200
+  },
+  {
+    "id": "m140",
+    "nom": "Ketoconazole savon",
+    "prix": 250
+  },
+  {
+    "id": "m141",
+    "nom": "Ketoconazole shampoo",
+    "prix": 300
+  },
+  {
+    "id": "m142",
+    "nom": "Ketoconazole spray",
+    "prix": 300
+  },
+  {
+    "id": "m143",
+    "nom": "Ketoconazole susp",
+    "prix": 250
+  },
+  {
+    "id": "m144",
+    "nom": "Labetalol 100mg/20ml",
+    "prix": 250
+  },
+  {
+    "id": "m145",
+    "nom": "Lidocaine 2%",
+    "prix": 350
+  },
+  {
+    "id": "m146",
+    "nom": "Loperamide Co",
+    "prix": 5
+  },
+  {
+    "id": "m147",
+    "nom": "Loratadine Co 10mg",
+    "prix": 15
+  },
+  {
+    "id": "m148",
+    "nom": "Loratadine Sp",
+    "prix": 250
+  },
+  {
+    "id": "m149",
+    "nom": "Lysivit Sp",
+    "prix": 1000
+  },
+  {
+    "id": "m150",
+    "nom": "Malaquin suspension 120ml",
+    "prix": 350
+  },
+  {
+    "id": "m151",
+    "nom": "Manitol 20%",
+    "prix": 650
+  },
+  {
+    "id": "m152",
+    "nom": "Mastisol",
+    "prix": 400
+  },
+  {
+    "id": "m153",
+    "nom": "Mebendazole 100mg",
+    "prix": 15
+  },
+  {
+    "id": "m154",
+    "nom": "Mentax Crème",
+    "prix": 250
+  },
+  {
+    "id": "m155",
+    "nom": "Metformin Co 1000mg",
+    "prix": 15
+  },
+  {
+    "id": "m156",
+    "nom": "Metformin Co 500mg",
+    "prix": 15
+  },
+  {
+    "id": "m157",
+    "nom": "Metformin Co 850mg",
+    "prix": 15
+  },
+  {
+    "id": "m158",
+    "nom": "Modilac 1",
+    "prix": 1750
+  },
+  {
+    "id": "m159",
+    "nom": "Modilac 2",
+    "prix": 1750
+  },
+  {
+    "id": "m160",
+    "nom": "Modilac 3",
+    "prix": 1750
+  },
+  {
+    "id": "m161",
+    "nom": "Metoclopramide Amp 10mg/2ml",
+    "prix": 200
+  },
+  {
+    "id": "m162",
+    "nom": "Metoclopramide Co 10mg",
+    "prix": 15
+  },
+  {
+    "id": "m163",
+    "nom": "Metoclopramide Sp",
+    "prix": 450
+  },
+  {
+    "id": "m164",
+    "nom": "Metoprolol Co 100mg",
+    "prix": 100
+  },
+  {
+    "id": "m165",
+    "nom": "Metromona Ovule",
+    "prix": 40
+  },
+  {
+    "id": "m166",
+    "nom": "Metronidazole Co 500mg",
+    "prix": 15
+  },
+  {
+    "id": "m167",
+    "nom": "Metronidazole susp 125",
+    "prix": 550
+  },
+  {
+    "id": "m168",
+    "nom": "Metronidazole perfusion 500mg",
+    "prix": 400
+  },
+  {
+    "id": "m169",
+    "nom": "Metronidazole susp 250",
+    "prix": 500
+  },
+  {
+    "id": "m170",
+    "nom": "MGSO4 5g",
+    "prix": 350
+  },
+  {
+    "id": "m171",
+    "nom": "Miconazol Crème",
+    "prix": 350
+  },
+  {
+    "id": "m172",
+    "nom": "Miconazol Crème 2%",
+    "prix": 150
+  },
+  {
+    "id": "m173",
+    "nom": "Miconazol Crème dermique",
+    "prix": 300
+  },
+  {
+    "id": "m174",
+    "nom": "Misoprostol Co 200mcg",
+    "prix": 750
+  },
+  {
+    "id": "m175",
+    "nom": "Misoprostol Crème dermique",
+    "prix": 350
+  },
+  {
+    "id": "m176",
+    "nom": "Montelukast Co",
+    "prix": 25
+  },
+  {
+    "id": "m177",
+    "nom": "Multitone Sp",
+    "prix": 300
+  },
+  {
+    "id": "m178",
+    "nom": "Multitone-Forté Co",
+    "prix": 10
+  },
+  {
+    "id": "m179",
+    "nom": "Multivitamines Co",
+    "prix": 15
+  },
+  {
+    "id": "m180",
+    "nom": "N/S goutte",
+    "prix": 500
+  },
+  {
+    "id": "m181",
+    "nom": "NaCl 0.45% fl 1000cc",
+    "prix": 750
+  },
+  {
+    "id": "m182",
+    "nom": "NaCl 0.9% fl 1000cc",
+    "prix": 750
+  },
+  {
+    "id": "m183",
+    "nom": "Nactalia 400g 1er âge",
+    "prix": 750
+  },
+  {
+    "id": "m184",
+    "nom": "Nactalia 400g 2ème âge",
+    "prix": 750
+  },
+  {
+    "id": "m185",
+    "nom": "Naproxen Co",
+    "prix": 15
+  },
+  {
+    "id": "m186",
+    "nom": "Nefedipine Co 20mg",
+    "prix": 15
+  },
+  {
+    "id": "m187",
+    "nom": "Neobac Crème",
+    "prix": 250
+  },
+  {
+    "id": "m188",
+    "nom": "Neomole perfusion",
+    "prix": 1000
+  },
+  {
+    "id": "m189",
+    "nom": "Nifedipine Co 10mg",
+    "prix": 15
+  },
+  {
+    "id": "m190",
+    "nom": "Nivaquine Sirop 25mg",
+    "prix": 300
+  },
+  {
+    "id": "m191",
+    "nom": "Nursie 400g 2ème âge",
+    "prix": 1000
+  },
+  {
+    "id": "m192",
+    "nom": "Nystatin goutte",
+    "prix": 250
+  },
+  {
+    "id": "m193",
+    "nom": "Nystatin Ovule",
+    "prix": 35
+  },
+  {
+    "id": "m194",
+    "nom": "Nystatin susp",
+    "prix": 350
+  },
+  {
+    "id": "m195",
+    "nom": "Nystazinc crème",
+    "prix": 250
+  },
+  {
+    "id": "m196",
+    "nom": "Omega 3",
+    "prix": 15
+  },
+  {
+    "id": "m197",
+    "nom": "Omeprazol Co 20mg",
+    "prix": 15
+  },
+  {
+    "id": "m198",
+    "nom": "Omeprazol Co 40mg",
+    "prix": 15
+  },
+  {
+    "id": "m199",
+    "nom": "Omeprazol vial 20mg",
+    "prix": 400
+  },
+  {
+    "id": "m200",
+    "nom": "Othorinol goutte Auriculaire",
+    "prix": 600
+  },
+  {
+    "id": "m201",
+    "nom": "Oxebral",
+    "prix": 50
+  },
+  {
+    "id": "m202",
+    "nom": "Oxytocin",
+    "prix": 350
+  },
+  {
+    "id": "m203",
+    "nom": "Paracetamol Co 325mg",
+    "prix": 15
+  },
+  {
+    "id": "m204",
+    "nom": "Paracetamol Co 500mg",
+    "prix": 15
+  },
+  {
+    "id": "m205",
+    "nom": "Paracetamol sirop",
+    "prix": 350
+  },
+  {
+    "id": "m206",
+    "nom": "Phenobarbital Co 100mg",
+    "prix": 15
+  },
+  {
+    "id": "m207",
+    "nom": "Phénitoïne",
+    "prix": 1000
+  },
+  {
+    "id": "m208",
+    "nom": "Phénobarbital",
+    "prix": 2000
+  },
+  {
+    "id": "m209",
+    "nom": "Piptazol",
+    "prix": 2000
+  },
+  {
+    "id": "m210",
+    "nom": "PNC Benzathine Vial 2.4 MUI",
+    "prix": 300
+  },
+  {
+    "id": "m211",
+    "nom": "Poire à succion",
+    "prix": 250
+  },
+  {
+    "id": "m212",
+    "nom": "Prenatal Co",
+    "prix": 5
+  },
+  {
+    "id": "m213",
+    "nom": "Primaquine comprimé 7.5mg",
+    "prix": 150
+  },
+  {
+    "id": "m214",
+    "nom": "Promethazine Amp 25mg/2ml",
+    "prix": 400
+  },
+  {
+    "id": "m215",
+    "nom": "Promethazine Co",
+    "prix": 10
+  },
+  {
+    "id": "m270",
+    "nom": "Piroxicam",
+    "prix": 15
+  },
+  {
+    "id": "m216",
+    "nom": "Pro-gysol",
+    "prix": 250
+  },
+  {
+    "id": "m217",
+    "nom": "Provit poudre",
+    "prix": 600
+  },
+  {
+    "id": "m271",
+    "nom": "Raccord",
+    "prix": 50
+  },
+  {
+    "id": "m218",
+    "nom": "Raccord transfusion",
+    "prix": 500
+  },
+  {
+    "id": "m219",
+    "nom": "Ranitidine Amp 50mg",
+    "prix": 200
+  },
+  {
+    "id": "m220",
+    "nom": "Ranitidine 300mg",
+    "prix": 15
+  },
+  {
+    "id": "m221",
+    "nom": "Ringer Lactate fl 1000cc",
+    "prix": 750
+  },
+  {
+    "id": "m222",
+    "nom": "Sac collecteur",
+    "prix": 1000
+  },
+  {
+    "id": "m223",
+    "nom": "Salbutamol Co 4mg",
+    "prix": 10
+  },
+  {
+    "id": "m224",
+    "nom": "Salbutamol Spray",
+    "prix": 450
+  },
+  {
+    "id": "m225",
+    "nom": "Scalvein 20",
+    "prix": 100
+  },
+  {
+    "id": "m226",
+    "nom": "Scalvein 21",
+    "prix": 100
+  },
+  {
+    "id": "m227",
+    "nom": "Scalvein 23",
+    "prix": 100
+  },
+  {
+    "id": "m228",
+    "nom": "Seringue 2cc/10cc",
+    "prix": 25
+  },
+  {
+    "id": "m229",
+    "nom": "Seringue 3cc",
+    "prix": 25
+  },
+  {
+    "id": "m230",
+    "nom": "Seringue 5cc",
+    "prix": 25
+  },
+  {
+    "id": "m231",
+    "nom": "Seringue 20cc",
+    "prix": 50
+  },
+  {
+    "id": "m232",
+    "nom": "Seringue 35cc",
+    "prix": 75
+  },
+  {
+    "id": "m233",
+    "nom": "Seringue 60cc",
+    "prix": 100
+  },
+  {
+    "id": "m234",
+    "nom": "Seringue insuline",
+    "prix": 5
+  },
+  {
+    "id": "m235",
+    "nom": "Seringue Sp",
+    "prix": 5
+  },
+  {
+    "id": "m236",
+    "nom": "Simflat Sp",
+    "prix": 750
+  },
+  {
+    "id": "m241",
+    "nom": "Similac",
+    "prix": 650
+  },
+  {
+    "id": "m242",
+    "nom": "Simvastatin Co 25mg",
+    "prix": 15
+  },
+  {
+    "id": "m243",
+    "nom": "Spiroka Co 25mg",
+    "prix": 20
+  },
+  {
+    "id": "m244",
+    "nom": "Sporamox Co 100mg",
+    "prix": 25
+  },
+  {
+    "id": "m245",
+    "nom": "Sporamox Sp 10mg",
+    "prix": 350
+  },
+  {
+    "id": "m246",
+    "nom": "SRO",
+    "prix": 5
+  },
+  {
+    "id": "m247",
+    "nom": "Superspass sirop",
+    "prix": 300
+  },
+  {
+    "id": "m248",
+    "nom": "Supplement herbal Co",
+    "prix": 5
+  },
+  {
+    "id": "m249",
+    "nom": "Tapis chauffant",
+    "prix": 500
+  },
+  {
+    "id": "m250",
+    "nom": "Telmisartan comprimé 20mg",
+    "prix": 10
+  },
+  {
+    "id": "m251",
+    "nom": "Tetracycline ointment 1%",
+    "prix": 200
+  },
+  {
+    "id": "m252",
+    "nom": "Toussicol Sp",
+    "prix": 600
+  },
+  {
+    "id": "m253",
+    "nom": "Tramadol Amp 100mg/2ml",
+    "prix": 750
+  },
+  {
+    "id": "m254",
+    "nom": "Tramadol Denk Effervescent",
+    "prix": 500
+  },
+  {
+    "id": "m255",
+    "nom": "Tube de levine",
+    "prix": 250
+  },
+  {
+    "id": "m256",
+    "nom": "Tylenol Sp",
+    "prix": 250
+  },
+  {
+    "id": "m257",
+    "nom": "Umcka",
+    "prix": 200
+  },
+  {
+    "id": "m258",
+    "nom": "Valsartan/HCTZ",
+    "prix": 10
+  },
+  {
+    "id": "m259",
+    "nom": "Vancomycin 1g",
+    "prix": 350
+  },
+  {
+    "id": "m260",
+    "nom": "Visine gouttes",
+    "prix": 500
+  },
+  {
+    "id": "m261",
+    "nom": "Vit K",
+    "prix": 350
+  },
+  {
+    "id": "m262",
+    "nom": "Vitamine A",
+    "prix": 20
+  },
+  {
+    "id": "m263",
+    "nom": "Vitamine B12 Co 1000mcg",
+    "prix": 10
+  },
+  {
+    "id": "m264",
+    "nom": "Vitamine C Co 500mg",
+    "prix": 20
+  },
+  {
+    "id": "m265",
+    "nom": "Vitamine C goutte",
+    "prix": 400
+  },
+  {
+    "id": "m266",
+    "nom": "Vitamine C Sp",
+    "prix": 500
+  },
+  {
+    "id": "m267",
+    "nom": "Vitamine D3 Co 1000 UI",
+    "prix": 10
+  },
+  {
+    "id": "m268",
+    "nom": "Vitamine E",
+    "prix": 15
+  },
+  {
+    "id": "m269",
+    "nom": "Vitamine K Ampoule 1ml",
+    "prix": 350
+  }
+];
+
+const ACTES_PAR_DEFAUT = [
+  {
+    "id": "a23",
+    "nom": "Consultation Chirurgie",
+    "prix": 1000,
+    "sub": "service"
+  },
+  {
+    "id": "a27",
+    "nom": "Consultation Pédiatre",
+    "prix": 500,
+    "sub": "service"
+  },
+  {
+    "id": "a28",
+    "nom": "Consultation Urgences",
+    "prix": 500,
+    "sub": "service"
+  },
+  {
+    "id": "a24",
+    "nom": "Consultation Générale",
+    "prix": 500,
+    "sub": "service"
+  },
+  {
+    "id": "a9",
+    "nom": "Bilan de suivi (Lettre)",
+    "prix": 1000,
+    "sub": "service"
+  },
+  {
+    "id": "a17",
+    "nom": "Certificat (Santé, Maladie, Grossesse)",
+    "prix": 500,
+    "sub": "service"
+  },
+  {
+    "id": "a43",
+    "nom": "Interconsultation",
+    "prix": 250,
+    "sub": "service"
+  },
+  {
+    "id": "a42",
+    "nom": "Hémogramme",
+    "prix": 750,
+    "sub": "labo"
+  },
+  {
+    "id": "a68",
+    "nom": "Taux de plaquettes",
+    "prix": 750,
+    "sub": "labo"
+  },
+  {
+    "id": "a39",
+    "nom": "Groupe Sanguin",
+    "prix": 300,
+    "sub": "labo"
+  },
+  {
+    "id": "a47",
+    "nom": "Malaria",
+    "prix": 0,
+    "sub": "labo"
+  },
+  {
+    "id": "a72",
+    "nom": "Widal",
+    "prix": 500,
+    "sub": "labo"
+  },
+  {
+    "id": "a70",
+    "nom": "Test de Grossesse",
+    "prix": 300,
+    "sub": "labo"
+  },
+  {
+    "id": "a70b",
+    "nom": "BHCG Plasmatiques",
+    "prix": 300,
+    "sub": "labo"
+  },
+  {
+    "id": "a71",
+    "nom": "Sedimentation",
+    "prix": 250,
+    "sub": "labo"
+  },
+  {
+    "id": "a38",
+    "nom": "Glycémie",
+    "prix": 300,
+    "sub": "labo"
+  },
+  {
+    "id": "a20",
+    "nom": "Cholestérol",
+    "prix": 400,
+    "sub": "labo"
+  },
+  {
+    "id": "a5",
+    "nom": "Acide Urique",
+    "prix": 400,
+    "sub": "labo"
+  },
+  {
+    "id": "a80",
+    "nom": "V.C.T",
+    "prix": 750,
+    "sub": "labo"
+  },
+  {
+    "id": "a81",
+    "nom": "VIH",
+    "prix": 750,
+    "sub": "labo"
+  },
+  {
+    "id": "a82",
+    "nom": "RPR",
+    "prix": 750,
+    "sub": "labo"
+  },
+  {
+    "id": "a83",
+    "nom": "TS/TC",
+    "prix": 600,
+    "sub": "labo"
+  },
+  {
+    "id": "a14",
+    "nom": "C.R.P",
+    "prix": 1000,
+    "sub": "labo"
+  },
+  {
+    "id": "a1",
+    "nom": "A.S.O",
+    "prix": 600,
+    "sub": "labo"
+  },
+  {
+    "id": "a6",
+    "nom": "Urines",
+    "prix": 500,
+    "sub": "labo"
+  },
+  {
+    "id": "a37",
+    "nom": "Frottis vaginal",
+    "prix": 750,
+    "sub": "labo"
+  },
+  {
+    "id": "a36",
+    "nom": "Frottis Urétral",
+    "prix": 750,
+    "sub": "labo"
+  },
+  {
+    "id": "a19",
+    "nom": "Test Chlamydia",
+    "prix": 1250,
+    "sub": "labo"
+  },
+  {
+    "id": "a57",
+    "nom": "Sérologie H-Pylori",
+    "prix": 750,
+    "sub": "labo"
+  },
+  {
+    "id": "a40",
+    "nom": "H-Pylori (Selles)",
+    "prix": 1250,
+    "sub": "labo"
+  },
+  {
+    "id": "a7",
+    "nom": "Selles",
+    "prix": 500,
+    "sub": "labo"
+  },
+  {
+    "id": "a56",
+    "nom": "Sang Occulte",
+    "prix": 400,
+    "sub": "labo"
+  },
+  {
+    "id": "a58",
+    "nom": "Sickling test",
+    "prix": 400,
+    "sub": "labo"
+  },
+  {
+    "id": "a44",
+    "nom": "Ionogramme",
+    "prix": 1000,
+    "sub": "labo"
+  },
+  {
+    "id": "a11",
+    "nom": "Bilan Lipidique",
+    "prix": 1750,
+    "sub": "labo"
+  },
+  {
+    "id": "a18",
+    "nom": "Chimie Sanguin",
+    "prix": 1500,
+    "sub": "labo"
+  },
+  {
+    "id": "a10",
+    "nom": "Bilan hépatique",
+    "prix": 1750,
+    "sub": "labo"
+  },
+  {
+    "id": "a12",
+    "nom": "Bilan Rénal",
+    "prix": 1750,
+    "sub": "labo"
+  },
+  {
+    "id": "a51",
+    "nom": "PSA",
+    "prix": 750,
+    "sub": "labo"
+  },
+  {
+    "id": "a52",
+    "nom": "PSA Quantitatif",
+    "prix": 1500,
+    "sub": "labo"
+  },
+  {
+    "id": "a8",
+    "nom": "Azote de l'Urée",
+    "prix": 400,
+    "sub": "labo"
+  },
+  {
+    "id": "a21",
+    "nom": "Col. Bleu de Méthylène",
+    "prix": 400,
+    "sub": "labo"
+  },
+  {
+    "id": "a29",
+    "nom": "Créatinine Sérum",
+    "prix": 400,
+    "sub": "labo"
+  },
+  {
+    "id": "a30",
+    "nom": "Créatinine Urine",
+    "prix": 400,
+    "sub": "labo"
+  },
+  {
+    "id": "a35",
+    "nom": "Électrolytes",
+    "prix": 1000,
+    "sub": "labo"
+  },
+  {
+    "id": "a41",
+    "nom": "HDL",
+    "prix": 400,
+    "sub": "labo"
+  },
+  {
+    "id": "a45",
+    "nom": "LDH",
+    "prix": 400,
+    "sub": "labo"
+  },
+  {
+    "id": "a46",
+    "nom": "Lipides totaux",
+    "prix": 400,
+    "sub": "labo"
+  },
+  {
+    "id": "a53",
+    "nom": "Recherche des filaires",
+    "prix": 400,
+    "sub": "labo"
+  },
+  {
+    "id": "a54",
+    "nom": "S.G.O.T",
+    "prix": 400,
+    "sub": "labo"
+  },
+  {
+    "id": "a55",
+    "nom": "S.G.P.T",
+    "prix": 400,
+    "sub": "labo"
+  },
+  {
+    "id": "a69",
+    "nom": "Temps de Saignement (TS)",
+    "prix": 300,
+    "sub": "labo"
+  },
+  {
+    "id": "a71b",
+    "nom": "Vitesse de sédimentation (VS)",
+    "prix": 250,
+    "sub": "labo"
+  },
+  {
+    "id": "a48",
+    "nom": "Oxygène",
+    "prix": 9000,
+    "sub": "oxygene"
+  },
+  {
+    "id": "a22",
+    "nom": "Concentrateur O2",
+    "prix": 2000,
+    "sub": "oxygene"
+  },
+  {
+    "id": "a49",
+    "nom": "Pansement + Brûlure + Débridement",
+    "prix": 1500,
+    "sub": "pansement"
+  },
+  {
+    "id": "a67",
+    "nom": "Suture complexe",
+    "prix": 1000,
+    "sub": "suture"
+  },
+  {
+    "id": "a2",
+    "nom": "Ablation / Épisiotomie",
+    "prix": 500,
+    "sub": "suture"
+  },
+  {
+    "id": "a75",
+    "nom": "Visite de contrôle du chirurgien",
+    "prix": 5000,
+    "sub": "visite"
+  },
+  {
+    "id": "a76",
+    "nom": "Césarienne Simple",
+    "prix": 35000,
+    "sub": "cesarienne"
+  },
+  {
+    "id": "a77",
+    "nom": "Césarienne UC1",
+    "prix": 40000,
+    "sub": "cesarienne"
+  },
+  {
+    "id": "a78",
+    "nom": "Césarienne UC2 + ligature des trompes",
+    "prix": 45000,
+    "sub": "cesarienne"
+  },
+  {
+    "id": "a3",
+    "nom": "Accouchement Gémellaire",
+    "prix": 7000,
+    "sub": "accouchement"
+  },
+  {
+    "id": "a4",
+    "nom": "Accouchement Physiologique",
+    "prix": 4000,
+    "sub": "accouchement"
+  },
+  {
+    "id": "a33",
+    "nom": "Délivrance Placentaire Artificielle",
+    "prix": 2000,
+    "sub": "chirurgie"
+  },
+  {
+    "id": "a13",
+    "nom": "Biopsie col / endomètre",
+    "prix": 3500,
+    "sub": "chirurgie"
+  },
+  {
+    "id": "a15",
+    "nom": "Cathéter + Sac collecteur + procédé",
+    "prix": 1000,
+    "sub": "chirurgie"
+  },
+  {
+    "id": "a16",
+    "nom": "Cathéter + sac collecteur seul",
+    "prix": 750,
+    "sub": "chirurgie"
+  },
+  {
+    "id": "a31",
+    "nom": "Curettage avec anesthésie",
+    "prix": 12000,
+    "sub": "curetage"
+  },
+  {
+    "id": "a32",
+    "nom": "Curettage sans anesthésie",
+    "prix": 8000,
+    "sub": "curetage"
+  },
+  {
+    "id": "a34",
+    "nom": "Drainage",
+    "prix": 1000,
+    "sub": "drainage"
+  },
+  {
+    "id": "a74",
+    "nom": "Séance de Nébulisation",
+    "prix": 600,
+    "sub": "nebulisation"
+  },
+  {
+    "id": "a50",
+    "nom": "Pap Test",
+    "prix": 2000,
+    "sub": "pap"
+  },
+  {
+    "id": "a73",
+    "nom": "Électrocardiogramme (ECG)",
+    "prix": 1500,
+    "sub": "ecg"
+  },
+  {
+    "id": "a59",
+    "nom": "Sonographie Abdo-Pelvienne",
+    "prix": 3000,
+    "sub": "sono"
+  },
+  {
+    "id": "a60",
+    "nom": "Sonographie Abdominale",
+    "prix": 2500,
+    "sub": "sono"
+  },
+  {
+    "id": "a61",
+    "nom": "Sonographie COU",
+    "prix": 2500,
+    "sub": "sono"
+  },
+  {
+    "id": "a62",
+    "nom": "Sonographie Mammaire",
+    "prix": 2500,
+    "sub": "sono"
+  },
+  {
+    "id": "a63",
+    "nom": "Sonographie Obstétrique",
+    "prix": 1250,
+    "sub": "sono"
+  },
+  {
+    "id": "a64",
+    "nom": "Sonographie Pelvienne",
+    "prix": 1250,
+    "sub": "sono"
+  },
+  {
+    "id": "a65",
+    "nom": "Sonographie Prostate",
+    "prix": 2500,
+    "sub": "sono"
+  },
+  {
+    "id": "a66",
+    "nom": "Sonographie Thyroïdes",
+    "prix": 2500,
+    "sub": "sono"
+  }
+];
+
+module.exports = { MEDICAMENTS_PAR_DEFAUT, ACTES_PAR_DEFAUT };
