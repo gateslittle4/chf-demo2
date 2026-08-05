@@ -5,7 +5,7 @@ const { useState, useEffect, useMemo } = React;
 
 const { chf, toEpisodeApi, fromEpisodeApi, generateLocalId, fromPaiementApi } = require('../api/supabase');
 const { firebase, auth, db, LOG_TARGETS_KEY, LOG_DOSSIER_BROUILLON_KEY, enregistrerAudit } = require('../api/firebase');
-const { CONFIG_LITS, CATEGORIES_LISTE } = require('../utils/constants');
+const { CONFIG_LITS, CATEGORIES_LISTE, LISTE_ONG } = require('../utils/constants');
 const { MEDICAMENTS_PAR_DEFAUT, ACTES_PAR_DEFAUT } = require('../utils/defaultCatalog');
 const { formatGourdes, formatDH, formaterNomPropre } = require('../utils/helpers');
 const { chiffrerTexte, dechiffrerTexte } = require('../utils/crypto');
@@ -28,6 +28,7 @@ const CalculateurPanel = require('../components/CalculateurPanel');
 const AchatExpress = require('../components/AchatExpress');
 const AccueilPanel = require('../components/AccueilPanel');
 const AnalyticsPanel = require('../components/AnalyticsPanel');
+const GestionOngPanel = require('../components/GestionOng');
 
 // ========================== COMPOSANT PRINCIPAL ==========================
 function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
@@ -38,6 +39,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   const [paiements, setPaiements] = useState([]);
   const [chargement, setChargement] = useState(true);
   const [ongTargets, setOngTargets] = useState({ "MSF-H": 0, "MSF-F": 0, "ALIMA": 0, "AVSI": 0, "GRID MISSION": 0, "WAY TO HEALTH": 0, "TEAM TASSY": 0 });
+  const [listeOngDocs, setListeOngDocs] = useState([]); // [{id, nom}] — chargé depuis Firestore (collection ong_partenaires)
   const [dossierActif, setDossierActif] = useState(false);
   const [nomPatient, setNomPatient] = useState("");
   const [selectedOng, setSelectedOng] = useState("");
@@ -121,6 +123,23 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   useEffect(() => {
     localStorage.setItem(LOG_TARGETS_KEY, JSON.stringify(ongTargets));
   }, [ongTargets]);
+
+  useEffect(() => {
+    if (!db) return;
+    const unsubscribe = db.collection('ong_partenaires').orderBy('nom').onSnapshot(snapshot => {
+      if (snapshot.empty) {
+        // Première utilisation : amorce la collection avec l'ancienne liste codée en dur, pour ne rien casser.
+        const batch = db.batch();
+        LISTE_ONG.forEach(nom => batch.set(db.collection('ong_partenaires').doc(), { nom, dateAjout: firebase.firestore.FieldValue.serverTimestamp() }));
+        batch.commit().catch(e => console.warn("Amorçage ong_partenaires:", e));
+        return; // le prochain onSnapshot (déclenché par ce commit) mettra à jour l'état
+      }
+      setListeOngDocs(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const listeOngNoms = listeOngDocs.length ? listeOngDocs.map(d => d.nom) : LISTE_ONG;
 
   useEffect(() => {
     if (!chargement) {
@@ -710,7 +729,8 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
           {(userRole === "administrateur" || userRole === "direction") && (
             <><button onClick={() => setOnglet("meds")} className={`px-4 py-2 font-medium border-b-2 ${onglet === "meds" ? "border-white text-white" : "text-[#9FB8A8]"}`}>Tarifs Pharma</button>
               <button onClick={() => setOnglet("actes")} className={`px-4 py-2 font-medium border-b-2 ${onglet === "actes" ? "border-white text-white" : "text-[#9FB8A8]"}`}>Tarifs Actes</button>
-              <button onClick={() => setOnglet("stock")} className={`px-4 py-2 font-medium border-b-2 ${onglet === "stock" ? "border-white text-white" : "text-[#9FB8A8]"}`}>📦 Stock</button></>
+              <button onClick={() => setOnglet("stock")} className={`px-4 py-2 font-medium border-b-2 ${onglet === "stock" ? "border-white text-white" : "text-[#9FB8A8]"}`}>📦 Stock</button>
+              <button onClick={() => setOnglet("ong")} className={`px-4 py-2 font-medium border-b-2 ${onglet === "ong" ? "border-white text-white" : "text-[#9FB8A8]"}`}>🤝 ONG</button></>
           )}
           {userRole === "administrateur" && (
             <button onClick={() => setOnglet("users")} className={`px-4 py-2 font-medium border-b-2 ${onglet === "users" ? "border-white text-white" : "text-[#9FB8A8]"}`}>👥 Utilisateurs</button>
@@ -732,7 +752,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
           />
         )}
         {onglet === "dashboard_direction" && (userRole === "direction" || userRole === "administrateur") && <DashboardDirectionPanel verifications={verifications} paiements={paiements} medicaments={medicaments} />}
-        {onglet === "dashboard_caisse" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && <DashboardCaissePanel verifications={verifications} paiements={paiements} userDisplayName={userDisplayName} />}
+        {onglet === "dashboard_caisse" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && <DashboardCaissePanel verifications={verifications} paiements={paiements} userDisplayName={userDisplayName} listeOng={listeOngNoms} />}
         {onglet === "calcul" && modePreValidation && (
           <div className="bg-white p-6 rounded-xl border border-emerald-400 shadow-xl space-y-4">
             <div className="text-center border-b pb-2"><span className="text-emerald-800 font-bold uppercase text-[11px]">Contrôle final</span><h3 className="text-lg font-black">📋 Totaux analytiques</h3><p className="text-xs text-gray-500">{nomPatient} | {selectedOng}</p></div>
@@ -768,13 +788,15 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
               dossierId={dossierId} setDossierId={setDossierId} patientsExistants={verifications} onChargerPatientExistant={chargerDossierExistant}
               paiementEffectue={paiementEffectue} setPaiementEffectue={setPaiementEffectue}
               showToast={showToast} onSuspendreDossier={suspendreDossier} onChangerTypeOng={changerTypeOng}
+              listeOng={listeOngNoms}
             />
         )}
-        {onglet === "verifie" && <HistoriqueVerifPanel verifications={verifications} setVerifications={setVerifications} onChargerPourModif={réimporterDossierDepuisArchives} onSupprimer={supprimerDossierArchive} filtreInitialNom={filtreArchivesInitialNom} clearFiltreInitialNom={() => setFiltreArchivesInitialNom("")} dossierPourExport={dossierPourExport} setDossierPourExport={setDossierPourExport} userRole={userRole} showToast={showToast} onChangerTypeOng={changerTypeOngPourDossier} />}
+        {onglet === "verifie" && <HistoriqueVerifPanel verifications={verifications} setVerifications={setVerifications} onChargerPourModif={réimporterDossierDepuisArchives} onSupprimer={supprimerDossierArchive} filtreInitialNom={filtreArchivesInitialNom} clearFiltreInitialNom={() => setFiltreArchivesInitialNom("")} dossierPourExport={dossierPourExport} setDossierPourExport={setDossierPourExport} userRole={userRole} showToast={showToast} onChangerTypeOng={changerTypeOngPourDossier} listeOng={listeOngNoms} />}
         {onglet === "analyse" && (userRole === "administrateur" || userRole === "direction") && <AnalyticsPanel verifications={verifications} />}
         {onglet === "meds" && (userRole === "administrateur" || userRole === "direction") && <GrilleEditionPanel titre="de la Pharmacie" items={medicaments} setItems={setMedicaments} collectionName="medicaments" showToast={showToast} />}
         {onglet === "actes" && (userRole === "administrateur" || userRole === "direction") && <GrilleEditionPanel titre="des Actes" items={actes} setItems={setActes} collectionName="actes" showToast={showToast} />}
         {onglet === "stock" && (userRole === "administrateur" || userRole === "direction") && <GestionStockPanel items={medicaments} setItems={setMedicaments} showToast={showToast} />}
+        {onglet === "ong" && (userRole === "administrateur" || userRole === "direction") && <GestionOngPanel listeOngDocs={listeOngDocs} showToast={showToast} />}
         {onglet === "users" && userRole === "administrateur" && <GestionUtilisateursPanel showToast={showToast} />}
         {onglet === "demandes" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && <DemandesPanel userRole={userRole} showToast={showToast} />}
       </main>
