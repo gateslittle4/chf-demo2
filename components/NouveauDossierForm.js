@@ -2,7 +2,6 @@
 // Purement présentationnel : toute la logique (états, soumission) reste dans
 // CalculateurPanel.js, qui passe tout en props. Extrait pour alléger ce gros fichier.
 const React = window.React;
-const { LISTE_ONG } = require('../utils/constants');
 const { Search } = require('../utils/icons');
 
 function NouveauDossierForm({
@@ -11,7 +10,7 @@ function NouveauDossierForm({
   inputNom, setInputNom, inputTypePatient, setInputTypePatient, inputOng, setInputOng,
   serviceChoisi, setServiceChoisi,
   inputNumDossier, setInputNumDossier, inputDateNaissance, setInputDateNaissance,
-  inputTelephone, setInputTelephone
+  inputTelephone, setInputTelephone, listeOng
 }) {
   return (
     <div className="bg-white p-6 rounded-xl border shadow-sm space-y-4">
@@ -36,7 +35,7 @@ function NouveauDossierForm({
           <div className="flex flex-col gap-1"><label className="text-[11px] font-bold uppercase text-gray-400">Nom complet</label><input type="text" value={inputNom} onChange={e=>setInputNom(e.target.value)} placeholder="Nom et prénom..." className="border rounded-lg p-2 text-xs outline-none" required /></div>
           <div className="flex flex-col gap-1"><label className="text-[11px] font-bold uppercase text-gray-400">Type de patient</label><select value={inputTypePatient} onChange={e=>setInputTypePatient(e.target.value)} className="border rounded-lg p-2 text-xs bg-white outline-none"><option value="ONG">🏥 Patient ONG</option><option value="PRIVE">💳 Patient Privé</option></select></div>
           <div className="flex flex-col gap-1"><label className="text-[11px] font-bold uppercase text-gray-400">Service prévu</label><select value={serviceChoisi} onChange={e=>setServiceChoisi(e.target.value)} className="border rounded-lg p-2 text-xs bg-white outline-none"><option value="">-- Non précisé (déduit automatiquement) --</option><option value="Urgences">🚨 Urgences</option><option value="Pédiatrie">🧒 Pédiatrie</option><option value="Général">🩺 Général</option><option value="Chirurgie">🔪 Chirurgie</option><option value="Maternité">🤰 Maternité</option><option value="Néonatologie">👶 Néonatologie</option></select><p className="text-[9px] text-gray-400">Aide le tableau de bord Pilotage CHF à classer ce dossier tout de suite, même avant qu'un acte soit facturé.</p></div>
-          <div className="flex flex-col gap-1"><label className="text-[11px] font-bold uppercase text-gray-400">ONG partenaire</label><select value={inputOng} onChange={e=>setInputOng(e.target.value)} className="border rounded-lg p-2 text-xs bg-white outline-none" disabled={inputTypePatient !== "ONG"}><option value="">-- Sélectionner --</option>{LISTE_ONG.map(o=><option key={o} value={o}>{o}</option>)}</select></div>
+          <div className="flex flex-col gap-1"><label className="text-[11px] font-bold uppercase text-gray-400">ONG partenaire</label><select value={inputOng} onChange={e=>setInputOng(e.target.value)} className="border rounded-lg p-2 text-xs bg-white outline-none" disabled={inputTypePatient !== "ONG"}><option value="">-- Sélectionner --</option>{listeOng.map(o=><option key={o} value={o}>{o}</option>)}</select></div>
           <div className="flex flex-col gap-1"><label className="text-[11px] font-bold uppercase text-gray-400">Numéro de dossier</label><input type="text" value={inputNumDossier} onChange={e=>setInputNumDossier(e.target.value)} placeholder="ex: F-2024-045" className="border rounded-lg p-2 text-xs outline-none" /></div>
           <div className="flex flex-col gap-1"><label className="text-[11px] font-bold uppercase text-gray-400">Date de naissance</label><input type="date" value={inputDateNaissance} onChange={e=>setInputDateNaissance(e.target.value)} className="border rounded-lg p-2 text-xs outline-none" /></div>
           <div className="flex flex-col gap-1"><label className="text-[11px] font-bold uppercase text-gray-400">Téléphone</label><input type="text" value={inputTelephone} onChange={e=>setInputTelephone(e.target.value)} placeholder="509-1234-5678" className="border rounded-lg p-2 text-xs outline-none" /></div>

@@ -1,12 +1,13 @@
 // components/ArchivesPanel.js
 const React = window.React;
 const { useState, useEffect, useMemo } = React;
-const { LISTE_ONG, CATEGORIES_LISTE } = require('../utils/constants');
+const { CATEGORIES_LISTE } = require('../utils/constants');
 const { formatGourdes, formatDH, echapperHTML } = require('../utils/helpers');
 const { Eye, Pencil, Trash2, Printer, Clock, FolderOpen, X, Download, Check } = require('../utils/icons');
 const { chf, toEpisodeApi } = require('../api/supabase');
+const { LOGO_CHF_BASE64 } = require('../utils/logoChf');
 
-function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, dossierPourExport, setDossierPourExport, userRole, showToast, onChangerTypeOng }) {
+function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, dossierPourExport, setDossierPourExport, userRole, showToast, onChangerTypeOng, listeOng }) {
   const [focusedVerif, setFocusedVerif] = useState(null);
   const [editTypeArchiveOuvert, setEditTypeArchiveOuvert] = useState(false);
   const [nouveauTypeArchive, setNouveauTypeArchive] = useState("ONG");
@@ -47,10 +48,10 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     });
   }, [verifications, filtreType, filtreOng, rechercheNomPatient, filtreDateDebut, filtreDateFin, filtreCategorie, filtreStatut]);
 
-  // Styles Excel réutilisables (repris d'une version perfectionnée par l'utilisateur)
+  // Styles Excel réutilisables (format ExcelJS — remplace xlsx-js-style, qui ne supporte pas les images)
   const EXCEL_STYLES = {
-    titre: { font: { bold: true, sz: 18 }, alignment: { horizontal: "center", vertical: "center" } },
-    sousTitre: { font: { sz: 11 }, alignment: { horizontal: "center", vertical: "center" } },
+    titre: { font: { bold: true, size: 18 }, alignment: { horizontal: "center", vertical: "center" } },
+    sousTitre: { font: { size: 11 }, alignment: { horizontal: "center", vertical: "center" } },
     gras: { font: { bold: true } },
     teteColonne: {
       font: { bold: true }, alignment: { horizontal: "center", vertical: "center" },
@@ -60,7 +61,17 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     celluleNombre: { alignment: { horizontal: "right" }, numFmt: "#,##0", border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } },
     celluleTotal: { font: { bold: true }, alignment: { horizontal: "right" }, numFmt: "\"HTG \"#,##0", border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } },
     grandTotalHtg: { font: { bold: true }, alignment: { horizontal: "right" }, numFmt: "\"HTG \"#,##0", border: { top: { style: "medium" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } },
-    celluleFinaleGras: { font: { bold: true, sz: 11 }, fill: { fgColor: { rgb: "D0D0D0" } }, alignment: { horizontal: "right" }, numFmt: "\"HTG \"#,##0", border: { top: { style: "medium" }, bottom: { style: "double" }, left: { style: "thin" }, right: { style: "thin" } } }
+    celluleFinaleGras: { font: { bold: true, size: 11 }, fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFD0D0D0" } }, alignment: { horizontal: "right" }, numFmt: "\"HTG \"#,##0", border: { top: { style: "medium" }, bottom: { style: "double" }, left: { style: "thin" }, right: { style: "thin" } } }
+  };
+
+  // Applique un style nommé (EXCEL_STYLES.xxx) à une cellule ExcelJS
+  const appliquerStyle = (cell, style) => {
+    if (!style) return;
+    if (style.font) cell.font = style.font;
+    if (style.alignment) cell.alignment = style.alignment;
+    if (style.border) cell.border = style.border;
+    if (style.numFmt) cell.numFmt = style.numFmt;
+    if (style.fill) cell.fill = style.fill;
   };
 
   // Libellés d'export courts, alignés sur le modèle Excel réel du CHF (pas les labels internes de l'app)
@@ -104,24 +115,45 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       const colonnesExport = Object.keys(LABELS_EXPORT).filter(k => clesVues.has(k)).map(k => ({ key: k, label: LABELS_EXPORT[k] }));
       if (autresUtilise) colonnesExport.push({ key: '__autres__', label: 'Autres' });
 
-      // Étape C : en-tête du document
-      const ws_data = [];
-      ws_data.push([{ v: "CENTRE HOSPITALIER DE FONTAINE", s: EXCEL_STYLES.titre }]);
-      ws_data.push([{ v: "#13, Fontaine Duvivier, Cite Soleil", s: EXCEL_STYLES.sousTitre }]);
-      ws_data.push([{ v: "tel: (509) 3647-0563 / 2226-8900", s: EXCEL_STYLES.sousTitre }]);
-      ws_data.push([{ v: "centrehfontaine@gmail.com", s: EXCEL_STYLES.sousTitre }]);
-      ws_data.push([]);
+      // Étape C : classeur ExcelJS + en-tête du document
+      // Le logo flotte au-dessus de l'en-tête (coin haut-gauche), sans réserver de colonne dédiée dans le tableau.
+      const wb = new window.ExcelJS.Workbook();
+      const ws = wb.addWorksheet("Facturation");
+      const derniereCol = colonnesExport.length + 3; // Nom(1) + Date(2) + colonnesExport(n) + Total
+
+      let r = 1;
+      const ligneCentree = (texte, style) => {
+        ws.mergeCells(r, 1, r, derniereCol);
+        const cell = ws.getCell(r, 1);
+        cell.value = texte;
+        appliquerStyle(cell, style);
+        r++;
+      };
+      ligneCentree("CENTRE HOSPITALIER DE FONTAINE", EXCEL_STYLES.titre);
+      ligneCentree("#13, Fontaine Duvivier, Cite Soleil", EXCEL_STYLES.sousTitre);
+      ligneCentree("tel: (509) 3647-0563 / 2226-8900", EXCEL_STYLES.sousTitre);
+      ligneCentree("centrehfontaine@gmail.com", EXCEL_STYLES.sousTitre);
+      r++; // ligne vide
 
       const now = new Date();
       const moisTexte = now.toLocaleString('fr-FR', { month: 'long' }).toUpperCase();
-      ws_data.push([{ v: "DATE D'ADMISSION :", s: EXCEL_STYLES.gras }, { v: `${moisTexte} ${now.getFullYear()}` }]);
-      ws_data.push([{ v: "FACTURE", s: EXCEL_STYLES.gras }, { v: `#${Math.floor(Math.random()*10000)}` }, { v: "" }, { v: "" }, { v: ongCible, s: EXCEL_STYLES.gras }]);
-      ws_data.push([]);
+      appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.gras);
+      ws.getCell(r, 1).value = "DATE D'ADMISSION :";
+      ws.getCell(r, 2).value = `${moisTexte} ${now.getFullYear()}`;
+      r++;
+      appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.gras);
+      ws.getCell(r, 1).value = "FACTURE";
+      ws.getCell(r, 2).value = `#${Math.floor(Math.random()*10000)}`;
+      ws.getCell(r, 5).value = ongCible;
+      appliquerStyle(ws.getCell(r, 5), EXCEL_STYLES.gras);
+      r++;
+      r++; // ligne vide
 
-      const headersLigne = [{ v: "Nom et Prenom", s: EXCEL_STYLES.teteColonne }, { v: "Date", s: EXCEL_STYLES.teteColonne }];
-      colonnesExport.forEach(c => headersLigne.push({ v: c.label, s: EXCEL_STYLES.teteColonne }));
-      headersLigne.push({ v: "Total", s: EXCEL_STYLES.teteColonne });
-      ws_data.push(headersLigne);
+      appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.teteColonne); ws.getCell(r, 1).value = "Nom et Prenom";
+      appliquerStyle(ws.getCell(r, 2), EXCEL_STYLES.teteColonne); ws.getCell(r, 2).value = "Date";
+      colonnesExport.forEach((c, i) => { const cell = ws.getCell(r, 3 + i); cell.value = c.label; appliquerStyle(cell, EXCEL_STYLES.teteColonne); });
+      { const cell = ws.getCell(r, 3 + colonnesExport.length); cell.value = "Total"; appliquerStyle(cell, EXCEL_STYLES.teteColonne); }
+      r++;
 
       // Étape D : une ligne par dossier
       const totalsParColonne = {};
@@ -140,56 +172,66 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
           totalPatient += f.totalGlobal || 0;
         });
 
-        const row = [{ v: doc.nomPatient, s: EXCEL_STYLES.celluleStandard }, { v: doc.periodeSejourString || doc.dateHeure || "—", s: EXCEL_STYLES.celluleStandard }];
-        colonnesExport.forEach(c => {
+        appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.celluleStandard); ws.getCell(r, 1).value = doc.nomPatient;
+        appliquerStyle(ws.getCell(r, 2), EXCEL_STYLES.celluleStandard); ws.getCell(r, 2).value = doc.periodeSejourString || doc.dateHeure || "—";
+        colonnesExport.forEach((c, i) => {
           totalsParColonne[c.key] += totalsPatient[c.key] || 0;
-          row.push(!totalsPatient[c.key] ? { v: "", s: EXCEL_STYLES.celluleStandard } : { v: totalsPatient[c.key], t: 'n', s: EXCEL_STYLES.celluleNombre });
+          const cell = ws.getCell(r, 3 + i);
+          if (!totalsPatient[c.key]) { cell.value = ""; appliquerStyle(cell, EXCEL_STYLES.celluleStandard); }
+          else { cell.value = totalsPatient[c.key]; appliquerStyle(cell, EXCEL_STYLES.celluleNombre); }
         });
-        row.push({ v: totalPatient, t: 'n', s: EXCEL_STYLES.celluleTotal });
-        ws_data.push(row);
+        { const cell = ws.getCell(r, 3 + colonnesExport.length); cell.value = totalPatient; appliquerStyle(cell, EXCEL_STYLES.celluleTotal); }
+        r++;
       });
 
       // Étape E : GRAND TOTAL, puis réductions/dons si activés dans l'interface
-      const totalRow = [{ v: "GRAND TOTAL", s: EXCEL_STYLES.grandTotalHtg }, { v: "", s: EXCEL_STYLES.grandTotalHtg }];
-      colonnesExport.forEach(c => totalRow.push({ v: totalsParColonne[c.key], t: 'n', s: EXCEL_STYLES.grandTotalHtg }));
-      totalRow.push({ v: grandTotalGeneral, t: 'n', s: EXCEL_STYLES.grandTotalHtg });
-      ws_data.push(totalRow);
+      appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.grandTotalHtg); ws.getCell(r, 1).value = "GRAND TOTAL";
+      appliquerStyle(ws.getCell(r, 2), EXCEL_STYLES.grandTotalHtg);
+      colonnesExport.forEach((c, i) => { const cell = ws.getCell(r, 3 + i); cell.value = totalsParColonne[c.key]; appliquerStyle(cell, EXCEL_STYLES.grandTotalHtg); });
+      { const cell = ws.getCell(r, 3 + colonnesExport.length); cell.value = grandTotalGeneral; appliquerStyle(cell, EXCEL_STYLES.grandTotalHtg); }
+      r++;
 
       const rabaisVal = appliqueRabais10 ? Math.round(grandTotalGeneral * 0.10) : 0;
       const donsVal = parseFloat(montantDonIntrants) || 0;
 
       if (rabaisVal > 0) {
-        const ligneRabais = [{ v: "Réductions 10%", s: EXCEL_STYLES.gras }, { v: "" }];
-        colonnesExport.forEach(c => ligneRabais.push({ v: "" }));
-        ligneRabais.push({ v: rabaisVal, t: 'n', s: EXCEL_STYLES.celluleTotal });
-        ws_data.push(ligneRabais);
+        appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.gras); ws.getCell(r, 1).value = "Réductions 10%";
+        const cell = ws.getCell(r, 3 + colonnesExport.length); cell.value = rabaisVal; appliquerStyle(cell, EXCEL_STYLES.celluleTotal);
+        r++;
       }
       if (donsVal > 0) {
-        const ligneDons = [{ v: "Dons / Intrants", s: EXCEL_STYLES.gras }, { v: "" }];
-        colonnesExport.forEach(c => ligneDons.push({ v: "" }));
-        ligneDons.push({ v: donsVal, t: 'n', s: EXCEL_STYLES.celluleTotal });
-        ws_data.push(ligneDons);
+        appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.gras); ws.getCell(r, 1).value = "Dons / Intrants";
+        const cell = ws.getCell(r, 3 + colonnesExport.length); cell.value = donsVal; appliquerStyle(cell, EXCEL_STYLES.celluleTotal);
+        r++;
       }
       if (rabaisVal > 0 || donsVal > 0) {
-        const ligneNet = [{ v: "MONTANT NET DÛ", s: EXCEL_STYLES.celluleFinaleGras }, { v: "", s: EXCEL_STYLES.celluleFinaleGras }];
-        colonnesExport.forEach(c => ligneNet.push({ v: "", s: EXCEL_STYLES.celluleFinaleGras }));
-        ligneNet.push({ v: grandTotalGeneral - rabaisVal - donsVal, t: 'n', s: EXCEL_STYLES.celluleFinaleGras });
-        ws_data.push(ligneNet);
+        appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.celluleFinaleGras); ws.getCell(r, 1).value = "MONTANT NET DÛ";
+        appliquerStyle(ws.getCell(r, 2), EXCEL_STYLES.celluleFinaleGras);
+        colonnesExport.forEach((c, i) => appliquerStyle(ws.getCell(r, 3 + i), EXCEL_STYLES.celluleFinaleGras));
+        const cell = ws.getCell(r, 3 + colonnesExport.length); cell.value = grandTotalGeneral - rabaisVal - donsVal; appliquerStyle(cell, EXCEL_STYLES.celluleFinaleGras);
+        r++;
       }
 
-      // Étape F : mise en forme de la feuille + téléchargement
-      const ws = window.XLSX.utils.aoa_to_sheet(ws_data);
-      ws['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: colonnesExport.length + 2 } },
-        { s: { r: 1, c: 0 }, e: { r: 1, c: colonnesExport.length + 2 } },
-        { s: { r: 2, c: 0 }, e: { r: 2, c: colonnesExport.length + 2 } },
-        { s: { r: 3, c: 0 }, e: { r: 3, c: colonnesExport.length + 2 } },
-      ];
-      ws['!cols'] = [{ wch: 26 }, { wch: 20 }, ...colonnesExport.map(() => ({ wch: 12 })), { wch: 16 }];
+      // Étape F : largeurs de colonnes, logo CHF flottant au-dessus de l'en-tête (à gauche, avant la ligne du mois), puis téléchargement
+      ws.getColumn(1).width = 26;
+      ws.getColumn(2).width = 20;
+      colonnesExport.forEach((c, i) => { ws.getColumn(3 + i).width = 12; });
+      ws.getColumn(3 + colonnesExport.length).width = 16;
+      for (let i = 1; i <= 4; i++) ws.getRow(i).height = 20;
 
-      const wb = window.XLSX.utils.book_new();
-      window.XLSX.utils.book_append_sheet(wb, ws, "Facturation");
-      window.XLSX.writeFile(wb, `Rapport_${ongCible.replace(/\s+/g, '_')}_${moisTexte}_${now.getFullYear()}.xlsx`);
+      const logoId = wb.addImage({ base64: LOGO_CHF_BASE64, extension: 'png' });
+      ws.addImage(logoId, { tl: { col: 0, row: 0 }, ext: { width: 90, height: 102 } });
+
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const urlTelechargement = URL.createObjectURL(blob);
+      const lien = document.createElement('a');
+      lien.href = urlTelechargement;
+      lien.download = `Rapport_${ongCible.replace(/\s+/g, '_')}_${moisTexte}_${now.getFullYear()}.xlsx`;
+      document.body.appendChild(lien);
+      lien.click();
+      document.body.removeChild(lien);
+      setTimeout(() => URL.revokeObjectURL(urlTelechargement), 1000);
 
       // Étape G : verrouille les dossiers exportés pour éviter qu'ils soient modifiés/supprimés après facturation
       const idsExportes = listeDossiersONG.map(d => d.id);
@@ -221,7 +263,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       if (key === 'hospit' && fiche.exeat) { return `<tr><td>Hébergement (${fiche.exeat.nbJours}j)</td><td class="qte">${fiche.exeat.nbJours}</td><td class="prix">${formatGourdes(fiche.exeat.prixParJour)}</td><td class="sous-total">${formatGourdes(val)}</td></tr>`; }
       return `<tr><td>${label}</td><td class="qte">1</td><td class="prix">${formatGourdes(val)}</td><td class="sous-total">${formatGourdes(val)}</td></tr>`;
     }).join('') : '';
-    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N°${fiche.numeroFiche}</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:12px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:20px;margin:4px 0;}.entete p{margin:2px 0;font-size:11px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:11px;margin-bottom:6px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:11px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:10px;text-transform:uppercase;}.total{font-weight:bold;font-size:16px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:9px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.info-patient{font-size:10px;margin-bottom:4px;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p><p>${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</p></div><div class="info"><span>Patient: ${echapperHTML(focusedVerif.nomPatient)}</span><span>${echapperHTML(focusedVerif.ongPartenaire || 'Privé')}</span></div><div class="info"><span>Fiche N°${fiche.numeroFiche}</span><span>Mode: ${echapperHTML(fiche.modePaiement || 'cash').toUpperCase()}</span></div><div class="info info-patient"><span>📞 ${echapperHTML(focusedVerif.telephone || 'N/R')}</span><span>📁 ${echapperHTML(focusedVerif.numDossier || 'N/R')}</span></div><div class="info info-patient"><span>Type: ${focusedVerif.typePatient === 'ONG' ? 'ONG' : 'Privé'}</span><span>Enregistré par: ${echapperHTML(fiche.creePar || 'inconnu')}</span></div>${fiche.exeat ? `<p style="font-size:10px; margin:4px 0;"><strong>Séjour:</strong> ${fiche.exeat.dateEntree.split('-').reverse().slice(0,2).join('/')} → ${fiche.exeat.dateSortie.split('-').reverse().slice(0,2).join('/')}</p>` : ''}<table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${hasLignes ? lignesHTML : fallbackHTML}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes<br/>${formatDH(fiche.totalGlobal)} DH</div>${fiche.solde && fiche.solde > 0 ? `<p style="font-size:12px; color:red;"><strong>Solde restant :</strong> ${formatGourdes(fiche.solde)} Gdes</p>` : ''}<div class="footer">Merci de votre visite !<br/>CHF Système Hospitalier – ${new Date().getFullYear()}</div></body></html>`;
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N°${fiche.numeroFiche}</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:13px;margin-bottom:6px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.info-patient{font-size:12px;margin-bottom:4px;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p><p>${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</p></div><div class="info"><span>Patient: ${echapperHTML(focusedVerif.nomPatient)}</span><span>${focusedVerif.typePatient === 'ONG' ? echapperHTML(focusedVerif.ongPartenaire || 'N/R') : 'Privé'}</span></div><div class="info"><span>Fiche N°${fiche.numeroFiche}</span><span>Mode: ${echapperHTML(fiche.modePaiement || 'cash').toUpperCase()}</span></div><div class="info info-patient"><span>📞 ${echapperHTML(focusedVerif.telephone || 'N/R')}</span><span>📁 ${echapperHTML(focusedVerif.numDossier || 'N/R')}</span></div><div class="info info-patient"><span>Type: ${focusedVerif.typePatient === 'ONG' ? 'Partenaire' : 'Privé'}</span><span>Enregistré par: ${echapperHTML(fiche.creePar || 'inconnu')}</span></div>${fiche.exeat ? `<p style="font-size:10px; margin:4px 0;"><strong>Séjour:</strong> ${fiche.exeat.dateEntree.split('-').reverse().slice(0,2).join('/')} → ${fiche.exeat.dateSortie.split('-').reverse().slice(0,2).join('/')}</p>` : ''}<table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${hasLignes ? lignesHTML : fallbackHTML}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes<br/>${formatDH(fiche.totalGlobal)} DH</div>${fiche.solde && fiche.solde > 0 ? `<p style="font-size:12px; color:red;"><strong>Solde restant :</strong> ${formatGourdes(fiche.solde)} Gdes</p>` : ''}<div class="footer">Merci de votre visite !<br/>CHF Système Hospitalier – ${new Date().getFullYear()}</div></body></html>`;
     const win = window.open('', '_blank', 'width=500,height=700');
     if (!win) { showToast("Autorisez les pop-ups.", "error"); return; }
     win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 500);
@@ -244,7 +286,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     <div className="space-y-4 text-xs">
       <div className="bg-white p-3 rounded-xl border shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         <div className="flex flex-col gap-1"><label className="text-[10px] font-bold text-gray-400 uppercase">Type</label><select value={filtreType} onChange={e => setFiltreType(e.target.value)} className="border rounded-lg p-1.5 bg-white outline-none"><option value="">Tous</option><option value="ONG">🏥 ONG</option><option value="PRIVE">💳 Privé</option></select></div>
-        <div className="flex flex-col gap-1"><label className="text-[10px] font-bold text-gray-400 uppercase">ONG</label><select value={filtreOng} onChange={e => setFiltreOng(e.target.value)} className="border rounded-lg p-1.5 bg-white outline-none" disabled={filtreType === "PRIVE"}><option value="">Tous</option>{LISTE_ONG.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
+        <div className="flex flex-col gap-1"><label className="text-[10px] font-bold text-gray-400 uppercase">ONG</label><select value={filtreOng} onChange={e => setFiltreOng(e.target.value)} className="border rounded-lg p-1.5 bg-white outline-none" disabled={filtreType === "PRIVE"}><option value="">Tous</option>{listeOng.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
         <div className="flex flex-col gap-1"><label className="text-[10px] font-bold text-gray-400 uppercase">Nom</label><input type="text" value={rechercheNomPatient} onChange={e => setRechercheNomPatient(e.target.value)} placeholder="Nom..." className="border rounded-lg p-1.5 outline-none" /></div>
         <div className="flex flex-col gap-1"><label className="text-[10px] font-bold text-gray-400 uppercase">Date début</label><input type="date" value={filtreDateDebut} onChange={e => setFiltreDateDebut(e.target.value)} className="border rounded-lg p-1.5 bg-white outline-none" /></div>
         <div className="flex flex-col gap-1"><label className="text-[10px] font-bold text-gray-400 uppercase">Date fin</label><input type="date" value={filtreDateFin} onChange={e => setFiltreDateFin(e.target.value)} className="border rounded-lg p-1.5 bg-white outline-none" /></div>
@@ -257,7 +299,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
         <div className="bg-white p-4 rounded-xl border border-purple-300 shadow-sm space-y-3">
           <h3 className="font-black text-purple-950 text-xs uppercase tracking-wider">💼 Clôture & Facturation</h3>
           <div className="flex flex-wrap gap-2 items-end">
-            <select value={dossierPourExport||""} onChange={e=>setDossierPourExport(e.target.value||null)} className="border rounded-lg p-1.5 text-xs bg-white font-bold outline-none"><option value="">-- Partenaire --</option>{LISTE_ONG.map(o=><option key={o} value={o}>{o}</option>)}</select>
+            <select value={dossierPourExport||""} onChange={e=>setDossierPourExport(e.target.value||null)} className="border rounded-lg p-1.5 text-xs bg-white font-bold outline-none"><option value="">-- Partenaire --</option>{listeOng.map(o=><option key={o} value={o}>{o}</option>)}</select>
             {dossierPourExport && (
               <div className="flex flex-wrap gap-4 items-center bg-white p-2 rounded-lg border border-dashed shadow-sm">
                 <label className="flex items-center gap-1 font-bold text-purple-900 cursor-pointer"><input type="checkbox" checked={appliqueRabais10} onChange={e=>setAppliqueRabais10(e.target.checked)} className="rounded" /> Rabais 10%</label>
@@ -334,7 +376,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                 </select>
                 {nouveauTypeArchive === "ONG" && (
                   <select value={nouvelOngArchive} onChange={e=>setNouvelOngArchive(e.target.value)} className="border rounded p-1 text-xs bg-white">
-                    <option value="">-- ONG --</option>{LISTE_ONG.map(o => <option key={o} value={o}>{o}</option>)}
+                    <option value="">-- ONG --</option>{listeOng.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
                 )}
                 <button onClick={async ()=>{ await onChangerTypeOng(focusedVerif.id, nouveauTypeArchive, nouveauTypeArchive==="ONG"?nouvelOngArchive:""); setFocusedVerif(f => f ? { ...f, typePatient: nouveauTypeArchive, ongPartenaire: nouveauTypeArchive==="ONG"?nouvelOngArchive:"" } : f); setEditTypeArchiveOuvert(false); }} className="bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded"><Check size={10}/></button>

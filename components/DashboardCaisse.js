@@ -1,11 +1,11 @@
 // components/DashboardCaisse.js
 const React = window.React;
 const { useState, useMemo } = React;
-const { LISTE_ONG } = require('../utils/constants');
+// utils/constants n'est plus requis directement ici — la liste des ONG vient en prop (listeOng).
 const { formatGourdes, echapperHTML } = require('../utils/helpers');
 const { Printer } = require('../utils/icons');
 
-function DashboardCaissePanel({ verifications, paiements, userDisplayName }) {
+function DashboardCaissePanel({ verifications, paiements, userDisplayName, listeOng }) {
   const [filtreDateDebut, setFiltreDateDebut] = useState("");
   const [filtreDateFin, setFiltreDateFin] = useState("");
   const [filtreMode, setFiltreMode] = useState("");
@@ -67,7 +67,7 @@ function DashboardCaissePanel({ verifications, paiements, userDisplayName }) {
         </div>
         <div><label className="text-[10px] font-bold text-gray-400">ONG</label>
           <select value={filtreOng} onChange={e=>setFiltreOng(e.target.value)} className="border rounded p-1.5 w-full bg-white">
-            <option value="">Toutes</option>{LISTE_ONG.map(o => <option key={o} value={o}>{o}</option>)}
+            <option value="">Toutes</option>{listeOng.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
         </div>
       </div>

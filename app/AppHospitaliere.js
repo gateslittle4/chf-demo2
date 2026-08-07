@@ -5,7 +5,7 @@ const { useState, useEffect, useMemo } = React;
 
 const { chf, toEpisodeApi, fromEpisodeApi, generateLocalId, fromPaiementApi } = require('../api/supabase');
 const { firebase, auth, db, LOG_TARGETS_KEY, LOG_DOSSIER_BROUILLON_KEY, enregistrerAudit } = require('../api/firebase');
-const { CONFIG_LITS, CATEGORIES_LISTE } = require('../utils/constants');
+const { CONFIG_LITS, CATEGORIES_LISTE, LISTE_ONG } = require('../utils/constants');
 const { MEDICAMENTS_PAR_DEFAUT, ACTES_PAR_DEFAUT } = require('../utils/defaultCatalog');
 const { formatGourdes, formatDH, formaterNomPropre } = require('../utils/helpers');
 const { chiffrerTexte, dechiffrerTexte } = require('../utils/crypto');
@@ -28,6 +28,7 @@ const CalculateurPanel = require('../components/CalculateurPanel');
 const AchatExpress = require('../components/AchatExpress');
 const AccueilPanel = require('../components/AccueilPanel');
 const AnalyticsPanel = require('../components/AnalyticsPanel');
+const GestionOngPanel = require('../components/GestionOng');
 
 // ========================== COMPOSANT PRINCIPAL ==========================
 function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
@@ -38,6 +39,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   const [paiements, setPaiements] = useState([]);
   const [chargement, setChargement] = useState(true);
   const [ongTargets, setOngTargets] = useState({ "MSF-H": 0, "MSF-F": 0, "ALIMA": 0, "AVSI": 0, "GRID MISSION": 0, "WAY TO HEALTH": 0, "TEAM TASSY": 0 });
+  const [listeOngDocs, setListeOngDocs] = useState([]); // [{id, nom}] — chargé depuis Firestore (collection ong_partenaires)
   const [dossierActif, setDossierActif] = useState(false);
   const [nomPatient, setNomPatient] = useState("");
   const [selectedOng, setSelectedOng] = useState("");
@@ -46,7 +48,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   const [dateNaissance, setDateNaissance] = useState("");
   const [telephone, setTelephone] = useState("");
   const [fichesDossier, setFichesDossier] = useState([]);
-  const [idFicheEnCoursDEdition, setIdFicheEnCoursDEdition] = useState(null);
+  const [idFicheEnCoursDEdition, setIdFicheEnCoursDEdition] = useState(null); // ID de la fiche en édition
   const [modePreValidation, setModePreValidation] = useState(false);
   const [lignesCalcul, setLignesCalcul] = useState([]);
   const [dateEntree1, setDateEntree1] = useState("");
@@ -123,6 +125,23 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   }, [ongTargets]);
 
   useEffect(() => {
+    if (!db) return;
+    const unsubscribe = db.collection('ong_partenaires').orderBy('nom').onSnapshot(snapshot => {
+      if (snapshot.empty) {
+        // Première utilisation : amorce la collection avec l'ancienne liste codée en dur, pour ne rien casser.
+        const batch = db.batch();
+        LISTE_ONG.forEach(nom => batch.set(db.collection('ong_partenaires').doc(), { nom, dateAjout: firebase.firestore.FieldValue.serverTimestamp() }));
+        batch.commit().catch(e => console.warn("Amorçage ong_partenaires:", e));
+        return; // le prochain onSnapshot (déclenché par ce commit) mettra à jour l'état
+      }
+      setListeOngDocs(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const listeOngNoms = listeOngDocs.length ? listeOngDocs.map(d => d.nom) : LISTE_ONG;
+
+  useEffect(() => {
     if (!chargement) {
       const brouillon = {
         dossierActif, nomPatient, selectedOng, typePatient, numDossierPatient, dateNaissance, telephone, fichesDossier, modePreValidation,
@@ -147,11 +166,66 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
     return () => window.removeEventListener('chf:synced', onSynced);
   }, []);
 
+  // Réinitialise le calculateur (et l'édition)
   const viderLeCalculateurFicheUniquement = () => {
-    setLignesCalcul([]); setIdFicheEnCoursDEdition(null);
-    setDateEntree1(""); setDateSortie1(""); setTypeLit1("normal"); setMultiPeriode(false);
-    setDateEntree2(""); setDateSortie2(""); setTypeLit2("normal"); setHasChirSpec(false); setNomChirSpec(""); setPrixChirSpec("");
+    setLignesCalcul([]);
+    setIdFicheEnCoursDEdition(null);
+    setDateEntree1("");
+    setDateSortie1("");
+    setTypeLit1("normal");
+    setMultiPeriode(false);
+    setDateEntree2("");
+    setDateSortie2("");
+    setTypeLit2("normal");
+    setHasChirSpec(false);
+    setNomChirSpec("");
+    setPrixChirSpec("");
     setPaiementEffectue(false);
+  };
+
+  // --- NOUVEAU : Charger une fiche existante pour modification ---
+  const editerFiche = (idFiche) => {
+    const fiche = fichesDossier.find(f => f.id === idFiche);
+    if (!fiche) {
+      showToast("Fiche introuvable.", "error");
+      return;
+    }
+    // Restaurer l'état du calculateur à partir de rawState
+    const raw = fiche.rawState || {};
+    setLignesCalcul(raw.lignesCalcul || []);
+    setDateEntree1(raw.dateEntree1 || "");
+    setDateSortie1(raw.dateSortie1 || "");
+    setTypeLit1(raw.typeLit1 || "normal");
+    setMultiPeriode(raw.multiPeriode || false);
+    setDateEntree2(raw.dateEntree2 || "");
+    setDateSortie2(raw.dateSortie2 || "");
+    setTypeLit2(raw.typeLit2 || "normal");
+    setHasChirSpec(raw.hasChirSpec || false);
+    setNomChirSpec(raw.nomChirSpec || "");
+    setPrixChirSpec(raw.prixChirSpec || "");
+    setIdFicheEnCoursDEdition(idFiche);
+    setPaiementEffectue(false);
+    showToast(`Édition de la fiche N°${fiche.numeroFiche}`, "info");
+  };
+
+  // --- NOUVEAU : Enregistrer une fiche modifiée (remplace l'ancienne) ---
+  const enregistrerFicheModifiee = (nouvelleFiche) => {
+    setFichesDossier(prev => prev.map(f => f.id === nouvelleFiche.id ? nouvelleFiche : f));
+    viderLeCalculateurFicheUniquement();
+    showToast("Fiche mise à jour", "success");
+  };
+
+  // --- Modification de l'enregistrement d'une nouvelle fiche : gère l'édition ---
+  const enregistrerNouvelleFiche = (fiche) => {
+    if (idFicheEnCoursDEdition) {
+      // Si une fiche est en cours d'édition, on la remplace
+      enregistrerFicheModifiee({ ...fiche, id: idFicheEnCoursDEdition });
+    } else {
+      // Sinon on l'ajoute
+      setFichesDossier(prev => [...prev, fiche]);
+      viderLeCalculateurFicheUniquement();
+      showToast("Fiche enregistrée", "success");
+    }
   };
 
   const initialiserNouveauDossier = async (nom, ong, numDossier, type, naissance, tel, serviceChoisi) => {
@@ -214,7 +288,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   };
 
   const declencherPreValidationDossier = () => {
-    const activeEstVide = lignesCalcul.length === 0 && j1 === 0 && !hasChirSpec;
+    const activeEstVide = lignesCalcul.length === 0 && j1 === 0 && !hasChirSpec && !dateEntree1;
     const proceder = (fichesFinales) => {
       if (fichesFinales.length === 0) { showToast("Dossier vide.", "error"); return; }
       setModePreValidation(true);
@@ -243,7 +317,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
     const datesTrouvees = [];
     fichesDossier.forEach(f => { if (f.rawState?.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 }); if (f.rawState?.multiPeriode && f.rawState?.dateEntree2) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 }); });
     let sejourTexte = "—";
-    if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map(d => `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`).join(" et ");
+    if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map(d => d.in === d.out ? d.in.split("-").reverse().join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`).join(" et ");
     const dossierArchiver = {
       nomPatient, ongPartenaire: selectedOng, typePatient, numDossier: numDossierPatient,
       dateNaissance, telephone, dateHeure: new Date().toLocaleDateString("fr-FR"),
@@ -313,20 +387,63 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
     demanderConfirmation();
   };
 
+  // --- CORRECTION DE LA SUSPENSION : sauvegarde les fiches ---
   const executerSuspension = async () => {
+    const somme = fichesDossier.reduce((s, f) => s + f.totalGlobal, 0);
+    const datesTrouvees = [];
+    fichesDossier.forEach(f => {
+      if (f.rawState?.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
+      if (f.rawState?.multiPeriode && f.rawState?.dateEntree2) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
+    });
+    let sejourTexte = "—";
+    if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map(d => d.in === d.out ? d.in.split("-").reverse().join("/") : `du ${d.in.split("-").reverse().slice(0,2).join("/")} au ${d.out.split("-").reverse().slice(0,2).join("/")}`).join(" et ");
+
+    const dossierSuspendu = {
+      nomPatient,
+      ongPartenaire: selectedOng,
+      typePatient,
+      numDossier: numDossierPatient,
+      dateNaissance,
+      telephone,
+      dateHeure: new Date().toLocaleDateString("fr-FR"),
+      periodeSejourString: sejourTexte,
+      dateEntreePourTri: datesTrouvees.length > 0 ? datesTrouvees[0].in : "9999-12-31",
+      totalGlobal: somme,
+      totalSaisiePapierDH: 0,
+      contientErreurs: false,
+      verrouilleFacture: false,
+      fiches: [...fichesDossier],  // ⬅️ CONSERVE LES FICHES
+      status: 'suspendu',
+      dateSuspension: new Date().toISOString(),
+      timestamp: Date.now()
+    };
+
     try {
-      await chf.updateEpisode(dossierId, toEpisodeApi({ status: 'suspendu', dateSuspension: new Date().toISOString() }));
-      showToast(`Dossier suspendu.`, "success");
+      await chf.updateEpisode(dossierId, toEpisodeApi(dossierSuspendu));
+      const updatedItems = verifications.map(v => v.id === dossierId ? { ...v, ...dossierSuspendu } : v);
+      setVerifications(updatedItems);
+      showToast(`Dossier suspendu avec ${fichesDossier.length} fiche(s)`, "success");
     } catch (error) {
-      if (!error.isOfflineQueue) { showToast("Erreur suspension: " + error.message, "error"); return; }
+      if (!error.isOfflineQueue) {
+        showToast("Erreur suspension: " + error.message, "error");
+        return;
+      }
+      const updatedItems = verifications.map(v => v.id === dossierId ? { ...v, ...dossierSuspendu } : v);
+      setVerifications(updatedItems);
       showToast("📴 Dossier suspendu hors ligne — sera synchronisé au retour d'internet", "info");
     }
+
+    // Nettoyer l'état local
     setDossierActif(false);
-    setNomPatient(""); setSelectedOng(""); setNumDossierPatient(""); sessionStorage.removeItem('numDossierPatient');
-    setFichesDossier([]); setModePreValidation(false); viderLeCalculateurFicheUniquement(); setDossierId(null);
+    setNomPatient("");
+    setSelectedOng("");
+    setNumDossierPatient("");
+    sessionStorage.removeItem('numDossierPatient');
+    setFichesDossier([]);
+    setModePreValidation(false);
+    viderLeCalculateurFicheUniquement();
+    setDossierId(null);
     localStorage.removeItem(LOG_DOSSIER_BROUILLON_KEY);
-    const updatedItems = verifications.map(v => v.id === dossierId ? { ...v, status: 'suspendu' } : v);
-    setVerifications(updatedItems);
   };
 
   const suspendreDossier = async () => {
@@ -454,14 +571,14 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
     setLignesCalcul(prev => {
       const index = prev.findIndex(l => l.itemId === item.id && l.type === cat);
       if (index !== -1) return prev.map((l, idx) => idx === index ? { ...l, qte: l.qte + qte } : l);
-      return [...prev, { id: "l-" + Math.random().toString(36).slice(2, 6), itemId: item.id, type: cat, sub: item.sub || "", nom: item.nom, qte, prix: item.prix }];
+      return [...prev, { id: "l-" + Math.random().toString(36).slice(2, 6), itemId: item.id, type: cat, sub: cat === "med" ? "" : (item.sub || ""), nom: item.nom, qte, prix: item.prix }];
     });
     setPaiementEffectue(false);
   };
 
-  const j1 = useMemo(() => { if (!dateEntree1 || !dateSortie1) return 0; const d = (new Date(dateSortie1) - new Date(dateEntree1)) / 86400000; if (d < 0) { setDateSortie1(""); return 0; } return d === 0 ? 1 : Math.floor(d); }, [dateEntree1, dateSortie1]);
+  const j1 = useMemo(() => { if (!dateEntree1 || !dateSortie1) return 0; const d = (new Date(dateSortie1) - new Date(dateEntree1)) / 86400000; if (d < 0) { setDateSortie1(""); return 0; } return Math.max(0, Math.floor(d)); }, [dateEntree1, dateSortie1]);
   const totalE1 = j1 * CONFIG_LITS[typeLit1].prix;
-  const j2 = useMemo(() => { if (!multiPeriode || !dateEntree2 || !dateSortie2) return 0; const d = (new Date(dateSortie2) - new Date(dateEntree2)) / 86400000; return d <= 0 ? 1 : Math.floor(d); }, [multiPeriode, dateEntree2, dateSortie2]);
+  const j2 = useMemo(() => { if (!multiPeriode || !dateEntree2 || !dateSortie2) return 0; const d = (new Date(dateSortie2) - new Date(dateEntree2)) / 86400000; return Math.max(0, Math.floor(d)); }, [multiPeriode, dateEntree2, dateSortie2]);
   const totalE2 = multiPeriode ? j2 * CONFIG_LITS[typeLit2].prix : 0;
   const totalGeneralExeat = totalE1 + totalE2;
   const totalChirSpec = useMemo(() => { const p = parseFloat(prixChirSpec); return isNaN(p) ? 0 : p; }, [hasChirSpec, prixChirSpec]);
@@ -520,11 +637,25 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   };
   const changerTypeOng = (nouveauType, nouvelOng) => changerTypeOngPourDossier(dossierId, nouveauType, nouvelOng);
 
-  const enregistrerNouvelleFiche = (fiche) => {
-    setFichesDossier(prev => [...prev, fiche]);
-    viderLeCalculateurFicheUniquement();
-    showToast("Fiche enregistrée", "success");
+  const changerNomPatientPourDossier = async (idCible, nouveauNom) => {
+    const propre = (nouveauNom || "").trim();
+    if (!propre) { showToast("Le nom ne peut pas être vide.", "error"); return; }
+    if (idCible === dossierId) setNomPatient(propre);
+    setVerifications(prev => prev.map(v => v.id === idCible ? { ...v, nomPatient: propre } : v));
+    if (!idCible) { showToast("Nom du patient mis à jour", "success"); return; }
+    try {
+      await chf.updateEpisode(idCible, toEpisodeApi({ nomPatient: propre }));
+      enregistrerAudit('changement_nom_patient', { dossierId: idCible, nouveauNom: propre });
+      showToast("Nom du patient mis à jour", "success");
+    } catch (error) {
+      if (error.isOfflineQueue) showToast("📴 Changement enregistré hors ligne", "info");
+      else showToast("Erreur: " + error.message, "error");
+    }
   };
+  const changerNomPatient = (nouveauNom) => changerNomPatientPourDossier(dossierId, nouveauNom);
+
+  // --- Cette fonction est appelée par CalculateurPanel via onEnregistrerFiche ---
+  // Elle est déjà définie plus haut comme enregistrerNouvelleFiche
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -608,7 +739,6 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
           <button onClick={() => setOnglet("calcul")} className={`px-4 py-2 font-medium border-b-2 ${onglet === "calcul" ? "border-white text-white" : "text-[#9FB8A8]"}`}>Calcul Facture</button>
           <button onClick={() => { setOnglet("verifie"); setModePreValidation(false); }} className={`px-4 py-2 font-medium border-b-2 ${onglet === "verifie" ? "border-white text-white" : "text-[#9FB8A8]"}`}>📁 Archives</button>
 
-          {/* Pilotage CHF restreint uniquement à Admin et Direction */}
           {(userRole === "administrateur" || userRole === "direction") && (
             <button onClick={() => { setOnglet("analyse"); setModePreValidation(false); }} className={`px-4 py-2 font-medium border-b-2 ${onglet === "analyse" ? "border-white text-white" : "text-[#9FB8A8]"}`}>📊 Pilotage CHF</button>
           )}
@@ -616,7 +746,8 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
           {(userRole === "administrateur" || userRole === "direction") && (
             <><button onClick={() => setOnglet("meds")} className={`px-4 py-2 font-medium border-b-2 ${onglet === "meds" ? "border-white text-white" : "text-[#9FB8A8]"}`}>Tarifs Pharma</button>
               <button onClick={() => setOnglet("actes")} className={`px-4 py-2 font-medium border-b-2 ${onglet === "actes" ? "border-white text-white" : "text-[#9FB8A8]"}`}>Tarifs Actes</button>
-              <button onClick={() => setOnglet("stock")} className={`px-4 py-2 font-medium border-b-2 ${onglet === "stock" ? "border-white text-white" : "text-[#9FB8A8]"}`}>📦 Stock</button></>
+              <button onClick={() => setOnglet("stock")} className={`px-4 py-2 font-medium border-b-2 ${onglet === "stock" ? "border-white text-white" : "text-[#9FB8A8]"}`}>📦 Stock</button>
+              <button onClick={() => setOnglet("ong")} className={`px-4 py-2 font-medium border-b-2 ${onglet === "ong" ? "border-white text-white" : "text-[#9FB8A8]"}`}>🤝 ONG</button></>
           )}
           {userRole === "administrateur" && (
             <button onClick={() => setOnglet("users")} className={`px-4 py-2 font-medium border-b-2 ${onglet === "users" ? "border-white text-white" : "text-[#9FB8A8]"}`}>👥 Utilisateurs</button>
@@ -638,7 +769,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
           />
         )}
         {onglet === "dashboard_direction" && (userRole === "direction" || userRole === "administrateur") && <DashboardDirectionPanel verifications={verifications} paiements={paiements} medicaments={medicaments} />}
-        {onglet === "dashboard_caisse" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && <DashboardCaissePanel verifications={verifications} paiements={paiements} userDisplayName={userDisplayName} />}
+        {onglet === "dashboard_caisse" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && <DashboardCaissePanel verifications={verifications} paiements={paiements} userDisplayName={userDisplayName} listeOng={listeOngNoms} />}
         {onglet === "calcul" && modePreValidation && (
           <div className="bg-white p-6 rounded-xl border border-emerald-400 shadow-xl space-y-4">
             <div className="text-center border-b pb-2"><span className="text-emerald-800 font-bold uppercase text-[11px]">Contrôle final</span><h3 className="text-lg font-black">📋 Totaux analytiques</h3><p className="text-xs text-gray-500">{nomPatient} | {selectedOng}</p></div>
@@ -656,7 +787,9 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
               medicaments={medicaments} actes={actes} lignes={lignesCalcul} setLignes={setLignesCalcul}
               dossierActif={dossierActif} nomPatient={nomPatient} selectedOng={selectedOng}
               onNouveauDossier={initialiserNouveauDossier} onAnnulerDossier={annulerDossier} onCloturerDossier={declencherPreValidationDossier}
-              fichesDossier={fichesDossier} onSupprimerFicheDossier={supprimerFicheDossier} idFicheEnCoursDEdition={null}
+              fichesDossier={fichesDossier} onSupprimerFicheDossier={supprimerFicheDossier} 
+              idFicheEnCoursDEdition={idFicheEnCoursDEdition}  // <-- passé pour affichage
+              onEditerFiche={editerFiche}                       // <-- nouvelle prop
               numeroFicheCourante={numeroFicheCourante}
               dateEntree1={dateEntree1} setDateEntree1={setDateEntree1} dateSortie1={dateSortie1} setDateSortie1={setDateSortie1}
               typeLit1={typeLit1} setTypeLit1={setTypeLit1} j1={j1} totalE1={totalE1}
@@ -671,17 +804,16 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
               dateNaissance={dateNaissance} telephone={telephone} numDossierPatient={numDossierPatient} typePatient={typePatient}
               dossierId={dossierId} setDossierId={setDossierId} patientsExistants={verifications} onChargerPatientExistant={chargerDossierExistant}
               paiementEffectue={paiementEffectue} setPaiementEffectue={setPaiementEffectue}
-              showToast={showToast} onSuspendreDossier={suspendreDossier} onChangerTypeOng={changerTypeOng}
+              showToast={showToast} onSuspendreDossier={suspendreDossier} onChangerTypeOng={changerTypeOng} onChangerNomPatient={changerNomPatient}
+              listeOng={listeOngNoms}
             />
         )}
-        {onglet === "verifie" && <HistoriqueVerifPanel verifications={verifications} setVerifications={setVerifications} onChargerPourModif={réimporterDossierDepuisArchives} onSupprimer={supprimerDossierArchive} filtreInitialNom={filtreArchivesInitialNom} clearFiltreInitialNom={() => setFiltreArchivesInitialNom("")} dossierPourExport={dossierPourExport} setDossierPourExport={setDossierPourExport} userRole={userRole} showToast={showToast} onChangerTypeOng={changerTypeOngPourDossier} />}
-
-        {/* Sécurité d'affichage renforcée pour le panneau d'analyse */}
+        {onglet === "verifie" && <HistoriqueVerifPanel verifications={verifications} setVerifications={setVerifications} onChargerPourModif={réimporterDossierDepuisArchives} onSupprimer={supprimerDossierArchive} filtreInitialNom={filtreArchivesInitialNom} clearFiltreInitialNom={() => setFiltreArchivesInitialNom("")} dossierPourExport={dossierPourExport} setDossierPourExport={setDossierPourExport} userRole={userRole} showToast={showToast} onChangerTypeOng={changerTypeOngPourDossier} listeOng={listeOngNoms} />}
         {onglet === "analyse" && (userRole === "administrateur" || userRole === "direction") && <AnalyticsPanel verifications={verifications} />}
-
         {onglet === "meds" && (userRole === "administrateur" || userRole === "direction") && <GrilleEditionPanel titre="de la Pharmacie" items={medicaments} setItems={setMedicaments} collectionName="medicaments" showToast={showToast} />}
         {onglet === "actes" && (userRole === "administrateur" || userRole === "direction") && <GrilleEditionPanel titre="des Actes" items={actes} setItems={setActes} collectionName="actes" showToast={showToast} />}
         {onglet === "stock" && (userRole === "administrateur" || userRole === "direction") && <GestionStockPanel items={medicaments} setItems={setMedicaments} showToast={showToast} />}
+        {onglet === "ong" && (userRole === "administrateur" || userRole === "direction") && <GestionOngPanel listeOngDocs={listeOngDocs} showToast={showToast} />}
         {onglet === "users" && userRole === "administrateur" && <GestionUtilisateursPanel showToast={showToast} />}
         {onglet === "demandes" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && <DemandesPanel userRole={userRole} showToast={showToast} />}
       </main>

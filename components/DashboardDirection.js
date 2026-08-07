@@ -21,12 +21,23 @@ function DashboardDirectionPanel({ verifications, paiements, medicaments }) {
   };
 
   const calculerStats = (dossiers, transactions) => {
-    const today = new Date().toISOString().split('T')[0];
     const mois = new Date().getMonth();
     const annee = new Date().getFullYear();
-    const caMois = transactions.filter(p => (p.mode === 'cash' || p.mode === 'ong') && new Date(p.date).getMonth() === mois && new Date(p.date).getFullYear() === annee).reduce((s, p) => s + (p.montant || 0), 0);
-    const caJourCash = transactions.filter(p => p.mode === 'cash' && p.date && p.date.startsWith(today)).reduce((s, p) => s + (p.montant || 0), 0);
-    const caJourOng = transactions.filter(p => p.mode === 'ong' && p.date && p.date.startsWith(today)).reduce((s, p) => s + (p.montant || 0), 0);
+    // CA basé sur les fiches enregistrées (dès la facturation), et non sur les paiements encaissés —
+    // un seul chiffre de référence pour le pilotage, cohérent avec le reste des analyses.
+    let caMois = 0, caJourCash = 0, caJourOng = 0;
+    dossiers.forEach(v => {
+      (v.fiches || []).forEach(f => {
+        const dateFiche = f.dateCreation ? new Date(f.dateCreation) : parseDateDossier(v.dateHeure);
+        if (!dateFiche || isNaN(dateFiche)) return;
+        const montant = f.totalGlobal || 0;
+        if ((f.modePaiement === 'cash' || f.modePaiement === 'ong') && dateFiche.getMonth() === mois && dateFiche.getFullYear() === annee) caMois += montant;
+        if (estAujourdhui(dateFiche)) {
+          if (f.modePaiement === 'cash') caJourCash += montant;
+          if (f.modePaiement === 'ong') caJourOng += montant;
+        }
+      });
+    });
     const patientsJour = dossiers.filter(v => estAujourdhui(parseDateDossier(v.dateHeure))).length;
     const hospitalises = dossiers.filter(v => v.status === 'hospitalise' || v.typePatient === 'hospitalise').length;
     const occupation = Math.min(100, (hospitalises / 50) * 100);
