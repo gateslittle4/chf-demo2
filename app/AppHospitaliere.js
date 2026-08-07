@@ -288,7 +288,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   };
 
   const declencherPreValidationDossier = () => {
-    const activeEstVide = lignesCalcul.length === 0 && j1 === 0 && !hasChirSpec;
+    const activeEstVide = lignesCalcul.length === 0 && j1 === 0 && !hasChirSpec && !dateEntree1;
     const proceder = (fichesFinales) => {
       if (fichesFinales.length === 0) { showToast("Dossier vide.", "error"); return; }
       setModePreValidation(true);
@@ -317,7 +317,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
     const datesTrouvees = [];
     fichesDossier.forEach(f => { if (f.rawState?.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 }); if (f.rawState?.multiPeriode && f.rawState?.dateEntree2) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 }); });
     let sejourTexte = "—";
-    if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map(d => `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`).join(" et ");
+    if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map(d => d.in === d.out ? d.in.split("-").reverse().join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`).join(" et ");
     const dossierArchiver = {
       nomPatient, ongPartenaire: selectedOng, typePatient, numDossier: numDossierPatient,
       dateNaissance, telephone, dateHeure: new Date().toLocaleDateString("fr-FR"),
@@ -396,7 +396,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
       if (f.rawState?.multiPeriode && f.rawState?.dateEntree2) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
     });
     let sejourTexte = "—";
-    if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map(d => `du ${d.in.split("-").reverse().slice(0,2).join("/")} au ${d.out.split("-").reverse().slice(0,2).join("/")}`).join(" et ");
+    if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map(d => d.in === d.out ? d.in.split("-").reverse().join("/") : `du ${d.in.split("-").reverse().slice(0,2).join("/")} au ${d.out.split("-").reverse().slice(0,2).join("/")}`).join(" et ");
 
     const dossierSuspendu = {
       nomPatient,
@@ -571,14 +571,14 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
     setLignesCalcul(prev => {
       const index = prev.findIndex(l => l.itemId === item.id && l.type === cat);
       if (index !== -1) return prev.map((l, idx) => idx === index ? { ...l, qte: l.qte + qte } : l);
-      return [...prev, { id: "l-" + Math.random().toString(36).slice(2, 6), itemId: item.id, type: cat, sub: item.sub || "", nom: item.nom, qte, prix: item.prix }];
+      return [...prev, { id: "l-" + Math.random().toString(36).slice(2, 6), itemId: item.id, type: cat, sub: cat === "med" ? "" : (item.sub || ""), nom: item.nom, qte, prix: item.prix }];
     });
     setPaiementEffectue(false);
   };
 
-  const j1 = useMemo(() => { if (!dateEntree1 || !dateSortie1) return 0; const d = (new Date(dateSortie1) - new Date(dateEntree1)) / 86400000; if (d < 0) { setDateSortie1(""); return 0; } return d === 0 ? 1 : Math.floor(d); }, [dateEntree1, dateSortie1]);
+  const j1 = useMemo(() => { if (!dateEntree1 || !dateSortie1) return 0; const d = (new Date(dateSortie1) - new Date(dateEntree1)) / 86400000; if (d < 0) { setDateSortie1(""); return 0; } return Math.max(0, Math.floor(d)); }, [dateEntree1, dateSortie1]);
   const totalE1 = j1 * CONFIG_LITS[typeLit1].prix;
-  const j2 = useMemo(() => { if (!multiPeriode || !dateEntree2 || !dateSortie2) return 0; const d = (new Date(dateSortie2) - new Date(dateEntree2)) / 86400000; return d <= 0 ? 1 : Math.floor(d); }, [multiPeriode, dateEntree2, dateSortie2]);
+  const j2 = useMemo(() => { if (!multiPeriode || !dateEntree2 || !dateSortie2) return 0; const d = (new Date(dateSortie2) - new Date(dateEntree2)) / 86400000; return Math.max(0, Math.floor(d)); }, [multiPeriode, dateEntree2, dateSortie2]);
   const totalE2 = multiPeriode ? j2 * CONFIG_LITS[typeLit2].prix : 0;
   const totalGeneralExeat = totalE1 + totalE2;
   const totalChirSpec = useMemo(() => { const p = parseFloat(prixChirSpec); return isNaN(p) ? 0 : p; }, [hasChirSpec, prixChirSpec]);
@@ -636,6 +636,23 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
     }
   };
   const changerTypeOng = (nouveauType, nouvelOng) => changerTypeOngPourDossier(dossierId, nouveauType, nouvelOng);
+
+  const changerNomPatientPourDossier = async (idCible, nouveauNom) => {
+    const propre = (nouveauNom || "").trim();
+    if (!propre) { showToast("Le nom ne peut pas être vide.", "error"); return; }
+    if (idCible === dossierId) setNomPatient(propre);
+    setVerifications(prev => prev.map(v => v.id === idCible ? { ...v, nomPatient: propre } : v));
+    if (!idCible) { showToast("Nom du patient mis à jour", "success"); return; }
+    try {
+      await chf.updateEpisode(idCible, toEpisodeApi({ nomPatient: propre }));
+      enregistrerAudit('changement_nom_patient', { dossierId: idCible, nouveauNom: propre });
+      showToast("Nom du patient mis à jour", "success");
+    } catch (error) {
+      if (error.isOfflineQueue) showToast("📴 Changement enregistré hors ligne", "info");
+      else showToast("Erreur: " + error.message, "error");
+    }
+  };
+  const changerNomPatient = (nouveauNom) => changerNomPatientPourDossier(dossierId, nouveauNom);
 
   // --- Cette fonction est appelée par CalculateurPanel via onEnregistrerFiche ---
   // Elle est déjà définie plus haut comme enregistrerNouvelleFiche
@@ -787,7 +804,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
               dateNaissance={dateNaissance} telephone={telephone} numDossierPatient={numDossierPatient} typePatient={typePatient}
               dossierId={dossierId} setDossierId={setDossierId} patientsExistants={verifications} onChargerPatientExistant={chargerDossierExistant}
               paiementEffectue={paiementEffectue} setPaiementEffectue={setPaiementEffectue}
-              showToast={showToast} onSuspendreDossier={suspendreDossier} onChangerTypeOng={changerTypeOng}
+              showToast={showToast} onSuspendreDossier={suspendreDossier} onChangerTypeOng={changerTypeOng} onChangerNomPatient={changerNomPatient}
               listeOng={listeOngNoms}
             />
         )}
