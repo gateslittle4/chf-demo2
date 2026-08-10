@@ -53,7 +53,7 @@ function AchatExpress({ medicaments, actes, setMedicaments, userRole, showToast,
     setPanier(prev => {
       const idx = prev.findIndex(l => l.itemId === selection.id && l.categorie === categorie);
       if (idx !== -1) return prev.map((l,i) => i===idx ? { ...l, qte: l.qte + qte } : l);
-      return [...prev, { itemId: selection.id, categorie, sub: categorie === 'med' ? '' : (selection.sub || ''), nom: selection.nom, qte, prix: selection.prix }];
+      return [...prev, { itemId: selection.id, categorie, sub: selection.sub || '', nom: selection.nom, qte, prix: selection.prix }];
     });
     setSelection(null); setRecherche(""); setQuantite("1");
     if (inputRef.current) inputRef.current.focus();
