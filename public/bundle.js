@@ -2834,11 +2834,11 @@
       var React = window.React;
       var { useState, useEffect, useMemo } = React;
       var { CATEGORIES_LISTE } = require_constants();
-      var { formatGourdes, formatDH, echapperHTML } = require_helpers();
+      var { formatGourdes, formatDH, echapperHTML, formaterNomPropre } = require_helpers();
       var { Eye, Pencil, Trash2, Printer, Clock, FolderOpen, X, Download, Check } = require_icons();
       var { chf, toEpisodeApi } = require_supabase();
       var { LOGO_CHF_BASE64 } = require_logoChf();
-      function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, dossierPourExport, setDossierPourExport, userRole, showToast, onChangerTypeOng, listeOng }) {
+      function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, userRole, showToast, onChangerTypeOng, listeOng }) {
         var _a;
         const [focusedVerif, setFocusedVerif] = useState(null);
         const [editTypeArchiveOuvert, setEditTypeArchiveOuvert] = useState(false);
@@ -2854,6 +2854,10 @@
         const [filtreStatut, setFiltreStatut] = useState("");
         const [appliqueRabais10, setAppliqueRabais10] = useState(false);
         const [montantDonIntrants, setMontantDonIntrants] = useState("");
+        const [sousOngletArchives, setSousOngletArchives] = useState("dossiers");
+        const [lotOngSelectionne, setLotOngSelectionne] = useState("");
+        const [lotFocusedNumero, setLotFocusedNumero] = useState(null);
+        const [dossierAAjouterAuLot, setDossierAAjouterAuLot] = useState("");
         useEffect(() => {
           if (filtreInitialNom) {
             setRechercheNomPatient(filtreInitialNom);
@@ -2863,6 +2867,26 @@
         useEffect(() => {
           setNombreAffiche(100);
         }, [filtreType, filtreOng, rechercheNomPatient, filtreDateDebut, filtreDateFin, filtreCategorie, filtreStatut]);
+        const lotsDuPartenaire = useMemo(() => {
+          if (!lotOngSelectionne) return [];
+          const parNumero = {};
+          verifications.forEach((v) => {
+            if (v.ongPartenaire === lotOngSelectionne && v.numeroLot != null) {
+              if (!parNumero[v.numeroLot]) parNumero[v.numeroLot] = [];
+              parNumero[v.numeroLot].push(v);
+            }
+          });
+          return Object.keys(parNumero).map((n) => Number(n)).sort((a, b) => b - a).map((n) => ({
+            numero: n,
+            dossiers: parNumero[n],
+            total: parNumero[n].reduce((s, v) => s + (v.totalGlobal || 0), 0)
+          }));
+        }, [verifications, lotOngSelectionne]);
+        const dossiersEnAttenteDeLot = useMemo(() => {
+          if (!lotOngSelectionne) return [];
+          return verifications.filter((v) => v.ongPartenaire === lotOngSelectionne && (v.status || "archived") === "archived" && v.numeroLot == null && !v.verrouilleFacture);
+        }, [verifications, lotOngSelectionne]);
+        const lotFocused = lotFocusedNumero != null ? lotsDuPartenaire.find((l) => l.numero === lotFocusedNumero) || null : null;
         const dossiersFiltres = useMemo(() => {
           return verifications.filter((v) => {
             var _a2;
@@ -2907,6 +2931,7 @@
           celluleNombre: { alignment: { horizontal: "right" }, numFmt: "#,##0", border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } },
           celluleTotal: { font: { bold: true }, alignment: { horizontal: "right" }, numFmt: '"HTG "#,##0', border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } },
           grandTotalHtg: { font: { bold: true }, alignment: { horizontal: "right" }, numFmt: '"HTG "#,##0', border: { top: { style: "medium" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } },
+          grandTotalNombre: { font: { bold: true }, alignment: { horizontal: "right" }, numFmt: "#,##0", border: { top: { style: "medium" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } },
           celluleFinaleGras: { font: { bold: true, size: 11 }, fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFD0D0D0" } }, alignment: { horizontal: "right" }, numFmt: '"HTG "#,##0', border: { top: { style: "medium" }, bottom: { style: "double" }, left: { style: "thin" }, right: { style: "thin" } } }
         };
         const appliquerStyle = (cell, style) => {
@@ -2937,23 +2962,29 @@
           nebulisation: "Nebulisation",
           radio: "Radiographie"
         };
-        const exporterBlocDossiersExcelPartenaire = async (ongCible) => {
+        const genererFichierExcelPourLot = async (ongCible, idsDossiers, numeroLot) => {
           try {
-            let listeDossiersONG = verifications.filter((v) => v.ongPartenaire === ongCible && (v.status || "archived") === "archived" && (filtreType === "" || (v.typePatient || "ONG") === filtreType));
-            if (filtreDateDebut || filtreDateFin) {
-              listeDossiersONG = listeDossiersONG.filter((v) => {
-                const d = new Date(v.dateEntreePourTri);
-                if (isNaN(d)) return false;
-                if (filtreDateDebut && d < new Date(filtreDateDebut)) return false;
-                if (filtreDateFin) {
-                  const fin = new Date(filtreDateFin);
-                  fin.setHours(23, 59, 59, 999);
-                  if (d > fin) return false;
-                }
-                return true;
-              });
-            }
-            listeDossiersONG = listeDossiersONG.sort((a, b) => new Date(a.dateEntreePourTri) - new Date(b.dateEntreePourTri));
+            let listeDossiersONG = verifications.filter((v) => idsDossiers.includes(v.id));
+            const extraireNomMere = (nom) => {
+              const m = (nom || "").trim().match(/^(?:bb|beb[ée])\.?\s+(.+)$/i);
+              return m ? m[1].trim().toLowerCase() : null;
+            };
+            const cleFamille = (nom) => extraireNomMere(nom) || (nom || "").trim().toLowerCase();
+            const dateMereParCle = {};
+            listeDossiersONG.forEach((v) => {
+              if (!extraireNomMere(v.nomPatient)) dateMereParCle[cleFamille(v.nomPatient)] = v.dateEntreePourTri;
+            });
+            const dateEffective = (v) => {
+              const nomMere = extraireNomMere(v.nomPatient);
+              return nomMere && dateMereParCle[nomMere] ? dateMereParCle[nomMere] : v.dateEntreePourTri;
+            };
+            listeDossiersONG = listeDossiersONG.sort((a, b) => {
+              const diff = new Date(dateEffective(a)) - new Date(dateEffective(b));
+              if (diff !== 0) return diff;
+              const cleA = cleFamille(a.nomPatient), cleB = cleFamille(b.nomPatient);
+              if (cleA !== cleB) return cleA.localeCompare(cleB);
+              return (extraireNomMere(a.nomPatient) ? 1 : 0) - (extraireNomMere(b.nomPatient) ? 1 : 0);
+            });
             if (listeDossiersONG.length === 0) {
               showToast(`Aucun dossier trouv\xE9 pour ${ongCible}`, "error");
               return;
@@ -2994,7 +3025,7 @@
             r++;
             appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.gras);
             ws.getCell(r, 1).value = "FACTURE";
-            ws.getCell(r, 2).value = `#${Math.floor(Math.random() * 1e4)}`;
+            ws.getCell(r, 2).value = `${ongCible.replace(/\s+/g, "")}-LOT${numeroLot}`;
             ws.getCell(r, 5).value = ongCible;
             appliquerStyle(ws.getCell(r, 5), EXCEL_STYLES.gras);
             r++;
@@ -3027,7 +3058,7 @@
                 totalPatient += f.totalGlobal || 0;
               });
               appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.celluleStandard);
-              ws.getCell(r, 1).value = doc.nomPatient;
+              ws.getCell(r, 1).value = formaterNomPropre(doc.nomPatient);
               appliquerStyle(ws.getCell(r, 2), EXCEL_STYLES.celluleStandard);
               ws.getCell(r, 2).value = doc.periodeSejourString || doc.dateHeure || "\u2014";
               colonnesExport.forEach((c, i) => {
@@ -3054,7 +3085,7 @@
             colonnesExport.forEach((c, i) => {
               const cell = ws.getCell(r, 3 + i);
               cell.value = totalsParColonne[c.key];
-              appliquerStyle(cell, EXCEL_STYLES.grandTotalHtg);
+              appliquerStyle(cell, EXCEL_STYLES.grandTotalNombre);
             });
             {
               const cell = ws.getCell(r, 3 + colonnesExport.length);
@@ -3104,28 +3135,86 @@
             const urlTelechargement = URL.createObjectURL(blob);
             const lien = document.createElement("a");
             lien.href = urlTelechargement;
-            lien.download = `Rapport_${ongCible.replace(/\s+/g, "_")}_${moisTexte}_${now.getFullYear()}.xlsx`;
+            lien.download = `Lot${numeroLot}_${ongCible.replace(/\s+/g, "_")}_${now.toLocaleDateString("fr-FR").replace(/\//g, "-")}.xlsx`;
             document.body.appendChild(lien);
             lien.click();
             document.body.removeChild(lien);
             setTimeout(() => URL.revokeObjectURL(urlTelechargement), 1e3);
             const idsExportes = listeDossiersONG.map((d) => d.id);
-            setVerifications((prev) => prev.map((v) => idsExportes.includes(v.id) ? { ...v, verrouilleFacture: true } : v));
+            setVerifications((prev) => prev.map((v) => idsExportes.includes(v.id) ? { ...v, numeroLot, verrouilleFacture: true } : v));
             let echecsVerrou = 0;
             await Promise.all(listeDossiersONG.map(async (d) => {
               try {
-                await chf.updateEpisode(d.id, toEpisodeApi({ verrouilleFacture: true }));
+                await chf.updateEpisode(d.id, toEpisodeApi({ numeroLot, verrouilleFacture: true }));
               } catch (e) {
                 if (!e.isOfflineQueue) echecsVerrou++;
               }
             }));
-            showToast(`\u2705 Export Excel de ${listeDossiersONG.length} dossiers (${formatGourdes(grandTotalGeneral)} Gdes)${echecsVerrou > 0 ? ` \u2014 \u26A0\uFE0F ${echecsVerrou} dossier(s) non verrouill\xE9(s), r\xE9essaie plus tard` : ""}`, "success");
-            setDossierPourExport(null);
+            showToast(`\u2705 Lot ${numeroLot} de ${ongCible} : ${listeDossiersONG.length} dossier(s), ${formatGourdes(grandTotalGeneral)} Gdes${echecsVerrou > 0 ? ` \u2014 \u26A0\uFE0F ${echecsVerrou} dossier(s) non enregistr\xE9(s), r\xE9essaie plus tard` : ""}`, "success");
             setAppliqueRabais10(false);
             setMontantDonIntrants("");
           } catch (error) {
             console.error("Erreur export Excel:", error);
             showToast("Une erreur s'est produite lors de la g\xE9n\xE9ration du fichier Excel.", "error");
+          }
+        };
+        const genererProchainLot = (ongCible) => {
+          const eligibles = verifications.filter((v) => v.ongPartenaire === ongCible && (v.status || "archived") === "archived" && v.numeroLot == null && !v.verrouilleFacture);
+          if (eligibles.length === 0) {
+            showToast(`Aucun nouveau dossier en attente pour ${ongCible}.`, "error");
+            return;
+          }
+          const numerosExistants = verifications.filter((v) => v.ongPartenaire === ongCible && v.numeroLot != null).map((v) => v.numeroLot);
+          const prochainNumero = numerosExistants.length > 0 ? Math.max(...numerosExistants) + 1 : 1;
+          const totalEstime = eligibles.reduce((s, v) => s + (v.totalGlobal || 0), 0);
+          setConfirmModal({
+            titre: `\u{1F4E6} G\xE9n\xE9rer le Lot ${prochainNumero} pour ${ongCible} ?`,
+            message: `${eligibles.length} dossier(s) seront inclus, pour un total d'environ ${formatGourdes(totalEstime)} Gdes. Une fois g\xE9n\xE9r\xE9, ce lot sera fig\xE9 : ces dossiers ne seront plus jamais repris automatiquement dans un futur lot.`,
+            confirmLabel: `\u{1F4E6} G\xE9n\xE9rer le Lot ${prochainNumero}`,
+            onConfirm: () => {
+              setConfirmModal(null);
+              genererFichierExcelPourLot(ongCible, eligibles.map((v) => v.id), prochainNumero);
+            },
+            onCancel: () => setConfirmModal(null)
+          });
+        };
+        const reimprimerLot = (ongCible, numeroLot) => {
+          const idsLot = verifications.filter((v) => v.ongPartenaire === ongCible && v.numeroLot === numeroLot).map((v) => v.id);
+          if (idsLot.length === 0) {
+            showToast("Lot introuvable.", "error");
+            return;
+          }
+          genererFichierExcelPourLot(ongCible, idsLot, numeroLot);
+        };
+        const retirerDossierDuLot = (dossier) => {
+          setConfirmModal({
+            titre: `Retirer ${dossier.nomPatient} du Lot ${dossier.numeroLot} ?`,
+            message: `Ce dossier redeviendra libre et sera inclus dans le PROCHAIN lot g\xE9n\xE9r\xE9 pour ${dossier.ongPartenaire}, pas dans celui-ci. Si ce lot a d\xE9j\xE0 \xE9t\xE9 envoy\xE9 au partenaire, r\xE9imprime-le apr\xE8s pour qu'il re\xE7oive la version sans ce dossier.`,
+            confirmLabel: "Retirer du lot",
+            danger: true,
+            onConfirm: async () => {
+              setConfirmModal(null);
+              setVerifications((prev) => prev.map((v) => v.id === dossier.id ? { ...v, numeroLot: null, verrouilleFacture: false } : v));
+              try {
+                await chf.updateEpisode(dossier.id, toEpisodeApi({ numeroLot: null, verrouilleFacture: false }));
+                showToast(`${dossier.nomPatient} retir\xE9 du Lot ${dossier.numeroLot}`, "success");
+              } catch (error) {
+                if (error.isOfflineQueue) showToast("\u{1F4F4} Changement enregistr\xE9 hors ligne", "info");
+                else showToast("Erreur: " + error.message, "error");
+              }
+            },
+            onCancel: () => setConfirmModal(null)
+          });
+        };
+        const ajouterDossierAuLot = async (idDossier, numeroLot, ongCible) => {
+          const dossier = verifications.find((v) => v.id === idDossier);
+          setVerifications((prev) => prev.map((v) => v.id === idDossier ? { ...v, numeroLot, verrouilleFacture: true } : v));
+          try {
+            await chf.updateEpisode(idDossier, toEpisodeApi({ numeroLot, verrouilleFacture: true }));
+            showToast(`${(dossier == null ? void 0 : dossier.nomPatient) || "Dossier"} ajout\xE9 au Lot ${numeroLot}`, "success");
+          } catch (error) {
+            if (error.isOfflineQueue) showToast("\u{1F4F4} Changement enregistr\xE9 hors ligne", "info");
+            else showToast("Erreur: " + error.message, "error");
           }
         };
         const imprimerFiche = (fiche) => {
@@ -3186,7 +3275,20 @@
           setFiltreDateFin("");
           setFiltreCategorie("");
           setFiltreStatut("");
-        }, className: "bg-gray-200 text-gray-700 px-3 py-1 rounded text-xs font-bold" }, "R\xE9initialiser")), peutExporter && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border border-purple-300 shadow-sm space-y-3" }, /* @__PURE__ */ React.createElement("h3", { className: "font-black text-purple-950 text-xs uppercase tracking-wider" }, "\u{1F4BC} Cl\xF4ture & Facturation"), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-2 items-end" }, /* @__PURE__ */ React.createElement("select", { value: dossierPourExport || "", onChange: (e) => setDossierPourExport(e.target.value || null), className: "border rounded-lg p-1.5 text-xs bg-white font-bold outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- Partenaire --"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o))), dossierPourExport && /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-4 items-center bg-white p-2 rounded-lg border border-dashed shadow-sm" }, /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1 font-bold text-purple-900 cursor-pointer" }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: appliqueRabais10, onChange: (e) => setAppliqueRabais10(e.target.checked), className: "rounded" }), " Rabais 10%"), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1" }, /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-gray-500" }, "Dons:"), /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", value: montantDonIntrants, onChange: (e) => setMontantDonIntrants(e.target.value), placeholder: "0", className: "border rounded p-1 w-24 font-mono font-bold text-right text-red-700 outline-none" })), /* @__PURE__ */ React.createElement("button", { onClick: () => exporterBlocDossiersExcelPartenaire(dossierPourExport), className: "bg-purple-700 text-white font-bold px-3 py-1.5 rounded flex items-center gap-1 shadow" }, /* @__PURE__ */ React.createElement(Download, { size: 13 }), " Excel")))), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm space-y-2" }, /* @__PURE__ */ React.createElement("h2", { className: "text-xs font-black text-gray-700 uppercase border-b pb-1" }, "\u{1F4C1} Dossiers (", dossiersFiltres.length, dossiersFiltres.length > nombreAffiche ? ` \u2014 ${nombreAffiche} affich\xE9s` : "", ")"), /* @__PURE__ */ React.createElement("div", { className: "overflow-x-auto max-h-96 overflow-y-auto" }, /* @__PURE__ */ React.createElement("table", { className: "w-full text-left" }, /* @__PURE__ */ React.createElement("thead", { className: "sticky top-0 bg-white shadow-sm" }, /* @__PURE__ */ React.createElement("tr", { className: "bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono" }, /* @__PURE__ */ React.createElement("th", { className: "p-2" }, "Date"), /* @__PURE__ */ React.createElement("th", { className: "p-2" }, "Patient"), /* @__PURE__ */ React.createElement("th", { className: "p-2" }, "Type"), /* @__PURE__ */ React.createElement("th", { className: "p-2" }, "Partenaire"), /* @__PURE__ */ React.createElement("th", { className: "p-2 text-center" }, "Vol."), /* @__PURE__ */ React.createElement("th", { className: "p-2 text-right" }, "Total"), /* @__PURE__ */ React.createElement("th", { className: "p-2 text-center" }, "Statut"), /* @__PURE__ */ React.createElement("th", { className: "p-2 text-center" }, "Actions"))), /* @__PURE__ */ React.createElement("tbody", { className: "divide-y divide-gray-100 font-mono text-[11px]" }, dossiersFiltres.slice(0, nombreAffiche).map((v) => {
+        }, className: "bg-gray-200 text-gray-700 px-3 py-1 rounded text-xs font-bold" }, "R\xE9initialiser")), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 border-b" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setSousOngletArchives("dossiers"), className: `px-4 py-2 text-xs font-bold rounded-t-lg ${sousOngletArchives === "dossiers" ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-500"}` }, "\u{1F4C1} Dossiers"), peutExporter && /* @__PURE__ */ React.createElement("button", { onClick: () => setSousOngletArchives("lots"), className: `px-4 py-2 text-xs font-bold rounded-t-lg ${sousOngletArchives === "lots" ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-500"}` }, "\u{1F4E6} Lots & Facturation")), sousOngletArchives === "lots" && peutExporter && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border border-purple-300 shadow-sm space-y-3" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Partenaire"), /* @__PURE__ */ React.createElement("select", { value: lotOngSelectionne, onChange: (e) => {
+          setLotOngSelectionne(e.target.value);
+          setLotFocusedNumero(null);
+        }, className: "border rounded-lg p-1.5 text-xs bg-white font-bold outline-none max-w-xs" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- S\xE9lectionner --"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o)))), lotOngSelectionne && !lotFocused && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-4 items-center bg-gray-50 p-3 rounded-lg border border-dashed" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-gray-700" }, "\u{1F195} ", dossiersEnAttenteDeLot.length, " dossier(s) en attente \u2014 ", formatGourdes(dossiersEnAttenteDeLot.reduce((s, v) => s + (v.totalGlobal || 0), 0)), " Gdes"), /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1 font-bold text-purple-900 cursor-pointer" }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: appliqueRabais10, onChange: (e) => setAppliqueRabais10(e.target.checked), className: "rounded" }), " Rabais 10%"), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1" }, /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-gray-500" }, "Dons:"), /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", value: montantDonIntrants, onChange: (e) => setMontantDonIntrants(e.target.value), placeholder: "0", className: "border rounded p-1 w-24 font-mono font-bold text-right text-red-700 outline-none" })), /* @__PURE__ */ React.createElement("button", { onClick: () => genererProchainLot(lotOngSelectionne), disabled: dossiersEnAttenteDeLot.length === 0, className: "bg-purple-700 text-white font-bold px-3 py-1.5 rounded flex items-center gap-1 shadow disabled:opacity-30" }, /* @__PURE__ */ React.createElement(Download, { size: 13 }), " G\xE9n\xE9rer le prochain lot")), /* @__PURE__ */ React.createElement("h3", { className: "font-black text-gray-700 text-xs uppercase border-b pb-1" }, "Lots d\xE9j\xE0 envoy\xE9s"), lotsDuPartenaire.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "text-gray-400 text-center py-3" }, "Aucun lot envoy\xE9 pour ce partenaire encore."), /* @__PURE__ */ React.createElement("div", { className: "divide-y" }, lotsDuPartenaire.map((lot) => /* @__PURE__ */ React.createElement("div", { key: lot.numero, className: "flex justify-between items-center py-2 text-xs" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-gray-700" }, "Lot ", lot.numero, " \u2014 ", lot.dossiers.length, " dossier(s) \u2014 ", formatGourdes(lot.total), " Gdes"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setLotFocusedNumero(lot.numero), className: "text-blue-600 font-bold underline" }, "Voir"), /* @__PURE__ */ React.createElement("button", { onClick: () => reimprimerLot(lotOngSelectionne, lot.numero), className: "text-purple-700 font-bold underline" }, "\u{1F504} R\xE9imprimer")))))), lotFocused && /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-center border-b pb-1" }, /* @__PURE__ */ React.createElement("h3", { className: "font-black text-gray-700 text-xs uppercase" }, "\u{1F4E6} Lot ", lotFocused.numero, " \u2014 ", lotOngSelectionne, " \u2014 ", formatGourdes(lotFocused.total), " Gdes"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => reimprimerLot(lotOngSelectionne, lotFocused.numero), className: "bg-purple-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Download, { size: 12 }), " R\xE9imprimer ce lot"), /* @__PURE__ */ React.createElement("button", { onClick: () => setLotFocusedNumero(null) }, /* @__PURE__ */ React.createElement(X, { size: 14 })))), dossiersEnAttenteDeLot.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 bg-gray-50 border border-dashed rounded-lg p-2" }, /* @__PURE__ */ React.createElement("select", { value: dossierAAjouterAuLot, onChange: (e) => setDossierAAjouterAuLot(e.target.value), className: "border rounded p-1.5 text-xs bg-white flex-1 outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- Ajouter un dossier libre \xE0 ce lot --"), dossiersEnAttenteDeLot.map((v) => /* @__PURE__ */ React.createElement("option", { key: v.id, value: v.id }, v.nomPatient, " \u2014 ", formatGourdes(v.totalGlobal || 0), " Gdes"))), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+          if (dossierAAjouterAuLot) {
+            ajouterDossierAuLot(dossierAAjouterAuLot, lotFocused.numero, lotOngSelectionne);
+            setDossierAAjouterAuLot("");
+          }
+        }, disabled: !dossierAAjouterAuLot, className: "bg-emerald-700 text-white font-bold px-2 py-1.5 rounded text-[10px] disabled:opacity-30 whitespace-nowrap" }, "\u2795 Ajouter")), /* @__PURE__ */ React.createElement("div", { className: "divide-y max-h-80 overflow-y-auto" }, lotFocused.dossiers.map((v) => /* @__PURE__ */ React.createElement("div", { key: v.id, className: "flex justify-between items-center py-2 text-xs font-mono" }, /* @__PURE__ */ React.createElement("span", null, v.nomPatient, " ", /* @__PURE__ */ React.createElement("span", { className: "text-gray-400" }, "\u2014 ", formatGourdes(v.totalGlobal || 0), " Gdes")), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1" }, peutModifier && /* @__PURE__ */ React.createElement("button", { onClick: () => {
+          if ((v.status || "archived") === "archived" && !confirm(`Ce dossier est d\xE9j\xE0 archiv\xE9 (Lot ${lotFocused.numero}). Le modifier corrigera ce dossier existant \u2014 pense \xE0 r\xE9imprimer le lot ensuite.
+
+Continuer ?`)) return;
+          onChargerPourModif(v);
+        }, className: "text-amber-700 p-1 bg-amber-50 rounded", title: "Modifier / corriger" }, /* @__PURE__ */ React.createElement(Pencil, { size: 13 })), peutModifier && /* @__PURE__ */ React.createElement("button", { onClick: () => retirerDossierDuLot(v), className: "text-red-600 p-1 bg-red-50 rounded", title: "Retirer du lot" }, "\u2796"))))))), sousOngletArchives === "dossiers" && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm space-y-2" }, /* @__PURE__ */ React.createElement("h2", { className: "text-xs font-black text-gray-700 uppercase border-b pb-1" }, "\u{1F4C1} Dossiers (", dossiersFiltres.length, dossiersFiltres.length > nombreAffiche ? ` \u2014 ${nombreAffiche} affich\xE9s` : "", ")"), /* @__PURE__ */ React.createElement("div", { className: "overflow-x-auto max-h-96 overflow-y-auto" }, /* @__PURE__ */ React.createElement("table", { className: "w-full text-left" }, /* @__PURE__ */ React.createElement("thead", { className: "sticky top-0 bg-white shadow-sm" }, /* @__PURE__ */ React.createElement("tr", { className: "bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono" }, /* @__PURE__ */ React.createElement("th", { className: "p-2" }, "Date"), /* @__PURE__ */ React.createElement("th", { className: "p-2" }, "Patient"), /* @__PURE__ */ React.createElement("th", { className: "p-2" }, "Type"), /* @__PURE__ */ React.createElement("th", { className: "p-2" }, "Partenaire"), /* @__PURE__ */ React.createElement("th", { className: "p-2 text-center" }, "Vol."), /* @__PURE__ */ React.createElement("th", { className: "p-2 text-right" }, "Total"), /* @__PURE__ */ React.createElement("th", { className: "p-2 text-center" }, "Statut"), /* @__PURE__ */ React.createElement("th", { className: "p-2 text-center" }, "Actions"))), /* @__PURE__ */ React.createElement("tbody", { className: "divide-y divide-gray-100 font-mono text-[11px]" }, dossiersFiltres.slice(0, nombreAffiche).map((v) => {
           const statut = v.status || "archived";
           const isSuspendu = statut === "suspendu";
           const isReporte = statut === "reporte";
@@ -3200,7 +3302,7 @@ Pour une nouvelle visite de ${v.nomPatient}, utilise plut\xF4t "Rechercher un pa
 Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             onChargerPourModif(v);
           }, className: "text-amber-700 p-1 bg-amber-50 rounded", title: "Modifier / corriger" }, /* @__PURE__ */ React.createElement(Pencil, { size: 13 })), peutSupprimer && /* @__PURE__ */ React.createElement("button", { onClick: () => onSupprimer(v.id), disabled: v.verrouilleFacture, className: "text-gray-300 hover:text-red-600 p-1 disabled:opacity-20" }, /* @__PURE__ */ React.createElement(Trash2, { size: 13 })), /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerArchive(v), className: "text-gray-600 p-1 bg-gray-50 rounded", title: "Imprimer" }, /* @__PURE__ */ React.createElement(Printer, { size: 13 })), isSuspendu && peutRouvrir && /* @__PURE__ */ React.createElement("button", { onClick: () => rouvrirDossierSuspendu(v), className: "text-emerald-600 p-1 bg-emerald-50 rounded", title: "Rouvrir" }, /* @__PURE__ */ React.createElement(FolderOpen, { size: 13 }))));
-        })))), dossiersFiltres.length > nombreAffiche && /* @__PURE__ */ React.createElement("div", { className: "flex justify-center pt-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setNombreAffiche((n) => n + 100), className: "bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-1.5 rounded-lg text-xs font-bold" }, "Charger plus (", dossiersFiltres.length - nombreAffiche, " restants)"))), focusedVerif && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border border-blue-200 shadow-md space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-center border-b pb-1" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-blue-900 text-xs uppercase" }, "\u{1F50D} ", focusedVerif.nomPatient), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerArchive(focusedVerif), className: "bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Imprimer dossier"), /* @__PURE__ */ React.createElement("button", { onClick: () => setFocusedVerif(null) }, /* @__PURE__ */ React.createElement(X, { size: 14 })))), onChangerTypeOng && peutModifier && (!editTypeArchiveOuvert ? /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 text-xs bg-gray-50 border rounded-lg p-2" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-purple-700" }, focusedVerif.ongPartenaire || "Priv\xE9", " - ", focusedVerif.typePatient === "ONG" ? "Partenaire" : "Priv\xE9"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+        })))), dossiersFiltres.length > nombreAffiche && /* @__PURE__ */ React.createElement("div", { className: "flex justify-center pt-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setNombreAffiche((n) => n + 100), className: "bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-1.5 rounded-lg text-xs font-bold" }, "Charger plus (", dossiersFiltres.length - nombreAffiche, " restants)"))), focusedVerif && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border border-blue-200 shadow-md space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-center border-b pb-1" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-blue-900 text-xs uppercase" }, "\u{1F50D} ", focusedVerif.nomPatient), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerArchive(focusedVerif), className: "bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Imprimer dossier"), /* @__PURE__ */ React.createElement("button", { onClick: () => setFocusedVerif(null) }, /* @__PURE__ */ React.createElement(X, { size: 14 })))), focusedVerif.numeroLot != null && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 text-xs bg-indigo-50 border border-indigo-200 rounded-lg p-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-indigo-800" }, "\u{1F4E6} Ce dossier fait partie du ", /* @__PURE__ */ React.createElement("strong", null, "Lot ", focusedVerif.numeroLot), " de ", focusedVerif.ongPartenaire, '. Une correction reste possible via "Modifier/corriger" \u2014 pense \xE0 r\xE9imprimer le lot ensuite pour que le partenaire re\xE7oive la version \xE0 jour.')), onChangerTypeOng && peutModifier && (!editTypeArchiveOuvert ? /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 text-xs bg-gray-50 border rounded-lg p-2" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-purple-700" }, focusedVerif.ongPartenaire || "Priv\xE9", " - ", focusedVerif.typePatient === "ONG" ? "Partenaire" : "Priv\xE9"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
           setNouveauTypeArchive(focusedVerif.typePatient || "ONG");
           setNouvelOngArchive(focusedVerif.ongPartenaire || "");
           setEditTypeArchiveOuvert(true);
@@ -3533,7 +3635,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
         const [depots, setDepots] = useState([]);
         const [searchPatientText, setSearchPatientText] = useState("");
         const [suggestionsPatients, setSuggestionsPatients] = useState([]);
-        const [confirmModal, setConfirmModal] = useState(null);
+        const [confirmModal, setConfirmModal2] = useState(null);
         const [editTypeOuvert, setEditTypeOuvert] = useState(false);
         const [nouveauTypeEdit, setNouveauTypeEdit] = useState("ONG");
         const [nouvelOngEdit, setNouvelOngEdit] = useState("");
@@ -3892,16 +3994,16 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             setMotifExoneration("");
             setAutorisationExoneration(false);
             setPaiementEffectue(true);
-            setConfirmModal({
+            setConfirmModal2({
               titre: "\u{1F5A8}\uFE0F Imprimer le ticket ?",
               message: "Le paiement a bien \xE9t\xE9 enregistr\xE9.",
               confirmLabel: "Imprimer",
               cancelLabel: "Plus tard",
               onConfirm: () => {
-                setConfirmModal(null);
+                setConfirmModal2(null);
                 imprimerTicket(true);
               },
-              onCancel: () => setConfirmModal(null)
+              onCancel: () => setConfirmModal2(null)
             });
           } catch (error) {
             showToast("Erreur: " + error.message, "error");
@@ -3913,7 +4015,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             return;
           }
           const libellesMode = { cash: "\u{1F4B5} Cash", credit: "\u{1F4DD} Cr\xE9dit", ong: "\u{1F3E5} Partenaire", exoneration: "\u{1F3AF} Exon\xE9ration" };
-          setConfirmModal({
+          setConfirmModal2({
             titre: "Confirmer l'encaissement",
             message: `Patient : ${nomPatient}
 Mode de paiement : ${libellesMode[modePaiement] || modePaiement}`,
@@ -3921,10 +4023,10 @@ Mode de paiement : ${libellesMode[modePaiement] || modePaiement}`,
             confirmLabel: "\u{1F4B3} Encaisser",
             cancelLabel: "Annuler",
             onConfirm: () => {
-              setConfirmModal(null);
+              setConfirmModal2(null);
               executerEncaissement();
             },
-            onCancel: () => setConfirmModal(null)
+            onCancel: () => setConfirmModal2(null)
           });
         };
         const peutCreerDossier = userRole === "comptable" || userRole === "direction" || userRole === "administrateur";
@@ -4067,7 +4169,7 @@ Mode de paiement : ${libellesMode[modePaiement] || modePaiement}`,
             setAutorisationExoneration(false);
             return;
           }
-          setConfirmModal({
+          setConfirmModal2({
             titre: "Autoriser l'exon\xE9ration ?",
             message: `Patient : ${nomPatient}
 Motif : ${motifExoneration || "(non pr\xE9cis\xE9)"}
@@ -4083,9 +4185,9 @@ Pourcentage : ${pourcentageExoneration}%`,
                 motif: motifExoneration
               });
               setAutorisationExoneration(true);
-              setConfirmModal(null);
+              setConfirmModal2(null);
             },
-            onCancel: () => setConfirmModal(null)
+            onCancel: () => setConfirmModal2(null)
           });
         } }), " Autoriser") : /* @__PURE__ */ React.createElement("button", { onClick: demanderExoneration, disabled: !pourcentageExoneration || pourcentageExoneration == 0, className: "bg-amber-500 text-white px-3 py-1 rounded text-xs disabled:opacity-30" }, "\u{1F4E8} Demander")), modePaiement === "cash" && !modeDepot && /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-3" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-500" }, "Montant vers\xE9"), /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", value: montantVerse, onChange: (e) => setMontantVerse(e.target.value), placeholder: "0", className: "border rounded-lg p-2 w-full text-sm font-mono", disabled: !peutEncaisser })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-500" }, "Monnaie"), /* @__PURE__ */ React.createElement("div", { className: "bg-gray-100 p-2 rounded-lg text-right font-mono font-bold text-lg text-emerald-700" }, formatGourdes(monnaieARendre), " Gdes"))), !modeDepot && /* @__PURE__ */ React.createElement("button", { onClick: demanderConfirmationEncaissement, disabled: !peutEncaisser || modePaiement === "exoneration" && !(userRole === "direction" || userRole === "administrateur"), className: "w-full bg-emerald-700 hover:bg-emerald-800 text-white py-2.5 rounded-lg text-sm font-bold shadow-md disabled:opacity-50" }, "\u{1F4B3} Encaisser cette fiche"))), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 flex-wrap" }, /* @__PURE__ */ React.createElement("button", { onClick: onViderFicheActive, className: "flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl py-3 text-xs font-bold" }, "\u{1F9F9} Vider l'\xE9cran"), /* @__PURE__ */ React.createElement("button", { onClick: imprimerFicheA4, disabled: !paiementEffectue, className: `flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}` }, "\u{1F5A8}\uFE0F A4"), /* @__PURE__ */ React.createElement("button", { onClick: imprimerTicket, disabled: !paiementEffectue, className: `flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? "bg-green-600 hover:bg-green-700 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}` }, "\u{1F9FE} Ticket"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
           var _a;
@@ -4752,14 +4854,13 @@ Pourcentage : ${pourcentageExoneration}%`,
         const [nomChirSpec, setNomChirSpec] = useState("");
         const [prixChirSpec, setPrixChirSpec] = useState("");
         const [filtreArchivesInitialNom, setFiltreArchivesInitialNom] = useState("");
-        const [dossierPourExport, setDossierPourExport] = useState(null);
         const [needsBackupWarning, setNeedsBackupWarning] = useState(false);
         const [modeSimulation, setModeSimulation] = useState(false);
         const [dossierId, setDossierId] = useState(null);
         const [dossierUpdatedAtOuverture, setDossierUpdatedAtOuverture] = useState(null);
         const [paiementEffectue, setPaiementEffectue] = useState(false);
         const [achatExpressOuvert, setAchatExpressOuvert] = useState(false);
-        const [confirmModal, setConfirmModal] = useState(null);
+        const [confirmModal, setConfirmModal2] = useState(null);
         const [avertissementInactivite, setAvertissementInactivite] = useState(false);
         const [toasts, setToasts] = useState([]);
         const showToast = (message, type = "info") => {
@@ -5025,14 +5126,14 @@ Pourcentage : ${pourcentageExoneration}%`,
             return;
           }
           const ficheOriginale = idFicheEnCoursDEdition ? fichesDossier.find((f) => f.id === idFicheEnCoursDEdition) : null;
-          setConfirmModal({
+          setConfirmModal2({
             titre: idFicheEnCoursDEdition ? "Modification non enregistr\xE9e" : "Fiche en cours d\xE9tect\xE9e",
             message: idFicheEnCoursDEdition ? `Tu modifies la Fiche N\xB0${(ficheOriginale == null ? void 0 : ficheOriginale.numeroFiche) || ""} et ces changements ne sont pas encore enregistr\xE9s.` : "Tu as une fiche en cours de saisie qui n'a pas encore \xE9t\xE9 ajout\xE9e au dossier.",
             detail: `${formatGourdes(grandTotalGlobalFiche)} Gdes`,
             confirmLabel: idFicheEnCoursDEdition ? "Oui, enregistrer la modification" : "Oui, l'ajouter",
             cancelLabel: "Non, continuer sans",
             onConfirm: () => {
-              setConfirmModal(null);
+              setConfirmModal2(null);
               const fiche = {
                 id: idFicheEnCoursDEdition || "fiche-" + Date.now(),
                 numeroFiche: idFicheEnCoursDEdition ? (ficheOriginale == null ? void 0 : ficheOriginale.numeroFiche) || numeroFicheCourante : numeroFicheCourante,
@@ -5047,7 +5148,7 @@ Pourcentage : ${pourcentageExoneration}%`,
               callback(fichesFinales);
             },
             onCancel: () => {
-              setConfirmModal(null);
+              setConfirmModal2(null);
               callback(fichesDossier);
             }
           });
@@ -5142,29 +5243,29 @@ Pourcentage : ${pourcentageExoneration}%`,
         };
         const finaliserEtArchiverDossierOfficiel = async () => {
           const somme = fichesDossier.reduce((s, f) => s + f.totalGlobal, 0);
-          const demanderConfirmation = () => setConfirmModal({
+          const demanderConfirmation = () => setConfirmModal2({
             titre: "Archiver ce dossier ?",
             message: `Patient : ${nomPatient}
 ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\xE9.`,
             detail: `${formatGourdes(somme)} Gdes  (${formatDH(somme)} DH)`,
             confirmLabel: "\u{1F7E2} Archiver",
             onConfirm: () => {
-              setConfirmModal(null);
+              setConfirmModal2(null);
               executerArchivage();
             },
-            onCancel: () => setConfirmModal(null)
+            onCancel: () => setConfirmModal2(null)
           });
           if (await verifierConflit()) {
-            setConfirmModal({
+            setConfirmModal2({
               titre: "\u26A0\uFE0F Ce dossier a \xE9t\xE9 modifi\xE9 entre-temps",
               message: "Une autre personne (ou un autre appareil) a modifi\xE9 ce dossier depuis que tu l'as ouvert ici. Continuer risque d'\xE9craser ses changements.",
               confirmLabel: "Continuer quand m\xEAme",
               danger: true,
               onConfirm: () => {
-                setConfirmModal(null);
+                setConfirmModal2(null);
                 demanderConfirmation();
               },
-              onCancel: () => setConfirmModal(null)
+              onCancel: () => setConfirmModal2(null)
             });
             return;
           }
@@ -5232,28 +5333,28 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             return;
           }
           avecFicheEnCoursAjoutee((fichesFinales) => {
-            const demanderConfirmation = () => setConfirmModal({
+            const demanderConfirmation = () => setConfirmModal2({
               titre: "Suspendre ce dossier ?",
               message: `Le dossier de ${nomPatient} sera mis en pause. Il pourra \xEAtre rouvert plus tard depuis les Archives.`,
               confirmLabel: "\u23F8\uFE0F Suspendre",
               onConfirm: () => {
-                setConfirmModal(null);
+                setConfirmModal2(null);
                 executerSuspension(fichesFinales);
               },
-              onCancel: () => setConfirmModal(null)
+              onCancel: () => setConfirmModal2(null)
             });
             (async () => {
               if (await verifierConflit()) {
-                setConfirmModal({
+                setConfirmModal2({
                   titre: "\u26A0\uFE0F Ce dossier a \xE9t\xE9 modifi\xE9 entre-temps",
                   message: "Une autre personne (ou un autre appareil) a modifi\xE9 ce dossier depuis que tu l'as ouvert ici. Continuer risque d'\xE9craser ses changements.",
                   confirmLabel: "Continuer quand m\xEAme",
                   danger: true,
                   onConfirm: () => {
-                    setConfirmModal(null);
+                    setConfirmModal2(null);
                     demanderConfirmation();
                   },
-                  onCancel: () => setConfirmModal(null)
+                  onCancel: () => setConfirmModal2(null)
                 });
                 return;
               }
@@ -5330,28 +5431,28 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             const cibleMois = /* @__PURE__ */ new Date();
             cibleMois.setMonth(cibleMois.getMonth() + 1);
             const libelleMois = cibleMois.toLocaleString("fr-FR", { month: "long", year: "numeric" });
-            const demanderConfirmation = () => setConfirmModal({
+            const demanderConfirmation = () => setConfirmModal2({
               titre: "Reporter ce dossier au mois suivant ?",
               message: `Le dossier de ${nomPatient} n'est pas complet. Il sera report\xE9 \xE0 ${libelleMois} avec ses ${fichesFinales.length} fiche(s), et exclu du rapport Excel du mois en cours.`,
               confirmLabel: "\u{1F4C5} Reporter",
               onConfirm: () => {
-                setConfirmModal(null);
+                setConfirmModal2(null);
                 executerReport(fichesFinales);
               },
-              onCancel: () => setConfirmModal(null)
+              onCancel: () => setConfirmModal2(null)
             });
             (async () => {
               if (await verifierConflit()) {
-                setConfirmModal({
+                setConfirmModal2({
                   titre: "\u26A0\uFE0F Ce dossier a \xE9t\xE9 modifi\xE9 entre-temps",
                   message: "Une autre personne (ou un autre appareil) a modifi\xE9 ce dossier depuis que tu l'as ouvert ici. Continuer risque d'\xE9craser ses changements.",
                   confirmLabel: "Continuer quand m\xEAme",
                   danger: true,
                   onConfirm: () => {
-                    setConfirmModal(null);
+                    setConfirmModal2(null);
                     demanderConfirmation();
                   },
-                  onCancel: () => setConfirmModal(null)
+                  onCancel: () => setConfirmModal2(null)
                 });
                 return;
               }
@@ -5390,29 +5491,29 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             showToast("Aucun dossier actif.", "error");
             return;
           }
-          setConfirmModal({
+          setConfirmModal2({
             titre: "Annuler ce dossier ?",
             message: `Le dossier de ${nomPatient} et toutes ses fiches (${fichesDossier.length}) seront d\xE9finitivement supprim\xE9s. Cette action est irr\xE9versible.`,
             confirmLabel: "\u{1F5D1}\uFE0F Annuler le dossier",
             danger: true,
             onConfirm: () => {
-              setConfirmModal(null);
+              setConfirmModal2(null);
               executerAnnulation();
             },
-            onCancel: () => setConfirmModal(null)
+            onCancel: () => setConfirmModal2(null)
           });
         };
         const r\u00E9importerDossierDepuisArchives = (doc) => chargerDossierExistant(doc);
         const supprimerDossierArchive = (id) => {
           const dossier = verifications.find((v) => v.id === id);
-          setConfirmModal({
+          setConfirmModal2({
             titre: "Supprimer d\xE9finitivement ce dossier ?",
             message: `${dossier ? `Patient : ${dossier.nomPatient}
 ` : ""}Cette action est irr\xE9versible \u2014 le dossier et son historique de facturation seront perdus pour de bon.`,
             confirmLabel: "\u{1F5D1}\uFE0F Supprimer d\xE9finitivement",
             danger: true,
             onConfirm: async () => {
-              setConfirmModal(null);
+              setConfirmModal2(null);
               enregistrerAudit("suppression_archive", { dossierId: id, nomPatient: (dossier == null ? void 0 : dossier.nomPatient) || null, totalGlobal: (dossier == null ? void 0 : dossier.totalGlobal) || null });
               try {
                 await chf.deleteEpisode(id);
@@ -5423,7 +5524,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
                 showToast("Erreur suppression: " + e.message, "error");
               }
             },
-            onCancel: () => setConfirmModal(null)
+            onCancel: () => setConfirmModal2(null)
           });
         };
         const executerSauvegardeGlobaleJSON = async () => {
@@ -5576,19 +5677,44 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             showToast("S\xE9lectionne une ONG.", "error");
             return;
           }
-          if (idCible === dossierId) {
-            setTypePatient(nouveauType);
-            setSelectedOng(nouveauType === "ONG" ? nouvelOng : "");
+          const executerChangement = async () => {
+            const dossierAvant = verifications.find((v) => v.id === idCible);
+            const sortDuLot = (dossierAvant == null ? void 0 : dossierAvant.numeroLot) != null;
+            const maj = { typePatient: nouveauType, ongPartenaire: nouveauType === "ONG" ? nouvelOng : "" };
+            if (sortDuLot) {
+              maj.numeroLot = null;
+              maj.verrouilleFacture = false;
+            }
+            if (idCible === dossierId) {
+              setTypePatient(nouveauType);
+              setSelectedOng(nouveauType === "ONG" ? nouvelOng : "");
+            }
+            setVerifications((prev) => prev.map((v) => v.id === idCible ? { ...v, ...maj } : v));
+            try {
+              await chf.updateEpisode(idCible, toEpisodeApi(maj));
+              enregistrerAudit("changement_type_ong", { dossierId: idCible, nouveauType, nouvelOng, sortDuLot });
+              showToast(sortDuLot ? `Type mis \xE0 jour \u2014 retir\xE9 du Lot ${dossierAvant.numeroLot}` : "Type de patient mis \xE0 jour", "success");
+            } catch (error) {
+              if (error.isOfflineQueue) showToast("\u{1F4F4} Changement enregistr\xE9 hors ligne", "info");
+              else showToast("Erreur: " + error.message, "error");
+            }
+          };
+          const dossierActuel = verifications.find((v) => v.id === idCible);
+          if ((dossierActuel == null ? void 0 : dossierActuel.numeroLot) != null) {
+            setConfirmModal2({
+              titre: "\u26A0\uFE0F Ce dossier fait partie d'un lot d\xE9j\xE0 envoy\xE9",
+              message: `Changer son partenaire le retirera du Lot ${dossierActuel.numeroLot} de ${dossierActuel.ongPartenaire}. Il faudra ensuite le rattacher \xE0 un nouveau lot s\xE9par\xE9ment (avec le nouveau partenaire). Continuer ?`,
+              confirmLabel: "Oui, changer et retirer du lot",
+              danger: true,
+              onConfirm: () => {
+                setConfirmModal2(null);
+                executerChangement();
+              },
+              onCancel: () => setConfirmModal2(null)
+            });
+            return;
           }
-          setVerifications((prev) => prev.map((v) => v.id === idCible ? { ...v, typePatient: nouveauType, ongPartenaire: nouveauType === "ONG" ? nouvelOng : "" } : v));
-          try {
-            await chf.updateEpisode(idCible, toEpisodeApi({ typePatient: nouveauType, ongPartenaire: nouveauType === "ONG" ? nouvelOng : "" }));
-            enregistrerAudit("changement_type_ong", { dossierId: idCible, nouveauType, nouvelOng });
-            showToast("Type de patient mis \xE0 jour", "success");
-          } catch (error) {
-            if (error.isOfflineQueue) showToast("\u{1F4F4} Changement enregistr\xE9 hors ligne", "info");
-            else showToast("Erreur: " + error.message, "error");
-          }
+          executerChangement();
         };
         const changerTypeOng = (nouveauType, nouvelOng) => changerTypeOngPourDossier(dossierId, nouveauType, nouvelOng);
         const changerNomPatientPourDossier = async (idCible, nouveauNom) => {
@@ -5768,7 +5894,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             onChangerNomPatient: changerNomPatient,
             listeOng: listeOngNoms
           }
-        )), onglet === "verifie" && /* @__PURE__ */ React.createElement(HistoriqueVerifPanel, { verifications, setVerifications, onChargerPourModif: r\u00E9importerDossierDepuisArchives, onSupprimer: supprimerDossierArchive, filtreInitialNom: filtreArchivesInitialNom, clearFiltreInitialNom: () => setFiltreArchivesInitialNom(""), dossierPourExport, setDossierPourExport, userRole, showToast, onChangerTypeOng: changerTypeOngPourDossier, listeOng: listeOngNoms }), onglet === "analyse" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(AnalyticsPanel, { verifications }), onglet === "meds" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GrilleEditionPanel, { titre: "de la Pharmacie", items: medicaments, setItems: setMedicaments, collectionName: "medicaments", showToast }), onglet === "actes" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GrilleEditionPanel, { titre: "des Actes", items: actes, setItems: setActes, collectionName: "actes", showToast }), onglet === "stock" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GestionStockPanel, { items: medicaments, setItems: setMedicaments, showToast }), onglet === "ong" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GestionOngPanel, { listeOngDocs, showToast }), onglet === "users" && userRole === "administrateur" && /* @__PURE__ */ React.createElement(GestionUtilisateursPanel, { showToast }), onglet === "demandes" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(DemandesPanel, { userRole, showToast })));
+        )), onglet === "verifie" && /* @__PURE__ */ React.createElement(HistoriqueVerifPanel, { verifications, setVerifications, onChargerPourModif: r\u00E9importerDossierDepuisArchives, onSupprimer: supprimerDossierArchive, filtreInitialNom: filtreArchivesInitialNom, clearFiltreInitialNom: () => setFiltreArchivesInitialNom(""), userRole, showToast, onChangerTypeOng: changerTypeOngPourDossier, listeOng: listeOngNoms }), onglet === "analyse" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(AnalyticsPanel, { verifications }), onglet === "meds" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GrilleEditionPanel, { titre: "de la Pharmacie", items: medicaments, setItems: setMedicaments, collectionName: "medicaments", showToast }), onglet === "actes" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GrilleEditionPanel, { titre: "des Actes", items: actes, setItems: setActes, collectionName: "actes", showToast }), onglet === "stock" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GestionStockPanel, { items: medicaments, setItems: setMedicaments, showToast }), onglet === "ong" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GestionOngPanel, { listeOngDocs, showToast }), onglet === "users" && userRole === "administrateur" && /* @__PURE__ */ React.createElement(GestionUtilisateursPanel, { showToast }), onglet === "demandes" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(DemandesPanel, { userRole, showToast })));
       }
       function ApplicationRoot() {
         var _a;

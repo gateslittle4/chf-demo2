@@ -62,7 +62,6 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   const [nomChirSpec, setNomChirSpec] = useState("");
   const [prixChirSpec, setPrixChirSpec] = useState("");
   const [filtreArchivesInitialNom, setFiltreArchivesInitialNom] = useState("");
-  const [dossierPourExport, setDossierPourExport] = useState(null);
   const [needsBackupWarning, setNeedsBackupWarning] = useState(false);
   const [modeSimulation, setModeSimulation] = useState(false);
   const [dossierId, setDossierId] = useState(null);
@@ -738,19 +737,38 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
 
   const changerTypeOngPourDossier = async (idCible, nouveauType, nouvelOng) => {
     if (nouveauType === "ONG" && !nouvelOng) { showToast("Sélectionne une ONG.", "error"); return; }
-    if (idCible === dossierId) {
-      setTypePatient(nouveauType);
-      setSelectedOng(nouveauType === "ONG" ? nouvelOng : "");
+    const executerChangement = async () => {
+      const dossierAvant = verifications.find(v => v.id === idCible);
+      const sortDuLot = dossierAvant?.numeroLot != null;
+      const maj = { typePatient: nouveauType, ongPartenaire: nouveauType === "ONG" ? nouvelOng : "" };
+      if (sortDuLot) { maj.numeroLot = null; maj.verrouilleFacture = false; }
+      if (idCible === dossierId) {
+        setTypePatient(nouveauType);
+        setSelectedOng(nouveauType === "ONG" ? nouvelOng : "");
+      }
+      setVerifications(prev => prev.map(v => v.id === idCible ? { ...v, ...maj } : v));
+      try {
+        await chf.updateEpisode(idCible, toEpisodeApi(maj));
+        enregistrerAudit('changement_type_ong', { dossierId: idCible, nouveauType, nouvelOng, sortDuLot });
+        showToast(sortDuLot ? `Type mis à jour — retiré du Lot ${dossierAvant.numeroLot}` : "Type de patient mis à jour", "success");
+      } catch (error) {
+        if (error.isOfflineQueue) showToast("📴 Changement enregistré hors ligne", "info");
+        else showToast("Erreur: " + error.message, "error");
+      }
+    };
+    const dossierActuel = verifications.find(v => v.id === idCible);
+    if (dossierActuel?.numeroLot != null) {
+      setConfirmModal({
+        titre: "⚠️ Ce dossier fait partie d'un lot déjà envoyé",
+        message: `Changer son partenaire le retirera du Lot ${dossierActuel.numeroLot} de ${dossierActuel.ongPartenaire}. Il faudra ensuite le rattacher à un nouveau lot séparément (avec le nouveau partenaire). Continuer ?`,
+        confirmLabel: "Oui, changer et retirer du lot",
+        danger: true,
+        onConfirm: () => { setConfirmModal(null); executerChangement(); },
+        onCancel: () => setConfirmModal(null)
+      });
+      return;
     }
-    setVerifications(prev => prev.map(v => v.id === idCible ? { ...v, typePatient: nouveauType, ongPartenaire: nouveauType === "ONG" ? nouvelOng : "" } : v));
-    try {
-      await chf.updateEpisode(idCible, toEpisodeApi({ typePatient: nouveauType, ongPartenaire: nouveauType === "ONG" ? nouvelOng : "" }));
-      enregistrerAudit('changement_type_ong', { dossierId: idCible, nouveauType, nouvelOng });
-      showToast("Type de patient mis à jour", "success");
-    } catch (error) {
-      if (error.isOfflineQueue) showToast("📴 Changement enregistré hors ligne", "info");
-      else showToast("Erreur: " + error.message, "error");
-    }
+    executerChangement();
   };
   const changerTypeOng = (nouveauType, nouvelOng) => changerTypeOngPourDossier(dossierId, nouveauType, nouvelOng);
 
@@ -938,7 +956,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
               listeOng={listeOngNoms}
             />
         )}
-        {onglet === "verifie" && <HistoriqueVerifPanel verifications={verifications} setVerifications={setVerifications} onChargerPourModif={réimporterDossierDepuisArchives} onSupprimer={supprimerDossierArchive} filtreInitialNom={filtreArchivesInitialNom} clearFiltreInitialNom={() => setFiltreArchivesInitialNom("")} dossierPourExport={dossierPourExport} setDossierPourExport={setDossierPourExport} userRole={userRole} showToast={showToast} onChangerTypeOng={changerTypeOngPourDossier} listeOng={listeOngNoms} />}
+        {onglet === "verifie" && <HistoriqueVerifPanel verifications={verifications} setVerifications={setVerifications} onChargerPourModif={réimporterDossierDepuisArchives} onSupprimer={supprimerDossierArchive} filtreInitialNom={filtreArchivesInitialNom} clearFiltreInitialNom={() => setFiltreArchivesInitialNom("")} userRole={userRole} showToast={showToast} onChangerTypeOng={changerTypeOngPourDossier} listeOng={listeOngNoms} />}
         {onglet === "analyse" && (userRole === "administrateur" || userRole === "direction") && <AnalyticsPanel verifications={verifications} />}
         {onglet === "meds" && (userRole === "administrateur" || userRole === "direction") && <GrilleEditionPanel titre="de la Pharmacie" items={medicaments} setItems={setMedicaments} collectionName="medicaments" showToast={showToast} />}
         {onglet === "actes" && (userRole === "administrateur" || userRole === "direction") && <GrilleEditionPanel titre="des Actes" items={actes} setItems={setActes} collectionName="actes" showToast={showToast} />}
