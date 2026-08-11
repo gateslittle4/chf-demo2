@@ -2,12 +2,12 @@
 const React = window.React;
 const { useState, useEffect, useMemo } = React;
 const { CATEGORIES_LISTE } = require('../utils/constants');
-const { formatGourdes, formatDH, echapperHTML } = require('../utils/helpers');
+const { formatGourdes, formatDH, echapperHTML, formaterNomPropre } = require('../utils/helpers');
 const { Eye, Pencil, Trash2, Printer, Clock, FolderOpen, X, Download, Check } = require('../utils/icons');
 const { chf, toEpisodeApi } = require('../api/supabase');
 const { LOGO_CHF_BASE64 } = require('../utils/logoChf');
 
-function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, dossierPourExport, setDossierPourExport, userRole, showToast, onChangerTypeOng, listeOng }) {
+function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, userRole, showToast, onChangerTypeOng, listeOng }) {
   const [focusedVerif, setFocusedVerif] = useState(null);
   const [editTypeArchiveOuvert, setEditTypeArchiveOuvert] = useState(false);
   const [nouveauTypeArchive, setNouveauTypeArchive] = useState("ONG");
@@ -22,9 +22,34 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
   const [filtreStatut, setFiltreStatut] = useState("");
   const [appliqueRabais10, setAppliqueRabais10] = useState(false);
   const [montantDonIntrants, setMontantDonIntrants] = useState("");
+  const [sousOngletArchives, setSousOngletArchives] = useState("dossiers");
+  const [lotOngSelectionne, setLotOngSelectionne] = useState("");
+  const [lotFocusedNumero, setLotFocusedNumero] = useState(null);
+  const [dossierAAjouterAuLot, setDossierAAjouterAuLot] = useState("");
 
   useEffect(() => { if (filtreInitialNom) { setRechercheNomPatient(filtreInitialNom); clearFiltreInitialNom(); } }, [filtreInitialNom]);
   useEffect(() => { setNombreAffiche(100); }, [filtreType, filtreOng, rechercheNomPatient, filtreDateDebut, filtreDateFin, filtreCategorie, filtreStatut]);
+
+  const lotsDuPartenaire = useMemo(() => {
+    if (!lotOngSelectionne) return [];
+    const parNumero = {};
+    verifications.forEach(v => {
+      if (v.ongPartenaire === lotOngSelectionne && v.numeroLot != null) {
+        if (!parNumero[v.numeroLot]) parNumero[v.numeroLot] = [];
+        parNumero[v.numeroLot].push(v);
+      }
+    });
+    return Object.keys(parNumero).map(n => Number(n)).sort((a, b) => b - a).map(n => ({
+      numero: n, dossiers: parNumero[n], total: parNumero[n].reduce((s, v) => s + (v.totalGlobal || 0), 0)
+    }));
+  }, [verifications, lotOngSelectionne]);
+
+  const dossiersEnAttenteDeLot = useMemo(() => {
+    if (!lotOngSelectionne) return [];
+    return verifications.filter(v => v.ongPartenaire === lotOngSelectionne && (v.status || 'archived') === 'archived' && v.numeroLot == null && !v.verrouilleFacture);
+  }, [verifications, lotOngSelectionne]);
+
+  const lotFocused = lotFocusedNumero != null ? (lotsDuPartenaire.find(l => l.numero === lotFocusedNumero) || null) : null;
 
   const dossiersFiltres = useMemo(() => {
     return verifications.filter(v => {
@@ -61,6 +86,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     celluleNombre: { alignment: { horizontal: "right" }, numFmt: "#,##0", border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } },
     celluleTotal: { font: { bold: true }, alignment: { horizontal: "right" }, numFmt: "\"HTG \"#,##0", border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } },
     grandTotalHtg: { font: { bold: true }, alignment: { horizontal: "right" }, numFmt: "\"HTG \"#,##0", border: { top: { style: "medium" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } },
+    grandTotalNombre: { font: { bold: true }, alignment: { horizontal: "right" }, numFmt: "#,##0", border: { top: { style: "medium" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } },
     celluleFinaleGras: { font: { bold: true, size: 11 }, fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFD0D0D0" } }, alignment: { horizontal: "right" }, numFmt: "\"HTG \"#,##0", border: { top: { style: "medium" }, bottom: { style: "double" }, left: { style: "thin" }, right: { style: "thin" } } }
   };
 
@@ -75,45 +101,49 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
   };
 
   // Libellés d'export courts, alignés sur le modèle Excel réel du CHF (pas les labels internes de l'app)
+  // Chaque catégorie de CATEGORIES_LISTE a sa propre colonne — aucune n'est regroupée dans un fourre-tout "Autres".
   const LABELS_EXPORT = {
     service: 'Admission', hospit: 'Lit/ Hosp', labo: 'Laboratoire', med: 'Medicaments',
     ecg: 'ECG', oxygene: 'O2', cesarienne: 'Cesarienne/Laparo', curetage: 'curtage',
-    chirurgie: 'Chirugie', accouchement: 'Accouch', sono: 'SONO', pansement: 'Pansement'
+    chirurgie: 'Chirugie', accouchement: 'Accouch', sono: 'SONO', pansement: 'Pansement',
+    suture: 'Suture', drainage: 'Drainage', pap: 'PAP Test', visite: 'Visite',
+    nebulisation: 'Nebulisation', radio: 'Radiographie'
   };
-  const CLES_AUTRES = ['suture', 'drainage', 'pap', 'visite', 'nebulisation'];
 
-  const exporterBlocDossiersExcelPartenaire = async (ongCible) => {
+  const genererFichierExcelPourLot = async (ongCible, idsDossiers, numeroLot) => {
     try {
-      // Étape A : récupération + filtrage (ONG + filtres actifs de l'écran) + tri chronologique
-      let listeDossiersONG = verifications.filter(v => v.ongPartenaire === ongCible && (filtreType === "" || (v.typePatient || 'ONG') === filtreType));
-      if (filtreDateDebut || filtreDateFin) {
-        listeDossiersONG = listeDossiersONG.filter(v => {
-          const d = new Date(v.dateEntreePourTri); if (isNaN(d)) return false;
-          if (filtreDateDebut && d < new Date(filtreDateDebut)) return false;
-          if (filtreDateFin) { const fin = new Date(filtreDateFin); fin.setHours(23,59,59,999); if (d > fin) return false; }
-          return true;
-        });
-      }
-      listeDossiersONG = listeDossiersONG.sort((a, b) => new Date(a.dateEntreePourTri) - new Date(b.dateEntreePourTri));
+      let listeDossiersONG = verifications.filter(v => idsDossiers.includes(v.id));
+      // Regroupement mère/bébé : un dossier nommé "Bb <nom de la mère>" est trié juste après le
+      // dossier de sa mère (même date effective, ordre alphabétique de la "famille" sinon), même si
+      // le bébé n'a pas sa propre date d'hébergement (il hérite alors de celle de sa mère pour le tri).
+      const extraireNomMere = (nom) => { const m = (nom || '').trim().match(/^(?:bb|beb[ée])\.?\s+(.+)$/i); return m ? m[1].trim().toLowerCase() : null; };
+      const cleFamille = (nom) => extraireNomMere(nom) || (nom || '').trim().toLowerCase();
+      const dateMereParCle = {};
+      listeDossiersONG.forEach(v => { if (!extraireNomMere(v.nomPatient)) dateMereParCle[cleFamille(v.nomPatient)] = v.dateEntreePourTri; });
+      const dateEffective = (v) => { const nomMere = extraireNomMere(v.nomPatient); return (nomMere && dateMereParCle[nomMere]) ? dateMereParCle[nomMere] : v.dateEntreePourTri; };
+      listeDossiersONG = listeDossiersONG.sort((a, b) => {
+        const diff = new Date(dateEffective(a)) - new Date(dateEffective(b));
+        if (diff !== 0) return diff;
+        const cleA = cleFamille(a.nomPatient), cleB = cleFamille(b.nomPatient);
+        if (cleA !== cleB) return cleA.localeCompare(cleB);
+        return (extraireNomMere(a.nomPatient) ? 1 : 0) - (extraireNomMere(b.nomPatient) ? 1 : 0);
+      });
 
       if (listeDossiersONG.length === 0) { showToast(`Aucun dossier trouvé pour ${ongCible}`, "error"); return; }
 
       // Étape B : détection dynamique des colonnes réellement utilisées (rien d'inventé, rien d'oublié)
       const clesVues = new Set(['service', 'hospit', 'labo', 'med']);
-      let autresUtilise = false;
       let grandTotalGeneral = 0;
       listeDossiersONG.forEach(doc => {
         (doc.fiches || []).forEach(f => {
           Object.entries(f.breakdown || {}).forEach(([k, val]) => {
             if (!val) return;
-            if (CLES_AUTRES.includes(k)) autresUtilise = true;
-            else if (LABELS_EXPORT[k]) clesVues.add(k);
+            if (LABELS_EXPORT[k]) clesVues.add(k);
           });
           grandTotalGeneral += f.totalGlobal || 0;
         });
       });
       const colonnesExport = Object.keys(LABELS_EXPORT).filter(k => clesVues.has(k)).map(k => ({ key: k, label: LABELS_EXPORT[k] }));
-      if (autresUtilise) colonnesExport.push({ key: '__autres__', label: 'Autres' });
 
       // Étape C : classeur ExcelJS + en-tête du document
       // Le logo flotte au-dessus de l'en-tête (coin haut-gauche), sans réserver de colonne dédiée dans le tableau.
@@ -143,7 +173,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       r++;
       appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.gras);
       ws.getCell(r, 1).value = "FACTURE";
-      ws.getCell(r, 2).value = `#${Math.floor(Math.random()*10000)}`;
+      ws.getCell(r, 2).value = `${ongCible.replace(/\s+/g,'')}-LOT${numeroLot}`;
       ws.getCell(r, 5).value = ongCible;
       appliquerStyle(ws.getCell(r, 5), EXCEL_STYLES.gras);
       r++;
@@ -166,13 +196,12 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
 
         (doc.fiches || []).forEach(f => {
           Object.entries(f.breakdown || {}).forEach(([k, val]) => {
-            if (CLES_AUTRES.includes(k)) totalsPatient['__autres__'] = (totalsPatient['__autres__'] || 0) + (val || 0);
-            else if (totalsPatient[k] !== undefined) totalsPatient[k] += (val || 0);
+            if (totalsPatient[k] !== undefined) totalsPatient[k] += (val || 0);
           });
           totalPatient += f.totalGlobal || 0;
         });
 
-        appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.celluleStandard); ws.getCell(r, 1).value = doc.nomPatient;
+        appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.celluleStandard); ws.getCell(r, 1).value = formaterNomPropre(doc.nomPatient);
         appliquerStyle(ws.getCell(r, 2), EXCEL_STYLES.celluleStandard); ws.getCell(r, 2).value = doc.periodeSejourString || doc.dateHeure || "—";
         colonnesExport.forEach((c, i) => {
           totalsParColonne[c.key] += totalsPatient[c.key] || 0;
@@ -187,7 +216,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       // Étape E : GRAND TOTAL, puis réductions/dons si activés dans l'interface
       appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.grandTotalHtg); ws.getCell(r, 1).value = "GRAND TOTAL";
       appliquerStyle(ws.getCell(r, 2), EXCEL_STYLES.grandTotalHtg);
-      colonnesExport.forEach((c, i) => { const cell = ws.getCell(r, 3 + i); cell.value = totalsParColonne[c.key]; appliquerStyle(cell, EXCEL_STYLES.grandTotalHtg); });
+      colonnesExport.forEach((c, i) => { const cell = ws.getCell(r, 3 + i); cell.value = totalsParColonne[c.key]; appliquerStyle(cell, EXCEL_STYLES.grandTotalNombre); });
       { const cell = ws.getCell(r, 3 + colonnesExport.length); cell.value = grandTotalGeneral; appliquerStyle(cell, EXCEL_STYLES.grandTotalHtg); }
       r++;
 
@@ -227,28 +256,87 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       const urlTelechargement = URL.createObjectURL(blob);
       const lien = document.createElement('a');
       lien.href = urlTelechargement;
-      lien.download = `Rapport_${ongCible.replace(/\s+/g, '_')}_${moisTexte}_${now.getFullYear()}.xlsx`;
+      lien.download = `Lot${numeroLot}_${ongCible.replace(/\s+/g, '_')}_${now.toLocaleDateString('fr-FR').replace(/\//g,'-')}.xlsx`;
       document.body.appendChild(lien);
       lien.click();
       document.body.removeChild(lien);
       setTimeout(() => URL.revokeObjectURL(urlTelechargement), 1000);
 
-      // Étape G : verrouille les dossiers exportés pour éviter qu'ils soient modifiés/supprimés après facturation
+      // Étape G : assigne le numéro de lot + verrouille les dossiers (protège contre modification
+      // libre et suppression). Idempotent : réimprimer un lot existant réassigne le même numéro.
       const idsExportes = listeDossiersONG.map(d => d.id);
-      setVerifications(prev => prev.map(v => idsExportes.includes(v.id) ? { ...v, verrouilleFacture: true } : v));
+      setVerifications(prev => prev.map(v => idsExportes.includes(v.id) ? { ...v, numeroLot, verrouilleFacture: true } : v));
       let echecsVerrou = 0;
       await Promise.all(listeDossiersONG.map(async (d) => {
-        try { await chf.updateEpisode(d.id, toEpisodeApi({ verrouilleFacture: true })); }
+        try { await chf.updateEpisode(d.id, toEpisodeApi({ numeroLot, verrouilleFacture: true })); }
         catch (e) { if (!e.isOfflineQueue) echecsVerrou++; }
       }));
 
-      showToast(`✅ Export Excel de ${listeDossiersONG.length} dossiers (${formatGourdes(grandTotalGeneral)} Gdes)${echecsVerrou > 0 ? ` — ⚠️ ${echecsVerrou} dossier(s) non verrouillé(s), réessaie plus tard` : ''}`, "success");
-      setDossierPourExport(null);
+      showToast(`✅ Lot ${numeroLot} de ${ongCible} : ${listeDossiersONG.length} dossier(s), ${formatGourdes(grandTotalGeneral)} Gdes${echecsVerrou > 0 ? ` — ⚠️ ${echecsVerrou} dossier(s) non enregistré(s), réessaie plus tard` : ''}`, "success");
       setAppliqueRabais10(false);
       setMontantDonIntrants("");
     } catch (error) {
       console.error("Erreur export Excel:", error);
       showToast("Une erreur s'est produite lors de la génération du fichier Excel.", "error");
+    }
+  };
+
+  const genererProchainLot = (ongCible) => {
+    const eligibles = verifications.filter(v => v.ongPartenaire === ongCible && (v.status || 'archived') === 'archived' && v.numeroLot == null && !v.verrouilleFacture);
+    if (eligibles.length === 0) { showToast(`Aucun nouveau dossier en attente pour ${ongCible}.`, "error"); return; }
+    const numerosExistants = verifications.filter(v => v.ongPartenaire === ongCible && v.numeroLot != null).map(v => v.numeroLot);
+    const prochainNumero = numerosExistants.length > 0 ? Math.max(...numerosExistants) + 1 : 1;
+    const totalEstime = eligibles.reduce((s, v) => s + (v.totalGlobal || 0), 0);
+    setConfirmModal({
+      titre: `📦 Générer le Lot ${prochainNumero} pour ${ongCible} ?`,
+      message: `${eligibles.length} dossier(s) seront inclus, pour un total d'environ ${formatGourdes(totalEstime)} Gdes. Une fois généré, ce lot sera figé : ces dossiers ne seront plus jamais repris automatiquement dans un futur lot.`,
+      confirmLabel: `📦 Générer le Lot ${prochainNumero}`,
+      onConfirm: () => { setConfirmModal(null); genererFichierExcelPourLot(ongCible, eligibles.map(v => v.id), prochainNumero); },
+      onCancel: () => setConfirmModal(null)
+    });
+  };
+
+  const reimprimerLot = (ongCible, numeroLot) => {
+    const idsLot = verifications.filter(v => v.ongPartenaire === ongCible && v.numeroLot === numeroLot).map(v => v.id);
+    if (idsLot.length === 0) { showToast("Lot introuvable.", "error"); return; }
+    genererFichierExcelPourLot(ongCible, idsLot, numeroLot);
+  };
+
+  // Retire un dossier de son lot : redevient libre, sera repris au prochain "Générer le prochain
+  // lot" pour ce partenaire — jamais automatiquement dans un autre lot déjà existant.
+  const retirerDossierDuLot = (dossier) => {
+    setConfirmModal({
+      titre: `Retirer ${dossier.nomPatient} du Lot ${dossier.numeroLot} ?`,
+      message: `Ce dossier redeviendra libre et sera inclus dans le PROCHAIN lot généré pour ${dossier.ongPartenaire}, pas dans celui-ci. Si ce lot a déjà été envoyé au partenaire, réimprime-le après pour qu'il reçoive la version sans ce dossier.`,
+      confirmLabel: "Retirer du lot",
+      danger: true,
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setVerifications(prev => prev.map(v => v.id === dossier.id ? { ...v, numeroLot: null, verrouilleFacture: false } : v));
+        try {
+          await chf.updateEpisode(dossier.id, toEpisodeApi({ numeroLot: null, verrouilleFacture: false }));
+          showToast(`${dossier.nomPatient} retiré du Lot ${dossier.numeroLot}`, "success");
+        } catch (error) {
+          if (error.isOfflineQueue) showToast("📴 Changement enregistré hors ligne", "info");
+          else showToast("Erreur: " + error.message, "error");
+        }
+      },
+      onCancel: () => setConfirmModal(null)
+    });
+  };
+
+  // Ajoute un dossier libre (jamais encore loté) à un lot déjà existant. Ne propose que des
+  // dossiers sans numeroLot — un dossier déjà dans un lot ne peut donc jamais se retrouver dans deux
+  // lots à la fois (il faut d'abord le retirer de l'un avant de pouvoir l'ajouter à l'autre).
+  const ajouterDossierAuLot = async (idDossier, numeroLot, ongCible) => {
+    const dossier = verifications.find(v => v.id === idDossier);
+    setVerifications(prev => prev.map(v => v.id === idDossier ? { ...v, numeroLot, verrouilleFacture: true } : v));
+    try {
+      await chf.updateEpisode(idDossier, toEpisodeApi({ numeroLot, verrouilleFacture: true }));
+      showToast(`${dossier?.nomPatient || 'Dossier'} ajouté au Lot ${numeroLot}`, "success");
+    } catch (error) {
+      if (error.isOfflineQueue) showToast("📴 Changement enregistré hors ligne", "info");
+      else showToast("Erreur: " + error.message, "error");
     }
   };
 
@@ -265,14 +353,14 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     }).join('') : '';
     const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N°${fiche.numeroFiche}</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:13px;margin-bottom:6px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.info-patient{font-size:12px;margin-bottom:4px;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p><p>${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</p></div><div class="info"><span>Patient: ${echapperHTML(focusedVerif.nomPatient)}</span><span>${focusedVerif.typePatient === 'ONG' ? echapperHTML(focusedVerif.ongPartenaire || 'N/R') : 'Privé'}</span></div><div class="info"><span>Fiche N°${fiche.numeroFiche}</span><span>Mode: ${echapperHTML(fiche.modePaiement || 'cash').toUpperCase()}</span></div><div class="info info-patient"><span>📞 ${echapperHTML(focusedVerif.telephone || 'N/R')}</span><span>📁 ${echapperHTML(focusedVerif.numDossier || 'N/R')}</span></div><div class="info info-patient"><span>Type: ${focusedVerif.typePatient === 'ONG' ? 'Partenaire' : 'Privé'}</span><span>Enregistré par: ${echapperHTML(fiche.creePar || 'inconnu')}</span></div>${fiche.exeat ? `<p style="font-size:10px; margin:4px 0;"><strong>Séjour:</strong> ${fiche.exeat.dateEntree.split('-').reverse().slice(0,2).join('/')} → ${fiche.exeat.dateSortie.split('-').reverse().slice(0,2).join('/')}</p>` : ''}<table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${hasLignes ? lignesHTML : fallbackHTML}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes<br/>${formatDH(fiche.totalGlobal)} DH</div>${fiche.solde && fiche.solde > 0 ? `<p style="font-size:12px; color:red;"><strong>Solde restant :</strong> ${formatGourdes(fiche.solde)} Gdes</p>` : ''}<div class="footer">Merci de votre visite !<br/>CHF Système Hospitalier – ${new Date().getFullYear()}</div></body></html>`;
     const win = window.open('', '_blank', 'width=500,height=700');
-    if (!win) { showToast("Autorisez les pop-ups.", "error"); return; }
+    if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
     win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 500);
   };
 
   const imprimerArchive = (dossier) => {
-    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Dossier ${echapperHTML(dossier.nomPatient)}</title><style>body{font-family:sans-serif;padding:20px;color:#000;} .entete{text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:14px;} .entete h1{font-size:22px;margin:4px 0;} .entete p{margin:2px 0;font-size:12px;} h1.titre{font-size:18px;margin-top:10px;} table{width:100%;border-collapse:collapse;margin-top:10px;} th,td{border:1px solid #ccc;padding:6px;text-align:left;font-size:12px;} .total{font-weight:bold;font-size:16px;margin-top:10px;} .info-patient{font-size:12px;margin:4px 0;} .meta-fiche{font-size:10px;color:#555;margin-top:4px;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p><p>${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</p></div><h1 class="titre">Dossier patient</h1><p class="info-patient"><strong>Nom :</strong> ${echapperHTML(dossier.nomPatient)} &nbsp;|&nbsp; <strong>N° Dossier :</strong> ${echapperHTML(dossier.numDossier || 'N/R')}</p><p class="info-patient"><strong>ONG / Type :</strong> ${echapperHTML(dossier.ongPartenaire || 'Privé')} (${echapperHTML(dossier.typePatient || 'ONG')})</p><p class="info-patient"><strong>Téléphone :</strong> ${echapperHTML(dossier.telephone || 'N/R')}</p><p class="info-patient"><strong>Date d'ouverture :</strong> ${echapperHTML(dossier.dateHeure)}</p><p><strong>Total :</strong> ${formatGourdes(dossier.totalGlobal)} Gdes (${formatDH(dossier.totalGlobal)} DH)</p><h3>Fiches :</h3>${dossier.fiches?.map(f => `<div style="border:1px solid #ddd;margin:10px 0;padding:10px;"><p><strong>Fiche N°${f.numeroFiche}</strong> - Total : ${formatGourdes(f.totalGlobal)} Gdes</p><table><thead><tr><th>Catégorie</th><th>Montant</th></tr></thead><tbody>${Object.entries(f.breakdown || {}).map(([key, val]) => { if (val === 0) return ''; const cat = CATEGORIES_LISTE.find(c => c.key === key); return `<tr><td>${echapperHTML(cat ? cat.label : key)}</td><td>${formatGourdes(val)}</td></tr>`; }).join('')}</tbody></table><p class="meta-fiche">Mode de paiement : ${echapperHTML((f.modePaiement || 'cash').toUpperCase())} &nbsp;|&nbsp; Encaissé par : ${echapperHTML(f.creePar || 'inconnu')} &nbsp;|&nbsp; ${f.dateCreation ? new Date(f.dateCreation).toLocaleString('fr-FR') : ''}</p></div>`).join('')}<p class="total">Total général : ${formatGourdes(dossier.totalGlobal)} Gdes (${formatDH(dossier.totalGlobal)} DH)</p></body></html>`;
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Dossier ${echapperHTML(dossier.nomPatient)}</title><style>body{font-family:sans-serif;padding:20px;color:#000;} .entete{text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:14px;} .entete h1{font-size:22px;margin:4px 0;} .entete p{margin:2px 0;font-size:12px;} h1.titre{font-size:18px;margin-top:10px;} table{width:100%;border-collapse:collapse;margin-top:10px;} th,td{border:1px solid #ccc;padding:6px;text-align:left;font-size:12px;} .total{font-weight:bold;font-size:16px;margin-top:10px;} .info-patient{font-size:12px;margin:4px 0;} .meta-fiche{font-size:10px;color:#555;margin-top:4px;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p><p>${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</p></div><h1 class="titre">Dossier patient</h1><p class="info-patient"><strong>Nom :</strong> ${echapperHTML(dossier.nomPatient)} &nbsp;|&nbsp; <strong>N° Dossier :</strong> ${echapperHTML(dossier.numDossier || 'N/R')}</p><p class="info-patient"><strong>Partenaire / Type :</strong> ${dossier.typePatient === 'ONG' ? echapperHTML(dossier.ongPartenaire || 'N/R') : 'Privé'} (${dossier.typePatient === 'ONG' ? 'Partenaire' : 'Privé'})</p><p class="info-patient"><strong>Téléphone :</strong> ${echapperHTML(dossier.telephone || 'N/R')}</p><p class="info-patient"><strong>Date d'ouverture :</strong> ${echapperHTML(dossier.dateHeure)}</p><p><strong>Total :</strong> ${formatGourdes(dossier.totalGlobal)} Gdes (${formatDH(dossier.totalGlobal)} DH)</p><h3>Fiches :</h3>${dossier.fiches?.map(f => `<div style="border:1px solid #ddd;margin:10px 0;padding:10px;"><p><strong>Fiche N°${f.numeroFiche}</strong> - Total : ${formatGourdes(f.totalGlobal)} Gdes</p><table><thead><tr><th>Catégorie</th><th>Montant</th></tr></thead><tbody>${Object.entries(f.breakdown || {}).map(([key, val]) => { if (val === 0) return ''; const cat = CATEGORIES_LISTE.find(c => c.key === key); return `<tr><td>${echapperHTML(cat ? cat.label : key)}</td><td>${formatGourdes(val)}</td></tr>`; }).join('')}</tbody></table><p class="meta-fiche">Mode de paiement : ${echapperHTML((f.modePaiement || 'cash').toUpperCase())} &nbsp;|&nbsp; Encaissé par : ${echapperHTML(f.creePar || 'inconnu')} &nbsp;|&nbsp; ${f.dateCreation ? new Date(f.dateCreation).toLocaleString('fr-FR') : ''}</p></div>`).join('')}<p class="total">Total général : ${formatGourdes(dossier.totalGlobal)} Gdes (${formatDH(dossier.totalGlobal)} DH)</p></body></html>`;
     const win = window.open('', '_blank', 'width=800,height=600');
-    if (!win) { showToast("Autorisez les pop-ups", "error"); return; }
+    if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
     win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 500);
   };
 
@@ -285,55 +373,108 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
   return (
     <div className="space-y-4 text-xs">
       <div className="bg-white p-3 rounded-xl border shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        <div className="flex flex-col gap-1"><label className="text-[10px] font-bold text-gray-400 uppercase">Type</label><select value={filtreType} onChange={e => setFiltreType(e.target.value)} className="border rounded-lg p-1.5 bg-white outline-none"><option value="">Tous</option><option value="ONG">🏥 ONG</option><option value="PRIVE">💳 Privé</option></select></div>
-        <div className="flex flex-col gap-1"><label className="text-[10px] font-bold text-gray-400 uppercase">ONG</label><select value={filtreOng} onChange={e => setFiltreOng(e.target.value)} className="border rounded-lg p-1.5 bg-white outline-none" disabled={filtreType === "PRIVE"}><option value="">Tous</option>{listeOng.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
+        <div className="flex flex-col gap-1"><label className="text-[10px] font-bold text-gray-400 uppercase">Type</label><select value={filtreType} onChange={e => setFiltreType(e.target.value)} className="border rounded-lg p-1.5 bg-white outline-none"><option value="">Tous</option><option value="ONG">🏥 Partenaire</option><option value="PRIVE">💳 Privé</option></select></div>
+        <div className="flex flex-col gap-1"><label className="text-[10px] font-bold text-gray-400 uppercase">Partenaire</label><select value={filtreOng} onChange={e => setFiltreOng(e.target.value)} className="border rounded-lg p-1.5 bg-white outline-none" disabled={filtreType === "PRIVE"}><option value="">Tous</option>{listeOng.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
         <div className="flex flex-col gap-1"><label className="text-[10px] font-bold text-gray-400 uppercase">Nom</label><input type="text" value={rechercheNomPatient} onChange={e => setRechercheNomPatient(e.target.value)} placeholder="Nom..." className="border rounded-lg p-1.5 outline-none" /></div>
         <div className="flex flex-col gap-1"><label className="text-[10px] font-bold text-gray-400 uppercase">Date début</label><input type="date" value={filtreDateDebut} onChange={e => setFiltreDateDebut(e.target.value)} className="border rounded-lg p-1.5 bg-white outline-none" /></div>
         <div className="flex flex-col gap-1"><label className="text-[10px] font-bold text-gray-400 uppercase">Date fin</label><input type="date" value={filtreDateFin} onChange={e => setFiltreDateFin(e.target.value)} className="border rounded-lg p-1.5 bg-white outline-none" /></div>
         <div className="flex flex-col gap-1"><label className="text-[10px] font-bold text-gray-400 uppercase">Catégorie</label><select value={filtreCategorie} onChange={e => setFiltreCategorie(e.target.value)} className="border rounded-lg p-1.5 bg-white outline-none"><option value="">Toutes</option>{CATEGORIES_LISTE.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select></div>
-        <div className="flex flex-col gap-1"><label className="text-[10px] font-bold text-gray-400 uppercase">Statut</label><select value={filtreStatut} onChange={e => setFiltreStatut(e.target.value)} className="border rounded-lg p-1.5 bg-white outline-none"><option value="">Tous</option><option value="actif">Actif</option><option value="suspendu">Suspendu</option><option value="archived">Archivé</option></select></div>
+        <div className="flex flex-col gap-1"><label className="text-[10px] font-bold text-gray-400 uppercase">Statut</label><select value={filtreStatut} onChange={e => setFiltreStatut(e.target.value)} className="border rounded-lg p-1.5 bg-white outline-none"><option value="">Tous</option><option value="actif">Actif</option><option value="suspendu">Suspendu</option><option value="reporte">Reporté</option><option value="archived">Archivé</option></select></div>
       </div>
       <div className="flex justify-end"><button onClick={()=>{setFiltreType("");setFiltreOng("");setRechercheNomPatient("");setFiltreDateDebut("");setFiltreDateFin("");setFiltreCategorie("");setFiltreStatut("");}} className="bg-gray-200 text-gray-700 px-3 py-1 rounded text-xs font-bold">Réinitialiser</button></div>
 
-      {peutExporter && (
+      <div className="flex gap-2 border-b">
+        <button onClick={() => setSousOngletArchives("dossiers")} className={`px-4 py-2 text-xs font-bold rounded-t-lg ${sousOngletArchives === "dossiers" ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-500"}`}>📁 Dossiers</button>
+        {peutExporter && <button onClick={() => setSousOngletArchives("lots")} className={`px-4 py-2 text-xs font-bold rounded-t-lg ${sousOngletArchives === "lots" ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-500"}`}>📦 Lots & Facturation</button>}
+      </div>
+
+      {sousOngletArchives === "lots" && peutExporter && (
         <div className="bg-white p-4 rounded-xl border border-purple-300 shadow-sm space-y-3">
-          <h3 className="font-black text-purple-950 text-xs uppercase tracking-wider">💼 Clôture & Facturation</h3>
-          <div className="flex flex-wrap gap-2 items-end">
-            <select value={dossierPourExport||""} onChange={e=>setDossierPourExport(e.target.value||null)} className="border rounded-lg p-1.5 text-xs bg-white font-bold outline-none"><option value="">-- Partenaire --</option>{listeOng.map(o=><option key={o} value={o}>{o}</option>)}</select>
-            {dossierPourExport && (
-              <div className="flex flex-wrap gap-4 items-center bg-white p-2 rounded-lg border border-dashed shadow-sm">
+          <div className="flex flex-col gap-1"><label className="text-[10px] font-bold text-gray-400 uppercase">Partenaire</label>
+            <select value={lotOngSelectionne} onChange={e => { setLotOngSelectionne(e.target.value); setLotFocusedNumero(null); }} className="border rounded-lg p-1.5 text-xs bg-white font-bold outline-none max-w-xs"><option value="">-- Sélectionner --</option>{listeOng.map(o => <option key={o} value={o}>{o}</option>)}</select>
+          </div>
+
+          {lotOngSelectionne && !lotFocused && (
+            <>
+              <div className="flex flex-wrap gap-4 items-center bg-gray-50 p-3 rounded-lg border border-dashed">
+                <span className="font-bold text-gray-700">🆕 {dossiersEnAttenteDeLot.length} dossier(s) en attente — {formatGourdes(dossiersEnAttenteDeLot.reduce((s,v)=>s+(v.totalGlobal||0),0))} Gdes</span>
                 <label className="flex items-center gap-1 font-bold text-purple-900 cursor-pointer"><input type="checkbox" checked={appliqueRabais10} onChange={e=>setAppliqueRabais10(e.target.checked)} className="rounded" /> Rabais 10%</label>
                 <div className="flex items-center gap-1"><span className="font-semibold text-gray-500">Dons:</span><input type="number" min="0" value={montantDonIntrants} onChange={e=>setMontantDonIntrants(e.target.value)} placeholder="0" className="border rounded p-1 w-24 font-mono font-bold text-right text-red-700 outline-none" /></div>
-                <button onClick={()=>exporterBlocDossiersExcelPartenaire(dossierPourExport)} className="bg-purple-700 text-white font-bold px-3 py-1.5 rounded flex items-center gap-1 shadow"><Download size={13}/> Excel</button>
+                <button onClick={() => genererProchainLot(lotOngSelectionne)} disabled={dossiersEnAttenteDeLot.length === 0} className="bg-purple-700 text-white font-bold px-3 py-1.5 rounded flex items-center gap-1 shadow disabled:opacity-30"><Download size={13}/> Générer le prochain lot</button>
               </div>
-            )}
-          </div>
+
+              <h3 className="font-black text-gray-700 text-xs uppercase border-b pb-1">Lots déjà envoyés</h3>
+              {lotsDuPartenaire.length === 0 && <p className="text-gray-400 text-center py-3">Aucun lot envoyé pour ce partenaire encore.</p>}
+              <div className="divide-y">
+                {lotsDuPartenaire.map(lot => (
+                  <div key={lot.numero} className="flex justify-between items-center py-2 text-xs">
+                    <span className="font-bold text-gray-700">Lot {lot.numero} — {lot.dossiers.length} dossier(s) — {formatGourdes(lot.total)} Gdes</span>
+                    <div className="flex gap-2">
+                      <button onClick={() => setLotFocusedNumero(lot.numero)} className="text-blue-600 font-bold underline">Voir</button>
+                      <button onClick={() => reimprimerLot(lotOngSelectionne, lot.numero)} className="text-purple-700 font-bold underline">🔄 Réimprimer</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {lotFocused && (
+            <div className="space-y-2">
+              <div className="flex justify-between items-center border-b pb-1">
+                <h3 className="font-black text-gray-700 text-xs uppercase">📦 Lot {lotFocused.numero} — {lotOngSelectionne} — {formatGourdes(lotFocused.total)} Gdes</h3>
+                <div className="flex gap-2">
+                  <button onClick={() => reimprimerLot(lotOngSelectionne, lotFocused.numero)} className="bg-purple-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1"><Download size={12}/> Réimprimer ce lot</button>
+                  <button onClick={() => setLotFocusedNumero(null)}><X size={14}/></button>
+                </div>
+              </div>
+              {dossiersEnAttenteDeLot.length > 0 && (
+                <div className="flex items-center gap-2 bg-gray-50 border border-dashed rounded-lg p-2">
+                  <select value={dossierAAjouterAuLot} onChange={e => setDossierAAjouterAuLot(e.target.value)} className="border rounded p-1.5 text-xs bg-white flex-1 outline-none"><option value="">-- Ajouter un dossier libre à ce lot --</option>{dossiersEnAttenteDeLot.map(v => <option key={v.id} value={v.id}>{v.nomPatient} — {formatGourdes(v.totalGlobal||0)} Gdes</option>)}</select>
+                  <button onClick={() => { if (dossierAAjouterAuLot) { ajouterDossierAuLot(dossierAAjouterAuLot, lotFocused.numero, lotOngSelectionne); setDossierAAjouterAuLot(""); } }} disabled={!dossierAAjouterAuLot} className="bg-emerald-700 text-white font-bold px-2 py-1.5 rounded text-[10px] disabled:opacity-30 whitespace-nowrap">➕ Ajouter</button>
+                </div>
+              )}
+              <div className="divide-y max-h-80 overflow-y-auto">
+                {lotFocused.dossiers.map(v => (
+                  <div key={v.id} className="flex justify-between items-center py-2 text-xs font-mono">
+                    <span>{v.nomPatient} <span className="text-gray-400">— {formatGourdes(v.totalGlobal||0)} Gdes</span></span>
+                    <div className="flex gap-1">
+                      {peutModifier && <button onClick={() => { if ((v.status||'archived')==='archived' && !confirm(`Ce dossier est déjà archivé (Lot ${lotFocused.numero}). Le modifier corrigera ce dossier existant — pense à réimprimer le lot ensuite.\n\nContinuer ?`)) return; onChargerPourModif(v); }} className="text-amber-700 p-1 bg-amber-50 rounded" title="Modifier / corriger"><Pencil size={13}/></button>}
+                      {peutModifier && <button onClick={() => retirerDossierDuLot(v)} className="text-red-600 p-1 bg-red-50 rounded" title="Retirer du lot">➖</button>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
+      {sousOngletArchives === "dossiers" && (
       <div className="bg-white p-4 rounded-xl border shadow-sm space-y-2">
         <h2 className="text-xs font-black text-gray-700 uppercase border-b pb-1">📁 Dossiers ({dossiersFiltres.length}{dossiersFiltres.length > nombreAffiche ? ` — ${nombreAffiche} affichés` : ''})</h2>
         <div className="overflow-x-auto max-h-96 overflow-y-auto">
           <table className="w-full text-left">
-            <thead className="sticky top-0 bg-white shadow-sm"><tr className="bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono"><th className="p-2">Date</th><th className="p-2">Patient</th><th className="p-2">Type</th><th className="p-2">ONG</th><th className="p-2 text-center">Vol.</th><th className="p-2 text-right">Total</th><th className="p-2 text-center">Statut</th><th className="p-2 text-center">Actions</th></tr></thead>
+            <thead className="sticky top-0 bg-white shadow-sm"><tr className="bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono"><th className="p-2">Date</th><th className="p-2">Patient</th><th className="p-2">Type</th><th className="p-2">Partenaire</th><th className="p-2 text-center">Vol.</th><th className="p-2 text-right">Total</th><th className="p-2 text-center">Statut</th><th className="p-2 text-center">Actions</th></tr></thead>
             <tbody className="divide-y divide-gray-100 font-mono text-[11px]">
               {dossiersFiltres.slice(0, nombreAffiche).map(v => {
                 const statut = v.status || 'archived';
                 const isSuspendu = statut === 'suspendu';
+                const isReporte = statut === 'reporte';
                 // Filet de sécurité : si totalGlobal est absent/invalide côté données,
                 // on recalcule à partir des fiches plutôt que d'afficher 0 silencieusement.
                 const totalFiable = Number.isFinite(v.totalGlobal) && v.totalGlobal > 0
                   ? v.totalGlobal
                   : (v.fiches || []).reduce((s, f) => s + (Number(f.totalGlobal) || 0), 0);
                 return (
-                  <tr key={v.id} className={isSuspendu ? 'bg-amber-50/60 border-l-4 border-amber-400' : (v.contientErreurs?'bg-red-50/40 border-l-4 border-red-500':'hover:bg-gray-50/50')}>
+                  <tr key={v.id} className={isSuspendu ? 'bg-amber-50/60 border-l-4 border-amber-400' : isReporte ? 'bg-indigo-50/60 border-l-4 border-indigo-400' : (v.contientErreurs?'bg-red-50/40 border-l-4 border-red-500':'hover:bg-gray-50/50')}>
                     <td className="p-2 text-gray-500">{v.dateHeure}</td>
                     <td className="p-2 font-bold font-sans flex items-center gap-1">{v.verrouilleFacture && <span>🔒</span>}{v.nomPatient}</td>
-                    <td className="p-2 text-center">{(v.typePatient||'ONG') === 'ONG' ? '🏥 ONG' : '💳 Privé'}</td>
+                    <td className="p-2 text-center">{(v.typePatient||'ONG') === 'ONG' ? '🏥 Partenaire' : '💳 Privé'}</td>
                     <td className="p-2 text-purple-800 font-bold">{v.ongPartenaire}</td>
                     <td className="p-2 text-center text-gray-600">{(v.fiches||[]).length}</td>
                     <td className="p-2 text-right font-bold text-emerald-800" title={v.totalGlobal !== totalFiable ? "Recalculé à partir des fiches — la valeur stockée était absente ou à zéro" : ""}>{formatDH(totalFiable)} DH{v.totalGlobal !== totalFiable && <span className="text-amber-500"> ⚠️</span>}</td>
-                    <td className="p-2 text-center">{statut === 'suspendu' ? <span className="text-amber-600 font-bold flex items-center gap-1"><Clock size={12}/> Suspendu</span> : statut === 'actif' ? <span className="text-blue-600">Actif</span> : <span className="text-gray-400">Archivé</span>}</td>
+                    <td className="p-2 text-center">{statut === 'suspendu' ? <span className="text-amber-600 font-bold flex items-center gap-1"><Clock size={12}/> Suspendu</span> : statut === 'reporte' ? <span className="text-indigo-600 font-bold flex items-center gap-1" title={v.moisReport ? `Reporté à ${v.moisReport}` : ''}>📅 Reporté{v.moisReport ? ` (${v.moisReport})` : ''}</span> : statut === 'actif' ? <span className="text-blue-600">Actif</span> : <span className="text-gray-400">Archivé</span>}</td>
                     <td className="p-2 flex justify-center gap-1 flex-wrap">
                       <button onClick={()=>setFocusedVerif(v)} className="text-blue-600 p-1 bg-blue-50 rounded" title="Voir"><Eye size={13}/></button>
                       {peutModifier && <button onClick={()=>{
@@ -359,24 +500,30 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
           </div>
         )}
       </div>
+      )}
 
       {focusedVerif && (
         <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-md space-y-4">
           <div className="flex justify-between items-center border-b pb-1"><h3 className="font-bold text-blue-900 text-xs uppercase">🔍 {focusedVerif.nomPatient}</h3><div className="flex gap-2"><button onClick={() => imprimerArchive(focusedVerif)} className="bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1"><Printer size={12}/> Imprimer dossier</button><button onClick={() => setFocusedVerif(null)}><X size={14}/></button></div></div>
+          {focusedVerif.numeroLot != null && (
+            <div className="flex items-center gap-2 text-xs bg-indigo-50 border border-indigo-200 rounded-lg p-2">
+              <span className="text-indigo-800">📦 Ce dossier fait partie du <strong>Lot {focusedVerif.numeroLot}</strong> de {focusedVerif.ongPartenaire}. Une correction reste possible via "Modifier/corriger" — pense à réimprimer le lot ensuite pour que le partenaire reçoive la version à jour.</span>
+            </div>
+          )}
           {onChangerTypeOng && peutModifier && (
             !editTypeArchiveOuvert ? (
               <div className="flex items-center gap-2 text-xs bg-gray-50 border rounded-lg p-2">
-                <span className="font-bold text-purple-700">{focusedVerif.ongPartenaire || 'Privé'} - {focusedVerif.typePatient || 'ONG'}</span>
-                <button onClick={()=>{ setNouveauTypeArchive(focusedVerif.typePatient||'ONG'); setNouvelOngArchive(focusedVerif.ongPartenaire||''); setEditTypeArchiveOuvert(true); }} className="text-[10px] font-bold text-blue-600 underline">✏️ Changer Privé/ONG</button>
+                <span className="font-bold text-purple-700">{focusedVerif.ongPartenaire || 'Privé'} - {focusedVerif.typePatient === 'ONG' ? 'Partenaire' : 'Privé'}</span>
+                <button onClick={()=>{ setNouveauTypeArchive(focusedVerif.typePatient||'ONG'); setNouvelOngArchive(focusedVerif.ongPartenaire||''); setEditTypeArchiveOuvert(true); }} className="text-[10px] font-bold text-blue-600 underline">✏️ Changer Privé/Partenaire</button>
               </div>
             ) : (
               <div className="flex gap-1.5 items-center bg-gray-50 border rounded-lg p-2 flex-wrap">
                 <select value={nouveauTypeArchive} onChange={e=>setNouveauTypeArchive(e.target.value)} className="border rounded p-1 text-xs bg-white">
-                  <option value="ONG">🏥 ONG</option><option value="PRIVE">💳 Privé</option>
+                  <option value="ONG">🏥 Partenaire</option><option value="PRIVE">💳 Privé</option>
                 </select>
                 {nouveauTypeArchive === "ONG" && (
                   <select value={nouvelOngArchive} onChange={e=>setNouvelOngArchive(e.target.value)} className="border rounded p-1 text-xs bg-white">
-                    <option value="">-- ONG --</option>{listeOng.map(o => <option key={o} value={o}>{o}</option>)}
+                    <option value="">-- Partenaire --</option>{listeOng.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
                 )}
                 <button onClick={async ()=>{ await onChangerTypeOng(focusedVerif.id, nouveauTypeArchive, nouveauTypeArchive==="ONG"?nouvelOngArchive:""); setFocusedVerif(f => f ? { ...f, typePatient: nouveauTypeArchive, ongPartenaire: nouveauTypeArchive==="ONG"?nouvelOngArchive:"" } : f); setEditTypeArchiveOuvert(false); }} className="bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded"><Check size={10}/></button>

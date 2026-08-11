@@ -27,7 +27,7 @@ function LoginScreen({ onLogin }) {
       <div className="w-full max-w-sm bg-[#F7F5F0] p-6 rounded-2xl border shadow-2xl text-center space-y-4">
         <div><p className="text-[10px] uppercase tracking-widest text-emerald-800 font-bold">Centre Hospitalier de Fontaine</p><h2 className="text-base font-black text-[#1E2A24] mt-1">🔐 Connexion</h2></div>
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="space-y-1"><label className="text-xs font-bold text-gray-600 block text-left">Identifiant</label><input type="text" value={identifiant} onChange={e => setIdentifiant(e.target.value)} placeholder="ex: esdras" className="w-full border rounded-lg p-2 text-sm outline-none font-mono" required /></div>
+          <div className="space-y-1"><label className="text-xs font-bold text-gray-600 block text-left">Identifiant</label><input type="text" value={identifiant} onChange={e => setIdentifiant(e.target.value)} placeholder="username" className="w-full border rounded-lg p-2 text-sm outline-none font-mono" required /></div>
           <div className="space-y-1"><label className="text-xs font-bold text-gray-600 block text-left">Mot de passe</label><input type="password" value={motDePasse} onChange={e => setMotDePasse(e.target.value)} placeholder="••••••••" className="w-full border rounded-lg p-2 text-sm outline-none font-mono" required /></div>
           {erreur && <div className="bg-red-50 text-red-700 p-2 rounded-lg text-xs font-bold">{erreur}</div>}
           <button type="submit" className="w-full bg-[#1E2A24] text-white rounded-xl py-2.5 font-bold text-xs hover:bg-[#2a3a32] transition">Se connecter</button>

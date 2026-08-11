@@ -2377,7 +2377,7 @@
             else setErreur("\u274C " + error.message);
           }
         };
-        return /* @__PURE__ */ React.createElement("div", { className: "min-h-screen w-full flex items-center justify-center bg-[#1E2A24] p-4" }, /* @__PURE__ */ React.createElement("div", { className: "w-full max-w-sm bg-[#F7F5F0] p-6 rounded-2xl border shadow-2xl text-center space-y-4" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: "text-[10px] uppercase tracking-widest text-emerald-800 font-bold" }, "Centre Hospitalier de Fontaine"), /* @__PURE__ */ React.createElement("h2", { className: "text-base font-black text-[#1E2A24] mt-1" }, "\u{1F510} Connexion")), /* @__PURE__ */ React.createElement("form", { onSubmit: handleSubmit, className: "space-y-3" }, /* @__PURE__ */ React.createElement("div", { className: "space-y-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-xs font-bold text-gray-600 block text-left" }, "Identifiant"), /* @__PURE__ */ React.createElement("input", { type: "text", value: identifiant, onChange: (e) => setIdentifiant(e.target.value), placeholder: "ex: esdras", className: "w-full border rounded-lg p-2 text-sm outline-none font-mono", required: true })), /* @__PURE__ */ React.createElement("div", { className: "space-y-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-xs font-bold text-gray-600 block text-left" }, "Mot de passe"), /* @__PURE__ */ React.createElement("input", { type: "password", value: motDePasse, onChange: (e) => setMotDePasse(e.target.value), placeholder: "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022", className: "w-full border rounded-lg p-2 text-sm outline-none font-mono", required: true })), erreur && /* @__PURE__ */ React.createElement("div", { className: "bg-red-50 text-red-700 p-2 rounded-lg text-xs font-bold" }, erreur), /* @__PURE__ */ React.createElement("button", { type: "submit", className: "w-full bg-[#1E2A24] text-white rounded-xl py-2.5 font-bold text-xs hover:bg-[#2a3a32] transition" }, "Se connecter")), /* @__PURE__ */ React.createElement("div", { className: "text-xs text-gray-500" }, "Contactez l'administrateur pour obtenir un compte.")));
+        return /* @__PURE__ */ React.createElement("div", { className: "min-h-screen w-full flex items-center justify-center bg-[#1E2A24] p-4" }, /* @__PURE__ */ React.createElement("div", { className: "w-full max-w-sm bg-[#F7F5F0] p-6 rounded-2xl border shadow-2xl text-center space-y-4" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: "text-[10px] uppercase tracking-widest text-emerald-800 font-bold" }, "Centre Hospitalier de Fontaine"), /* @__PURE__ */ React.createElement("h2", { className: "text-base font-black text-[#1E2A24] mt-1" }, "\u{1F510} Connexion")), /* @__PURE__ */ React.createElement("form", { onSubmit: handleSubmit, className: "space-y-3" }, /* @__PURE__ */ React.createElement("div", { className: "space-y-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-xs font-bold text-gray-600 block text-left" }, "Identifiant"), /* @__PURE__ */ React.createElement("input", { type: "text", value: identifiant, onChange: (e) => setIdentifiant(e.target.value), placeholder: "username", className: "w-full border rounded-lg p-2 text-sm outline-none font-mono", required: true })), /* @__PURE__ */ React.createElement("div", { className: "space-y-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-xs font-bold text-gray-600 block text-left" }, "Mot de passe"), /* @__PURE__ */ React.createElement("input", { type: "password", value: motDePasse, onChange: (e) => setMotDePasse(e.target.value), placeholder: "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022", className: "w-full border rounded-lg p-2 text-sm outline-none font-mono", required: true })), erreur && /* @__PURE__ */ React.createElement("div", { className: "bg-red-50 text-red-700 p-2 rounded-lg text-xs font-bold" }, erreur), /* @__PURE__ */ React.createElement("button", { type: "submit", className: "w-full bg-[#1E2A24] text-white rounded-xl py-2.5 font-bold text-xs hover:bg-[#2a3a32] transition" }, "Se connecter")), /* @__PURE__ */ React.createElement("div", { className: "text-xs text-gray-500" }, "Contactez l'administrateur pour obtenir un compte.")));
       }
       module.exports = LoginScreen;
     }
@@ -2720,7 +2720,7 @@
         useEffect(() => {
           if (verifications.length || paiements.length) calculerStats(verifications, paiements);
         }, [verifications, paiements]);
-        return /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, /* @__PURE__ */ React.createElement("h2", { className: "font-black text-gray-800 text-base" }, "\u{1F4CA} Tableau de bord - Direction"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4" }, /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "CA du mois"), /* @__PURE__ */ React.createElement("p", { className: "text-2xl font-black text-emerald-700" }, formatGourdes(stats.caMois), " Gdes")), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Cash aujourd'hui"), /* @__PURE__ */ React.createElement("p", { className: "text-2xl font-black text-blue-600" }, formatGourdes(stats.caJourCash), " Gdes")), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "ONG aujourd'hui"), /* @__PURE__ */ React.createElement("p", { className: "text-2xl font-black text-purple-600" }, formatGourdes(stats.caJourOng), " Gdes")), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Consultations aujourd'hui"), /* @__PURE__ */ React.createElement("p", { className: "text-2xl font-black text-purple-600" }, stats.patientsJour)), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Taux d'occupation"), /* @__PURE__ */ React.createElement("p", { className: "text-2xl font-black text-amber-600" }, Math.round(stats.occupation), "%")), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Taux de recouvrement"), /* @__PURE__ */ React.createElement("p", { className: "text-2xl font-black text-emerald-600" }, Math.round(stats.recouvrement), "%"))), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-gray-700 text-xs uppercase" }, "\u{1F3C6} Top 5 actes (par cat\xE9gorie)"), /* @__PURE__ */ React.createElement("div", { className: "mt-2 space-y-1" }, stats.topActes.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "text-gray-400 text-xs" }, "Aucune donn\xE9e."), stats.topActes.map((a, i) => /* @__PURE__ */ React.createElement("div", { key: i, className: "flex justify-between text-xs border-b py-1" }, /* @__PURE__ */ React.createElement("span", null, i + 1, ". ", a.label), /* @__PURE__ */ React.createElement("span", { className: "font-bold" }, a.count, " prescriptions"))))), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-gray-700 text-xs uppercase" }, "\u{1F50D} D\xE9tail par type pr\xE9cis (consultations, sonographies, c\xE9sariennes...)"), /* @__PURE__ */ React.createElement("div", { className: "mt-2 space-y-1" }, stats.topDetail.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "text-gray-400 text-xs" }, "Aucune donn\xE9e d\xE9taill\xE9e pour l'instant."), stats.topDetail.map((d, i) => /* @__PURE__ */ React.createElement("div", { key: i, className: "flex justify-between text-xs border-b py-1" }, /* @__PURE__ */ React.createElement("span", null, i + 1, ". ", d.nom), /* @__PURE__ */ React.createElement("span", { className: "font-bold" }, d.qte, " fois"))))), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-gray-700 text-xs uppercase" }, "\u{1F52C} Sonographies aujourd'hui, par type"), /* @__PURE__ */ React.createElement("div", { className: "mt-2 space-y-1" }, stats.sonographiesAujourdhui.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "text-gray-400 text-xs" }, "Aucune sonographie enregistr\xE9e aujourd'hui."), stats.sonographiesAujourdhui.map((d, i) => /* @__PURE__ */ React.createElement("div", { key: i, className: "flex justify-between text-xs border-b py-1" }, /* @__PURE__ */ React.createElement("span", null, d.nom), /* @__PURE__ */ React.createElement("span", { className: "font-bold" }, d.qte))), stats.sonographiesAujourdhui.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "flex justify-between text-xs pt-1 font-black border-t-2 mt-1" }, /* @__PURE__ */ React.createElement("span", null, "TOTAL"), /* @__PURE__ */ React.createElement("span", null, stats.sonographiesAujourdhui.reduce((s, d) => s + d.qte, 0))))));
+        return /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, /* @__PURE__ */ React.createElement("h2", { className: "font-black text-gray-800 text-base" }, "\u{1F4CA} Tableau de bord - Direction"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4" }, /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "CA du mois"), /* @__PURE__ */ React.createElement("p", { className: "text-2xl font-black text-emerald-700" }, formatGourdes(stats.caMois), " Gdes")), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Cash aujourd'hui"), /* @__PURE__ */ React.createElement("p", { className: "text-2xl font-black text-blue-600" }, formatGourdes(stats.caJourCash), " Gdes")), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Partenaire aujourd'hui"), /* @__PURE__ */ React.createElement("p", { className: "text-2xl font-black text-purple-600" }, formatGourdes(stats.caJourOng), " Gdes")), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Consultations aujourd'hui"), /* @__PURE__ */ React.createElement("p", { className: "text-2xl font-black text-purple-600" }, stats.patientsJour)), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Taux d'occupation"), /* @__PURE__ */ React.createElement("p", { className: "text-2xl font-black text-amber-600" }, Math.round(stats.occupation), "%")), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Taux de recouvrement"), /* @__PURE__ */ React.createElement("p", { className: "text-2xl font-black text-emerald-600" }, Math.round(stats.recouvrement), "%"))), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-gray-700 text-xs uppercase" }, "\u{1F3C6} Top 5 actes (par cat\xE9gorie)"), /* @__PURE__ */ React.createElement("div", { className: "mt-2 space-y-1" }, stats.topActes.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "text-gray-400 text-xs" }, "Aucune donn\xE9e."), stats.topActes.map((a, i) => /* @__PURE__ */ React.createElement("div", { key: i, className: "flex justify-between text-xs border-b py-1" }, /* @__PURE__ */ React.createElement("span", null, i + 1, ". ", a.label), /* @__PURE__ */ React.createElement("span", { className: "font-bold" }, a.count, " prescriptions"))))), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-gray-700 text-xs uppercase" }, "\u{1F50D} D\xE9tail par type pr\xE9cis (consultations, sonographies, c\xE9sariennes...)"), /* @__PURE__ */ React.createElement("div", { className: "mt-2 space-y-1" }, stats.topDetail.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "text-gray-400 text-xs" }, "Aucune donn\xE9e d\xE9taill\xE9e pour l'instant."), stats.topDetail.map((d, i) => /* @__PURE__ */ React.createElement("div", { key: i, className: "flex justify-between text-xs border-b py-1" }, /* @__PURE__ */ React.createElement("span", null, i + 1, ". ", d.nom), /* @__PURE__ */ React.createElement("span", { className: "font-bold" }, d.qte, " fois"))))), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-gray-700 text-xs uppercase" }, "\u{1F52C} Sonographies aujourd'hui, par type"), /* @__PURE__ */ React.createElement("div", { className: "mt-2 space-y-1" }, stats.sonographiesAujourdhui.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "text-gray-400 text-xs" }, "Aucune sonographie enregistr\xE9e aujourd'hui."), stats.sonographiesAujourdhui.map((d, i) => /* @__PURE__ */ React.createElement("div", { key: i, className: "flex justify-between text-xs border-b py-1" }, /* @__PURE__ */ React.createElement("span", null, d.nom), /* @__PURE__ */ React.createElement("span", { className: "font-bold" }, d.qte))), stats.sonographiesAujourdhui.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "flex justify-between text-xs pt-1 font-black border-t-2 mt-1" }, /* @__PURE__ */ React.createElement("span", null, "TOTAL"), /* @__PURE__ */ React.createElement("span", null, stats.sonographiesAujourdhui.reduce((s, d) => s + d.qte, 0))))));
       }
       module.exports = DashboardDirectionPanel;
     }
@@ -2733,7 +2733,7 @@
       var { useState, useMemo } = React;
       var { formatGourdes, echapperHTML } = require_helpers();
       var { Printer } = require_icons();
-      function DashboardCaissePanel({ verifications, paiements, userDisplayName, listeOng }) {
+      function DashboardCaissePanel({ verifications, paiements, userDisplayName, listeOng, showToast }) {
         const [filtreDateDebut, setFiltreDateDebut] = useState("");
         const [filtreDateFin, setFiltreDateFin] = useState("");
         const [filtreMode, setFiltreMode] = useState("");
@@ -2758,21 +2758,22 @@
         const totalFiltre = paiementsFiltres.reduce((s, p) => s + (p.montant || 0), 0);
         const rapportONG = useMemo(() => {
           const modes = ["cash", "credit", "ong", "exoneration", "depot"];
-          const ongs = [...new Set(paiementsFiltres.map((p) => p.ongPartenaire || "Sans ONG"))];
+          const ongs = [...new Set(paiementsFiltres.map((p) => p.ongPartenaire || "Sans partenaire"))];
           const matrix = {};
           ongs.forEach((ong) => {
             matrix[ong] = {};
             modes.forEach((m) => matrix[ong][m] = 0);
           });
           paiementsFiltres.forEach((p) => {
-            const ong = p.ongPartenaire || "Sans ONG";
+            const ong = p.ongPartenaire || "Sans partenaire";
             const mode = p.mode || "cash";
             if (matrix[ong] && matrix[ong][mode] !== void 0) matrix[ong][mode] += p.montant || 0;
           });
           return { matrix, ongs, modes };
         }, [paiementsFiltres]);
+        const LABELS_MODE = { cash: "CASH", credit: "CR\xC9DIT", ong: "PARTENAIRE", exoneration: "EXON\xC9RATION", depot: "D\xC9P\xD4T" };
         const imprimerRapport = () => {
-          const contenu = `<html><head><meta charset="UTF-8"><title>Rapport ONG</title><style>body{font-family:sans-serif;padding:20px;} table{width:100%;border-collapse:collapse;} th,td{border:1px solid #ccc;padding:6px;text-align:center;} th{background:#eee;} .footer{margin-top:16px;font-size:11px;color:#555;text-align:right;} </style></head><body><h2>Rapport ONG - ${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")}</h2><table><thead><tr><th>ONG</th>${rapportONG.modes.map((m) => `<th>${echapperHTML(m.toUpperCase())}</th>`).join("")}<th>Total</th></tr></thead><tbody>${rapportONG.ongs.map((ong) => {
+          const contenu = `<html><head><meta charset="UTF-8"><title>Rapport Partenaire</title><style>body{font-family:sans-serif;padding:20px;} table{width:100%;border-collapse:collapse;} th,td{border:1px solid #ccc;padding:6px;text-align:center;} th{background:#eee;} .footer{margin-top:16px;font-size:11px;color:#555;text-align:right;} </style></head><body><h2>Rapport Partenaire - ${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")}</h2><table><thead><tr><th>Partenaire</th>${rapportONG.modes.map((m) => `<th>${echapperHTML(LABELS_MODE[m] || m.toUpperCase())}</th>`).join("")}<th>Total</th></tr></thead><tbody>${rapportONG.ongs.map((ong) => {
             const row = rapportONG.matrix[ong];
             const totalRow = rapportONG.modes.reduce((s, m) => s + (row[m] || 0), 0);
             return `<tr><td><strong>${echapperHTML(ong)}</strong></td>${rapportONG.modes.map((m) => `<td>${formatGourdes(row[m] || 0)}</td>`).join("")}<td><strong>${formatGourdes(totalRow)}</strong></td></tr>`;
@@ -2782,7 +2783,7 @@
           }).join("")}<td><strong>${formatGourdes(totalFiltre)}</strong></td></tr></tbody></table><p class="footer">Imprim\xE9 par : ${echapperHTML(userDisplayName || "inconnu")} \u2014 ${(/* @__PURE__ */ new Date()).toLocaleString("fr-FR")}</p></body></html>`;
           const win = window.open("", "_blank", "width=800,height=600");
           if (!win) {
-            alert("Autorisez les pop-ups");
+            showToast("Impression bloqu\xE9e par le navigateur. R\xE9essaie en cliquant sur Imprimer \u2014 si \xE7a ne marche toujours pas, demande \xE0 quelqu'un de v\xE9rifier les r\xE9glages.", "error");
             return;
           }
           win.document.write(contenu);
@@ -2795,10 +2796,10 @@
             alert("Aucune transaction \xE0 imprimer.");
             return;
           }
-          const contenu = `<html><head><meta charset="UTF-8"><title>Transactions - CHF</title><style>body{font-family:sans-serif;padding:20px;} h1{font-size:18px;text-align:center;} table{width:100%;border-collapse:collapse;margin-top:14px;} th,td{border:1px solid #ccc;padding:6px;text-align:left;font-size:12px;} th{background:#eee;} .total{font-weight:bold;font-size:15px;text-align:right;margin-top:10px;} .footer{margin-top:16px;font-size:11px;color:#555;text-align:right;}</style></head><body><h1>CHF \u2014 Transactions filtr\xE9es (${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")})</h1><table><thead><tr><th>Patient</th><th>Montant</th><th>Mode</th><th>ONG</th><th>Date</th><th>Encaiss\xE9 par</th></tr></thead><tbody>${paiementsFiltres.map((p) => `<tr><td>${echapperHTML(p.patientNom || "")}</td><td>${formatGourdes(p.montant)} Gdes</td><td>${echapperHTML(p.mode || "")}</td><td>${echapperHTML(p.ongPartenaire || "\u2014")}</td><td>${new Date(p.date).toLocaleDateString("fr-FR")}</td><td>${echapperHTML(p.encaissePar || "\u2014")}</td></tr>`).join("")}</tbody></table><p class="total">Total : ${formatGourdes(totalFiltre)} Gdes (${paiementsFiltres.length} transactions)</p><p class="footer">Imprim\xE9 par : ${echapperHTML(userDisplayName || "inconnu")} \u2014 ${(/* @__PURE__ */ new Date()).toLocaleString("fr-FR")}</p></body></html>`;
+          const contenu = `<html><head><meta charset="UTF-8"><title>Transactions - CHF</title><style>body{font-family:sans-serif;padding:20px;} h1{font-size:18px;text-align:center;} table{width:100%;border-collapse:collapse;margin-top:14px;} th,td{border:1px solid #ccc;padding:6px;text-align:left;font-size:12px;} th{background:#eee;} .total{font-weight:bold;font-size:15px;text-align:right;margin-top:10px;} .footer{margin-top:16px;font-size:11px;color:#555;text-align:right;}</style></head><body><h1>CHF \u2014 Transactions filtr\xE9es (${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")})</h1><table><thead><tr><th>Patient</th><th>Montant</th><th>Mode</th><th>Partenaire</th><th>Date</th><th>Encaiss\xE9 par</th></tr></thead><tbody>${paiementsFiltres.map((p) => `<tr><td>${echapperHTML(p.patientNom || "")}</td><td>${formatGourdes(p.montant)} Gdes</td><td>${echapperHTML(LABELS_MODE[p.mode] || p.mode || "")}</td><td>${echapperHTML(p.ongPartenaire || "\u2014")}</td><td>${new Date(p.date).toLocaleDateString("fr-FR")}</td><td>${echapperHTML(p.encaissePar || "\u2014")}</td></tr>`).join("")}</tbody></table><p class="total">Total : ${formatGourdes(totalFiltre)} Gdes (${paiementsFiltres.length} transactions)</p><p class="footer">Imprim\xE9 par : ${echapperHTML(userDisplayName || "inconnu")} \u2014 ${(/* @__PURE__ */ new Date()).toLocaleString("fr-FR")}</p></body></html>`;
           const win2 = window.open("", "_blank", "width=800,height=600");
           if (!win2) {
-            alert("Autorisez les pop-ups");
+            showToast("Impression bloqu\xE9e par le navigateur. R\xE9essaie en cliquant sur Imprimer \u2014 si \xE7a ne marche toujours pas, demande \xE0 quelqu'un de v\xE9rifier les r\xE9glages.", "error");
             return;
           }
           win2.document.write(contenu);
@@ -2806,7 +2807,7 @@
           win2.focus();
           setTimeout(() => win2.print(), 500);
         };
-        return /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, /* @__PURE__ */ React.createElement("h2", { className: "font-black text-gray-800 text-base" }, "\u{1F4B5} Tableau de bord - Caisse"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 border-b pb-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setSousOnglet("general"), className: `px-4 py-2 font-bold text-xs rounded-t-lg ${sousOnglet === "general" ? "bg-[#1E2A24] text-white" : "bg-gray-100"}` }, "\u{1F4CA} G\xE9n\xE9ral"), /* @__PURE__ */ React.createElement("button", { onClick: () => setSousOnglet("rapport_ong"), className: `px-4 py-2 font-bold text-xs rounded-t-lg ${sousOnglet === "rapport_ong" ? "bg-[#1E2A24] text-white" : "bg-gray-100"}` }, "\u{1F4CA} Rapport ONG")), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400" }, "Date d\xE9but"), /* @__PURE__ */ React.createElement("input", { type: "date", value: filtreDateDebut, onChange: (e) => setFiltreDateDebut(e.target.value), className: "border rounded p-1.5 w-full" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400" }, "Date fin"), /* @__PURE__ */ React.createElement("input", { type: "date", value: filtreDateFin, onChange: (e) => setFiltreDateFin(e.target.value), className: "border rounded p-1.5 w-full" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400" }, "Mode"), /* @__PURE__ */ React.createElement("select", { value: filtreMode, onChange: (e) => setFiltreMode(e.target.value), className: "border rounded p-1.5 w-full bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Tous"), /* @__PURE__ */ React.createElement("option", { value: "cash" }, "Cash"), /* @__PURE__ */ React.createElement("option", { value: "credit" }, "Cr\xE9dit"), /* @__PURE__ */ React.createElement("option", { value: "ong" }, "ONG"), /* @__PURE__ */ React.createElement("option", { value: "exoneration" }, "Exon\xE9ration"), /* @__PURE__ */ React.createElement("option", { value: "depot" }, "D\xE9p\xF4t"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400" }, "ONG"), /* @__PURE__ */ React.createElement("select", { value: filtreOng, onChange: (e) => setFiltreOng(e.target.value), className: "border rounded p-1.5 w-full bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Toutes"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o))))), sousOnglet === "general" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 sm:grid-cols-3 gap-4" }, /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Total filtr\xE9"), /* @__PURE__ */ React.createElement("p", { className: "text-2xl font-black text-emerald-700" }, formatGourdes(totalFiltre), " Gdes")), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Transactions"), /* @__PURE__ */ React.createElement("p", { className: "text-2xl font-black text-blue-600" }, paiementsFiltres.length)), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "D\xE9p\xF4ts"), /* @__PURE__ */ React.createElement("p", { className: "text-2xl font-black text-purple-600" }, paiementsFiltres.filter((p) => p.mode === "depot").length))), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm" }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-center mb-2" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-gray-700 text-xs uppercase" }, "\u{1F4CB} Transactions filtr\xE9es"), /* @__PURE__ */ React.createElement("button", { onClick: imprimerTransactions, className: "bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Imprimer")), /* @__PURE__ */ React.createElement("div", { className: "overflow-x-auto max-h-64 overflow-y-auto" }, /* @__PURE__ */ React.createElement("table", { className: "w-full text-xs" }, /* @__PURE__ */ React.createElement("thead", { className: "sticky top-0 bg-gray-100" }, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", null, "Patient"), /* @__PURE__ */ React.createElement("th", null, "Montant"), /* @__PURE__ */ React.createElement("th", null, "Mode"), /* @__PURE__ */ React.createElement("th", null, "ONG"), /* @__PURE__ */ React.createElement("th", null, "Date"))), /* @__PURE__ */ React.createElement("tbody", null, paiementsFiltres.slice(0, 50).map((p, i) => /* @__PURE__ */ React.createElement("tr", { key: i, className: "border-b" }, /* @__PURE__ */ React.createElement("td", { className: "p-1" }, p.patientNom), /* @__PURE__ */ React.createElement("td", { className: "p-1" }, formatGourdes(p.montant)), /* @__PURE__ */ React.createElement("td", { className: "p-1" }, p.mode), /* @__PURE__ */ React.createElement("td", { className: "p-1" }, p.ongPartenaire || "\u2014"), /* @__PURE__ */ React.createElement("td", { className: "p-1" }, new Date(p.date).toLocaleDateString("fr-FR"))))))))), sousOnglet === "rapport_ong" && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm space-y-3" }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-center" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-gray-700 text-xs uppercase" }, "\u{1F4CA} Rapport crois\xE9 ONG / Mode"), /* @__PURE__ */ React.createElement("button", { onClick: imprimerRapport, className: "bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Imprimer")), /* @__PURE__ */ React.createElement("div", { className: "overflow-x-auto" }, /* @__PURE__ */ React.createElement("table", { className: "w-full text-xs border-collapse" }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", { className: "bg-gray-100" }, /* @__PURE__ */ React.createElement("th", { className: "p-2 border" }, "ONG"), rapportONG.modes.map((m) => /* @__PURE__ */ React.createElement("th", { key: m, className: "p-2 border text-center" }, m.toUpperCase())), /* @__PURE__ */ React.createElement("th", { className: "p-2 border text-center" }, "Total"))), /* @__PURE__ */ React.createElement("tbody", null, rapportONG.ongs.map((ong) => {
+        return /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, /* @__PURE__ */ React.createElement("h2", { className: "font-black text-gray-800 text-base" }, "\u{1F4B5} Tableau de bord - Caisse"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 border-b pb-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setSousOnglet("general"), className: `px-4 py-2 font-bold text-xs rounded-t-lg ${sousOnglet === "general" ? "bg-[#1E2A24] text-white" : "bg-gray-100"}` }, "\u{1F4CA} G\xE9n\xE9ral"), /* @__PURE__ */ React.createElement("button", { onClick: () => setSousOnglet("rapport_ong"), className: `px-4 py-2 font-bold text-xs rounded-t-lg ${sousOnglet === "rapport_ong" ? "bg-[#1E2A24] text-white" : "bg-gray-100"}` }, "\u{1F4CA} Rapport Partenaire")), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400" }, "Date d\xE9but"), /* @__PURE__ */ React.createElement("input", { type: "date", value: filtreDateDebut, onChange: (e) => setFiltreDateDebut(e.target.value), className: "border rounded p-1.5 w-full" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400" }, "Date fin"), /* @__PURE__ */ React.createElement("input", { type: "date", value: filtreDateFin, onChange: (e) => setFiltreDateFin(e.target.value), className: "border rounded p-1.5 w-full" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400" }, "Mode"), /* @__PURE__ */ React.createElement("select", { value: filtreMode, onChange: (e) => setFiltreMode(e.target.value), className: "border rounded p-1.5 w-full bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Tous"), /* @__PURE__ */ React.createElement("option", { value: "cash" }, "Cash"), /* @__PURE__ */ React.createElement("option", { value: "credit" }, "Cr\xE9dit"), /* @__PURE__ */ React.createElement("option", { value: "ong" }, "Partenaire"), /* @__PURE__ */ React.createElement("option", { value: "exoneration" }, "Exon\xE9ration"), /* @__PURE__ */ React.createElement("option", { value: "depot" }, "D\xE9p\xF4t"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400" }, "Partenaire"), /* @__PURE__ */ React.createElement("select", { value: filtreOng, onChange: (e) => setFiltreOng(e.target.value), className: "border rounded p-1.5 w-full bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Toutes"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o))))), sousOnglet === "general" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 sm:grid-cols-3 gap-4" }, /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Total filtr\xE9"), /* @__PURE__ */ React.createElement("p", { className: "text-2xl font-black text-emerald-700" }, formatGourdes(totalFiltre), " Gdes")), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Transactions"), /* @__PURE__ */ React.createElement("p", { className: "text-2xl font-black text-blue-600" }, paiementsFiltres.length)), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "D\xE9p\xF4ts"), /* @__PURE__ */ React.createElement("p", { className: "text-2xl font-black text-purple-600" }, paiementsFiltres.filter((p) => p.mode === "depot").length))), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm" }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-center mb-2" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-gray-700 text-xs uppercase" }, "\u{1F4CB} Transactions filtr\xE9es"), /* @__PURE__ */ React.createElement("button", { onClick: imprimerTransactions, className: "bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Imprimer")), /* @__PURE__ */ React.createElement("div", { className: "overflow-x-auto max-h-64 overflow-y-auto" }, /* @__PURE__ */ React.createElement("table", { className: "w-full text-xs" }, /* @__PURE__ */ React.createElement("thead", { className: "sticky top-0 bg-gray-100" }, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", null, "Patient"), /* @__PURE__ */ React.createElement("th", null, "Montant"), /* @__PURE__ */ React.createElement("th", null, "Mode"), /* @__PURE__ */ React.createElement("th", null, "Partenaire"), /* @__PURE__ */ React.createElement("th", null, "Date"))), /* @__PURE__ */ React.createElement("tbody", null, paiementsFiltres.slice(0, 50).map((p, i) => /* @__PURE__ */ React.createElement("tr", { key: i, className: "border-b" }, /* @__PURE__ */ React.createElement("td", { className: "p-1" }, p.patientNom), /* @__PURE__ */ React.createElement("td", { className: "p-1" }, formatGourdes(p.montant)), /* @__PURE__ */ React.createElement("td", { className: "p-1" }, LABELS_MODE[p.mode] || p.mode), /* @__PURE__ */ React.createElement("td", { className: "p-1" }, p.ongPartenaire || "\u2014"), /* @__PURE__ */ React.createElement("td", { className: "p-1" }, new Date(p.date).toLocaleDateString("fr-FR"))))))))), sousOnglet === "rapport_ong" && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm space-y-3" }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-center" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-gray-700 text-xs uppercase" }, "\u{1F4CA} Rapport crois\xE9 Partenaire / Mode"), /* @__PURE__ */ React.createElement("button", { onClick: imprimerRapport, className: "bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Imprimer")), /* @__PURE__ */ React.createElement("div", { className: "overflow-x-auto" }, /* @__PURE__ */ React.createElement("table", { className: "w-full text-xs border-collapse" }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", { className: "bg-gray-100" }, /* @__PURE__ */ React.createElement("th", { className: "p-2 border" }, "Partenaire"), rapportONG.modes.map((m) => /* @__PURE__ */ React.createElement("th", { key: m, className: "p-2 border text-center" }, LABELS_MODE[m] || m.toUpperCase())), /* @__PURE__ */ React.createElement("th", { className: "p-2 border text-center" }, "Total"))), /* @__PURE__ */ React.createElement("tbody", null, rapportONG.ongs.map((ong) => {
           const row = rapportONG.matrix[ong];
           const totalRow = rapportONG.modes.reduce((s, m) => s + (row[m] || 0), 0);
           return /* @__PURE__ */ React.createElement("tr", { key: ong }, /* @__PURE__ */ React.createElement("td", { className: "p-2 border font-bold" }, ong), rapportONG.modes.map((m) => /* @__PURE__ */ React.createElement("td", { key: m, className: "p-2 border text-right" }, formatGourdes(row[m] || 0))), /* @__PURE__ */ React.createElement("td", { className: "p-2 border text-right font-bold" }, formatGourdes(totalRow)));
@@ -2833,11 +2834,11 @@
       var React = window.React;
       var { useState, useEffect, useMemo } = React;
       var { CATEGORIES_LISTE } = require_constants();
-      var { formatGourdes, formatDH, echapperHTML } = require_helpers();
+      var { formatGourdes, formatDH, echapperHTML, formaterNomPropre } = require_helpers();
       var { Eye, Pencil, Trash2, Printer, Clock, FolderOpen, X, Download, Check } = require_icons();
       var { chf, toEpisodeApi } = require_supabase();
       var { LOGO_CHF_BASE64 } = require_logoChf();
-      function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, dossierPourExport, setDossierPourExport, userRole, showToast, onChangerTypeOng, listeOng }) {
+      function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, userRole, showToast, onChangerTypeOng, listeOng }) {
         var _a;
         const [focusedVerif, setFocusedVerif] = useState(null);
         const [editTypeArchiveOuvert, setEditTypeArchiveOuvert] = useState(false);
@@ -2853,6 +2854,10 @@
         const [filtreStatut, setFiltreStatut] = useState("");
         const [appliqueRabais10, setAppliqueRabais10] = useState(false);
         const [montantDonIntrants, setMontantDonIntrants] = useState("");
+        const [sousOngletArchives, setSousOngletArchives] = useState("dossiers");
+        const [lotOngSelectionne, setLotOngSelectionne] = useState("");
+        const [lotFocusedNumero, setLotFocusedNumero] = useState(null);
+        const [dossierAAjouterAuLot, setDossierAAjouterAuLot] = useState("");
         useEffect(() => {
           if (filtreInitialNom) {
             setRechercheNomPatient(filtreInitialNom);
@@ -2862,6 +2867,26 @@
         useEffect(() => {
           setNombreAffiche(100);
         }, [filtreType, filtreOng, rechercheNomPatient, filtreDateDebut, filtreDateFin, filtreCategorie, filtreStatut]);
+        const lotsDuPartenaire = useMemo(() => {
+          if (!lotOngSelectionne) return [];
+          const parNumero = {};
+          verifications.forEach((v) => {
+            if (v.ongPartenaire === lotOngSelectionne && v.numeroLot != null) {
+              if (!parNumero[v.numeroLot]) parNumero[v.numeroLot] = [];
+              parNumero[v.numeroLot].push(v);
+            }
+          });
+          return Object.keys(parNumero).map((n) => Number(n)).sort((a, b) => b - a).map((n) => ({
+            numero: n,
+            dossiers: parNumero[n],
+            total: parNumero[n].reduce((s, v) => s + (v.totalGlobal || 0), 0)
+          }));
+        }, [verifications, lotOngSelectionne]);
+        const dossiersEnAttenteDeLot = useMemo(() => {
+          if (!lotOngSelectionne) return [];
+          return verifications.filter((v) => v.ongPartenaire === lotOngSelectionne && (v.status || "archived") === "archived" && v.numeroLot == null && !v.verrouilleFacture);
+        }, [verifications, lotOngSelectionne]);
+        const lotFocused = lotFocusedNumero != null ? lotsDuPartenaire.find((l) => l.numero === lotFocusedNumero) || null : null;
         const dossiersFiltres = useMemo(() => {
           return verifications.filter((v) => {
             var _a2;
@@ -2906,6 +2931,7 @@
           celluleNombre: { alignment: { horizontal: "right" }, numFmt: "#,##0", border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } },
           celluleTotal: { font: { bold: true }, alignment: { horizontal: "right" }, numFmt: '"HTG "#,##0', border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } },
           grandTotalHtg: { font: { bold: true }, alignment: { horizontal: "right" }, numFmt: '"HTG "#,##0', border: { top: { style: "medium" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } },
+          grandTotalNombre: { font: { bold: true }, alignment: { horizontal: "right" }, numFmt: "#,##0", border: { top: { style: "medium" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } },
           celluleFinaleGras: { font: { bold: true, size: 11 }, fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFD0D0D0" } }, alignment: { horizontal: "right" }, numFmt: '"HTG "#,##0', border: { top: { style: "medium" }, bottom: { style: "double" }, left: { style: "thin" }, right: { style: "thin" } } }
         };
         const appliquerStyle = (cell, style) => {
@@ -2928,45 +2954,53 @@
           chirurgie: "Chirugie",
           accouchement: "Accouch",
           sono: "SONO",
-          pansement: "Pansement"
+          pansement: "Pansement",
+          suture: "Suture",
+          drainage: "Drainage",
+          pap: "PAP Test",
+          visite: "Visite",
+          nebulisation: "Nebulisation",
+          radio: "Radiographie"
         };
-        const CLES_AUTRES = ["suture", "drainage", "pap", "visite", "nebulisation"];
-        const exporterBlocDossiersExcelPartenaire = async (ongCible) => {
+        const genererFichierExcelPourLot = async (ongCible, idsDossiers, numeroLot) => {
           try {
-            let listeDossiersONG = verifications.filter((v) => v.ongPartenaire === ongCible && (filtreType === "" || (v.typePatient || "ONG") === filtreType));
-            if (filtreDateDebut || filtreDateFin) {
-              listeDossiersONG = listeDossiersONG.filter((v) => {
-                const d = new Date(v.dateEntreePourTri);
-                if (isNaN(d)) return false;
-                if (filtreDateDebut && d < new Date(filtreDateDebut)) return false;
-                if (filtreDateFin) {
-                  const fin = new Date(filtreDateFin);
-                  fin.setHours(23, 59, 59, 999);
-                  if (d > fin) return false;
-                }
-                return true;
-              });
-            }
-            listeDossiersONG = listeDossiersONG.sort((a, b) => new Date(a.dateEntreePourTri) - new Date(b.dateEntreePourTri));
+            let listeDossiersONG = verifications.filter((v) => idsDossiers.includes(v.id));
+            const extraireNomMere = (nom) => {
+              const m = (nom || "").trim().match(/^(?:bb|beb[ée])\.?\s+(.+)$/i);
+              return m ? m[1].trim().toLowerCase() : null;
+            };
+            const cleFamille = (nom) => extraireNomMere(nom) || (nom || "").trim().toLowerCase();
+            const dateMereParCle = {};
+            listeDossiersONG.forEach((v) => {
+              if (!extraireNomMere(v.nomPatient)) dateMereParCle[cleFamille(v.nomPatient)] = v.dateEntreePourTri;
+            });
+            const dateEffective = (v) => {
+              const nomMere = extraireNomMere(v.nomPatient);
+              return nomMere && dateMereParCle[nomMere] ? dateMereParCle[nomMere] : v.dateEntreePourTri;
+            };
+            listeDossiersONG = listeDossiersONG.sort((a, b) => {
+              const diff = new Date(dateEffective(a)) - new Date(dateEffective(b));
+              if (diff !== 0) return diff;
+              const cleA = cleFamille(a.nomPatient), cleB = cleFamille(b.nomPatient);
+              if (cleA !== cleB) return cleA.localeCompare(cleB);
+              return (extraireNomMere(a.nomPatient) ? 1 : 0) - (extraireNomMere(b.nomPatient) ? 1 : 0);
+            });
             if (listeDossiersONG.length === 0) {
               showToast(`Aucun dossier trouv\xE9 pour ${ongCible}`, "error");
               return;
             }
             const clesVues = /* @__PURE__ */ new Set(["service", "hospit", "labo", "med"]);
-            let autresUtilise = false;
             let grandTotalGeneral = 0;
             listeDossiersONG.forEach((doc) => {
               (doc.fiches || []).forEach((f) => {
                 Object.entries(f.breakdown || {}).forEach(([k, val]) => {
                   if (!val) return;
-                  if (CLES_AUTRES.includes(k)) autresUtilise = true;
-                  else if (LABELS_EXPORT[k]) clesVues.add(k);
+                  if (LABELS_EXPORT[k]) clesVues.add(k);
                 });
                 grandTotalGeneral += f.totalGlobal || 0;
               });
             });
             const colonnesExport = Object.keys(LABELS_EXPORT).filter((k) => clesVues.has(k)).map((k) => ({ key: k, label: LABELS_EXPORT[k] }));
-            if (autresUtilise) colonnesExport.push({ key: "__autres__", label: "Autres" });
             const wb = new window.ExcelJS.Workbook();
             const ws = wb.addWorksheet("Facturation");
             const derniereCol = colonnesExport.length + 3;
@@ -2991,7 +3025,7 @@
             r++;
             appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.gras);
             ws.getCell(r, 1).value = "FACTURE";
-            ws.getCell(r, 2).value = `#${Math.floor(Math.random() * 1e4)}`;
+            ws.getCell(r, 2).value = `${ongCible.replace(/\s+/g, "")}-LOT${numeroLot}`;
             ws.getCell(r, 5).value = ongCible;
             appliquerStyle(ws.getCell(r, 5), EXCEL_STYLES.gras);
             r++;
@@ -3019,13 +3053,12 @@
               let totalPatient = 0;
               (doc.fiches || []).forEach((f) => {
                 Object.entries(f.breakdown || {}).forEach(([k, val]) => {
-                  if (CLES_AUTRES.includes(k)) totalsPatient["__autres__"] = (totalsPatient["__autres__"] || 0) + (val || 0);
-                  else if (totalsPatient[k] !== void 0) totalsPatient[k] += val || 0;
+                  if (totalsPatient[k] !== void 0) totalsPatient[k] += val || 0;
                 });
                 totalPatient += f.totalGlobal || 0;
               });
               appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.celluleStandard);
-              ws.getCell(r, 1).value = doc.nomPatient;
+              ws.getCell(r, 1).value = formaterNomPropre(doc.nomPatient);
               appliquerStyle(ws.getCell(r, 2), EXCEL_STYLES.celluleStandard);
               ws.getCell(r, 2).value = doc.periodeSejourString || doc.dateHeure || "\u2014";
               colonnesExport.forEach((c, i) => {
@@ -3052,7 +3085,7 @@
             colonnesExport.forEach((c, i) => {
               const cell = ws.getCell(r, 3 + i);
               cell.value = totalsParColonne[c.key];
-              appliquerStyle(cell, EXCEL_STYLES.grandTotalHtg);
+              appliquerStyle(cell, EXCEL_STYLES.grandTotalNombre);
             });
             {
               const cell = ws.getCell(r, 3 + colonnesExport.length);
@@ -3102,28 +3135,86 @@
             const urlTelechargement = URL.createObjectURL(blob);
             const lien = document.createElement("a");
             lien.href = urlTelechargement;
-            lien.download = `Rapport_${ongCible.replace(/\s+/g, "_")}_${moisTexte}_${now.getFullYear()}.xlsx`;
+            lien.download = `Lot${numeroLot}_${ongCible.replace(/\s+/g, "_")}_${now.toLocaleDateString("fr-FR").replace(/\//g, "-")}.xlsx`;
             document.body.appendChild(lien);
             lien.click();
             document.body.removeChild(lien);
             setTimeout(() => URL.revokeObjectURL(urlTelechargement), 1e3);
             const idsExportes = listeDossiersONG.map((d) => d.id);
-            setVerifications((prev) => prev.map((v) => idsExportes.includes(v.id) ? { ...v, verrouilleFacture: true } : v));
+            setVerifications((prev) => prev.map((v) => idsExportes.includes(v.id) ? { ...v, numeroLot, verrouilleFacture: true } : v));
             let echecsVerrou = 0;
             await Promise.all(listeDossiersONG.map(async (d) => {
               try {
-                await chf.updateEpisode(d.id, toEpisodeApi({ verrouilleFacture: true }));
+                await chf.updateEpisode(d.id, toEpisodeApi({ numeroLot, verrouilleFacture: true }));
               } catch (e) {
                 if (!e.isOfflineQueue) echecsVerrou++;
               }
             }));
-            showToast(`\u2705 Export Excel de ${listeDossiersONG.length} dossiers (${formatGourdes(grandTotalGeneral)} Gdes)${echecsVerrou > 0 ? ` \u2014 \u26A0\uFE0F ${echecsVerrou} dossier(s) non verrouill\xE9(s), r\xE9essaie plus tard` : ""}`, "success");
-            setDossierPourExport(null);
+            showToast(`\u2705 Lot ${numeroLot} de ${ongCible} : ${listeDossiersONG.length} dossier(s), ${formatGourdes(grandTotalGeneral)} Gdes${echecsVerrou > 0 ? ` \u2014 \u26A0\uFE0F ${echecsVerrou} dossier(s) non enregistr\xE9(s), r\xE9essaie plus tard` : ""}`, "success");
             setAppliqueRabais10(false);
             setMontantDonIntrants("");
           } catch (error) {
             console.error("Erreur export Excel:", error);
             showToast("Une erreur s'est produite lors de la g\xE9n\xE9ration du fichier Excel.", "error");
+          }
+        };
+        const genererProchainLot = (ongCible) => {
+          const eligibles = verifications.filter((v) => v.ongPartenaire === ongCible && (v.status || "archived") === "archived" && v.numeroLot == null && !v.verrouilleFacture);
+          if (eligibles.length === 0) {
+            showToast(`Aucun nouveau dossier en attente pour ${ongCible}.`, "error");
+            return;
+          }
+          const numerosExistants = verifications.filter((v) => v.ongPartenaire === ongCible && v.numeroLot != null).map((v) => v.numeroLot);
+          const prochainNumero = numerosExistants.length > 0 ? Math.max(...numerosExistants) + 1 : 1;
+          const totalEstime = eligibles.reduce((s, v) => s + (v.totalGlobal || 0), 0);
+          setConfirmModal({
+            titre: `\u{1F4E6} G\xE9n\xE9rer le Lot ${prochainNumero} pour ${ongCible} ?`,
+            message: `${eligibles.length} dossier(s) seront inclus, pour un total d'environ ${formatGourdes(totalEstime)} Gdes. Une fois g\xE9n\xE9r\xE9, ce lot sera fig\xE9 : ces dossiers ne seront plus jamais repris automatiquement dans un futur lot.`,
+            confirmLabel: `\u{1F4E6} G\xE9n\xE9rer le Lot ${prochainNumero}`,
+            onConfirm: () => {
+              setConfirmModal(null);
+              genererFichierExcelPourLot(ongCible, eligibles.map((v) => v.id), prochainNumero);
+            },
+            onCancel: () => setConfirmModal(null)
+          });
+        };
+        const reimprimerLot = (ongCible, numeroLot) => {
+          const idsLot = verifications.filter((v) => v.ongPartenaire === ongCible && v.numeroLot === numeroLot).map((v) => v.id);
+          if (idsLot.length === 0) {
+            showToast("Lot introuvable.", "error");
+            return;
+          }
+          genererFichierExcelPourLot(ongCible, idsLot, numeroLot);
+        };
+        const retirerDossierDuLot = (dossier) => {
+          setConfirmModal({
+            titre: `Retirer ${dossier.nomPatient} du Lot ${dossier.numeroLot} ?`,
+            message: `Ce dossier redeviendra libre et sera inclus dans le PROCHAIN lot g\xE9n\xE9r\xE9 pour ${dossier.ongPartenaire}, pas dans celui-ci. Si ce lot a d\xE9j\xE0 \xE9t\xE9 envoy\xE9 au partenaire, r\xE9imprime-le apr\xE8s pour qu'il re\xE7oive la version sans ce dossier.`,
+            confirmLabel: "Retirer du lot",
+            danger: true,
+            onConfirm: async () => {
+              setConfirmModal(null);
+              setVerifications((prev) => prev.map((v) => v.id === dossier.id ? { ...v, numeroLot: null, verrouilleFacture: false } : v));
+              try {
+                await chf.updateEpisode(dossier.id, toEpisodeApi({ numeroLot: null, verrouilleFacture: false }));
+                showToast(`${dossier.nomPatient} retir\xE9 du Lot ${dossier.numeroLot}`, "success");
+              } catch (error) {
+                if (error.isOfflineQueue) showToast("\u{1F4F4} Changement enregistr\xE9 hors ligne", "info");
+                else showToast("Erreur: " + error.message, "error");
+              }
+            },
+            onCancel: () => setConfirmModal(null)
+          });
+        };
+        const ajouterDossierAuLot = async (idDossier, numeroLot, ongCible) => {
+          const dossier = verifications.find((v) => v.id === idDossier);
+          setVerifications((prev) => prev.map((v) => v.id === idDossier ? { ...v, numeroLot, verrouilleFacture: true } : v));
+          try {
+            await chf.updateEpisode(idDossier, toEpisodeApi({ numeroLot, verrouilleFacture: true }));
+            showToast(`${(dossier == null ? void 0 : dossier.nomPatient) || "Dossier"} ajout\xE9 au Lot ${numeroLot}`, "success");
+          } catch (error) {
+            if (error.isOfflineQueue) showToast("\u{1F4F4} Changement enregistr\xE9 hors ligne", "info");
+            else showToast("Erreur: " + error.message, "error");
           }
         };
         const imprimerFiche = (fiche) => {
@@ -3142,7 +3233,7 @@
           const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N\xB0${fiche.numeroFiche}</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:13px;margin-bottom:6px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.info-patient{font-size:12px;margin-bottom:4px;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p><p>${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")} ${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p></div><div class="info"><span>Patient: ${echapperHTML(focusedVerif.nomPatient)}</span><span>${focusedVerif.typePatient === "ONG" ? echapperHTML(focusedVerif.ongPartenaire || "N/R") : "Priv\xE9"}</span></div><div class="info"><span>Fiche N\xB0${fiche.numeroFiche}</span><span>Mode: ${echapperHTML(fiche.modePaiement || "cash").toUpperCase()}</span></div><div class="info info-patient"><span>\u{1F4DE} ${echapperHTML(focusedVerif.telephone || "N/R")}</span><span>\u{1F4C1} ${echapperHTML(focusedVerif.numDossier || "N/R")}</span></div><div class="info info-patient"><span>Type: ${focusedVerif.typePatient === "ONG" ? "Partenaire" : "Priv\xE9"}</span><span>Enregistr\xE9 par: ${echapperHTML(fiche.creePar || "inconnu")}</span></div>${fiche.exeat ? `<p style="font-size:10px; margin:4px 0;"><strong>S\xE9jour:</strong> ${fiche.exeat.dateEntree.split("-").reverse().slice(0, 2).join("/")} \u2192 ${fiche.exeat.dateSortie.split("-").reverse().slice(0, 2).join("/")}</p>` : ""}<table><thead><tr><th>D\xE9signation</th><th class="qte">Qt\xE9</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${hasLignes ? lignesHTML : fallbackHTML}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes<br/>${formatDH(fiche.totalGlobal)} DH</div>${fiche.solde && fiche.solde > 0 ? `<p style="font-size:12px; color:red;"><strong>Solde restant :</strong> ${formatGourdes(fiche.solde)} Gdes</p>` : ""}<div class="footer">Merci de votre visite !<br/>CHF Syst\xE8me Hospitalier \u2013 ${(/* @__PURE__ */ new Date()).getFullYear()}</div></body></html>`;
           const win = window.open("", "_blank", "width=500,height=700");
           if (!win) {
-            showToast("Autorisez les pop-ups.", "error");
+            showToast("Impression bloqu\xE9e par le navigateur. R\xE9essaie en cliquant sur Imprimer \u2014 si \xE7a ne marche toujours pas, demande \xE0 quelqu'un de v\xE9rifier les r\xE9glages.", "error");
             return;
           }
           win.document.write(contenu);
@@ -3152,14 +3243,14 @@
         };
         const imprimerArchive = (dossier) => {
           var _a2;
-          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Dossier ${echapperHTML(dossier.nomPatient)}</title><style>body{font-family:sans-serif;padding:20px;color:#000;} .entete{text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:14px;} .entete h1{font-size:22px;margin:4px 0;} .entete p{margin:2px 0;font-size:12px;} h1.titre{font-size:18px;margin-top:10px;} table{width:100%;border-collapse:collapse;margin-top:10px;} th,td{border:1px solid #ccc;padding:6px;text-align:left;font-size:12px;} .total{font-weight:bold;font-size:16px;margin-top:10px;} .info-patient{font-size:12px;margin:4px 0;} .meta-fiche{font-size:10px;color:#555;margin-top:4px;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p><p>${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")} ${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p></div><h1 class="titre">Dossier patient</h1><p class="info-patient"><strong>Nom :</strong> ${echapperHTML(dossier.nomPatient)} &nbsp;|&nbsp; <strong>N\xB0 Dossier :</strong> ${echapperHTML(dossier.numDossier || "N/R")}</p><p class="info-patient"><strong>ONG / Type :</strong> ${echapperHTML(dossier.ongPartenaire || "Priv\xE9")} (${echapperHTML(dossier.typePatient || "ONG")})</p><p class="info-patient"><strong>T\xE9l\xE9phone :</strong> ${echapperHTML(dossier.telephone || "N/R")}</p><p class="info-patient"><strong>Date d'ouverture :</strong> ${echapperHTML(dossier.dateHeure)}</p><p><strong>Total :</strong> ${formatGourdes(dossier.totalGlobal)} Gdes (${formatDH(dossier.totalGlobal)} DH)</p><h3>Fiches :</h3>${(_a2 = dossier.fiches) == null ? void 0 : _a2.map((f) => `<div style="border:1px solid #ddd;margin:10px 0;padding:10px;"><p><strong>Fiche N\xB0${f.numeroFiche}</strong> - Total : ${formatGourdes(f.totalGlobal)} Gdes</p><table><thead><tr><th>Cat\xE9gorie</th><th>Montant</th></tr></thead><tbody>${Object.entries(f.breakdown || {}).map(([key, val]) => {
+          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Dossier ${echapperHTML(dossier.nomPatient)}</title><style>body{font-family:sans-serif;padding:20px;color:#000;} .entete{text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:14px;} .entete h1{font-size:22px;margin:4px 0;} .entete p{margin:2px 0;font-size:12px;} h1.titre{font-size:18px;margin-top:10px;} table{width:100%;border-collapse:collapse;margin-top:10px;} th,td{border:1px solid #ccc;padding:6px;text-align:left;font-size:12px;} .total{font-weight:bold;font-size:16px;margin-top:10px;} .info-patient{font-size:12px;margin:4px 0;} .meta-fiche{font-size:10px;color:#555;margin-top:4px;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p><p>${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")} ${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p></div><h1 class="titre">Dossier patient</h1><p class="info-patient"><strong>Nom :</strong> ${echapperHTML(dossier.nomPatient)} &nbsp;|&nbsp; <strong>N\xB0 Dossier :</strong> ${echapperHTML(dossier.numDossier || "N/R")}</p><p class="info-patient"><strong>Partenaire / Type :</strong> ${dossier.typePatient === "ONG" ? echapperHTML(dossier.ongPartenaire || "N/R") : "Priv\xE9"} (${dossier.typePatient === "ONG" ? "Partenaire" : "Priv\xE9"})</p><p class="info-patient"><strong>T\xE9l\xE9phone :</strong> ${echapperHTML(dossier.telephone || "N/R")}</p><p class="info-patient"><strong>Date d'ouverture :</strong> ${echapperHTML(dossier.dateHeure)}</p><p><strong>Total :</strong> ${formatGourdes(dossier.totalGlobal)} Gdes (${formatDH(dossier.totalGlobal)} DH)</p><h3>Fiches :</h3>${(_a2 = dossier.fiches) == null ? void 0 : _a2.map((f) => `<div style="border:1px solid #ddd;margin:10px 0;padding:10px;"><p><strong>Fiche N\xB0${f.numeroFiche}</strong> - Total : ${formatGourdes(f.totalGlobal)} Gdes</p><table><thead><tr><th>Cat\xE9gorie</th><th>Montant</th></tr></thead><tbody>${Object.entries(f.breakdown || {}).map(([key, val]) => {
             if (val === 0) return "";
             const cat = CATEGORIES_LISTE.find((c) => c.key === key);
             return `<tr><td>${echapperHTML(cat ? cat.label : key)}</td><td>${formatGourdes(val)}</td></tr>`;
           }).join("")}</tbody></table><p class="meta-fiche">Mode de paiement : ${echapperHTML((f.modePaiement || "cash").toUpperCase())} &nbsp;|&nbsp; Encaiss\xE9 par : ${echapperHTML(f.creePar || "inconnu")} &nbsp;|&nbsp; ${f.dateCreation ? new Date(f.dateCreation).toLocaleString("fr-FR") : ""}</p></div>`).join("")}<p class="total">Total g\xE9n\xE9ral : ${formatGourdes(dossier.totalGlobal)} Gdes (${formatDH(dossier.totalGlobal)} DH)</p></body></html>`;
           const win = window.open("", "_blank", "width=800,height=600");
           if (!win) {
-            showToast("Autorisez les pop-ups", "error");
+            showToast("Impression bloqu\xE9e par le navigateur. R\xE9essaie en cliquant sur Imprimer \u2014 si \xE7a ne marche toujours pas, demande \xE0 quelqu'un de v\xE9rifier les r\xE9glages.", "error");
             return;
           }
           win.document.write(contenu);
@@ -3176,7 +3267,7 @@
           onChargerPourModif(dossier);
           showToast(`Dossier de ${dossier.nomPatient} rouvert`, "success");
         };
-        return /* @__PURE__ */ React.createElement("div", { className: "space-y-4 text-xs" }, /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Type"), /* @__PURE__ */ React.createElement("select", { value: filtreType, onChange: (e) => setFiltreType(e.target.value), className: "border rounded-lg p-1.5 bg-white outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Tous"), /* @__PURE__ */ React.createElement("option", { value: "ONG" }, "\u{1F3E5} ONG"), /* @__PURE__ */ React.createElement("option", { value: "PRIVE" }, "\u{1F4B3} Priv\xE9"))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "ONG"), /* @__PURE__ */ React.createElement("select", { value: filtreOng, onChange: (e) => setFiltreOng(e.target.value), className: "border rounded-lg p-1.5 bg-white outline-none", disabled: filtreType === "PRIVE" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Tous"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o)))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Nom"), /* @__PURE__ */ React.createElement("input", { type: "text", value: rechercheNomPatient, onChange: (e) => setRechercheNomPatient(e.target.value), placeholder: "Nom...", className: "border rounded-lg p-1.5 outline-none" })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Date d\xE9but"), /* @__PURE__ */ React.createElement("input", { type: "date", value: filtreDateDebut, onChange: (e) => setFiltreDateDebut(e.target.value), className: "border rounded-lg p-1.5 bg-white outline-none" })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Date fin"), /* @__PURE__ */ React.createElement("input", { type: "date", value: filtreDateFin, onChange: (e) => setFiltreDateFin(e.target.value), className: "border rounded-lg p-1.5 bg-white outline-none" })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Cat\xE9gorie"), /* @__PURE__ */ React.createElement("select", { value: filtreCategorie, onChange: (e) => setFiltreCategorie(e.target.value), className: "border rounded-lg p-1.5 bg-white outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Toutes"), CATEGORIES_LISTE.map((c) => /* @__PURE__ */ React.createElement("option", { key: c.key, value: c.key }, c.label)))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Statut"), /* @__PURE__ */ React.createElement("select", { value: filtreStatut, onChange: (e) => setFiltreStatut(e.target.value), className: "border rounded-lg p-1.5 bg-white outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Tous"), /* @__PURE__ */ React.createElement("option", { value: "actif" }, "Actif"), /* @__PURE__ */ React.createElement("option", { value: "suspendu" }, "Suspendu"), /* @__PURE__ */ React.createElement("option", { value: "archived" }, "Archiv\xE9")))), /* @__PURE__ */ React.createElement("div", { className: "flex justify-end" }, /* @__PURE__ */ React.createElement("button", { onClick: () => {
+        return /* @__PURE__ */ React.createElement("div", { className: "space-y-4 text-xs" }, /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Type"), /* @__PURE__ */ React.createElement("select", { value: filtreType, onChange: (e) => setFiltreType(e.target.value), className: "border rounded-lg p-1.5 bg-white outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Tous"), /* @__PURE__ */ React.createElement("option", { value: "ONG" }, "\u{1F3E5} Partenaire"), /* @__PURE__ */ React.createElement("option", { value: "PRIVE" }, "\u{1F4B3} Priv\xE9"))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Partenaire"), /* @__PURE__ */ React.createElement("select", { value: filtreOng, onChange: (e) => setFiltreOng(e.target.value), className: "border rounded-lg p-1.5 bg-white outline-none", disabled: filtreType === "PRIVE" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Tous"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o)))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Nom"), /* @__PURE__ */ React.createElement("input", { type: "text", value: rechercheNomPatient, onChange: (e) => setRechercheNomPatient(e.target.value), placeholder: "Nom...", className: "border rounded-lg p-1.5 outline-none" })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Date d\xE9but"), /* @__PURE__ */ React.createElement("input", { type: "date", value: filtreDateDebut, onChange: (e) => setFiltreDateDebut(e.target.value), className: "border rounded-lg p-1.5 bg-white outline-none" })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Date fin"), /* @__PURE__ */ React.createElement("input", { type: "date", value: filtreDateFin, onChange: (e) => setFiltreDateFin(e.target.value), className: "border rounded-lg p-1.5 bg-white outline-none" })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Cat\xE9gorie"), /* @__PURE__ */ React.createElement("select", { value: filtreCategorie, onChange: (e) => setFiltreCategorie(e.target.value), className: "border rounded-lg p-1.5 bg-white outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Toutes"), CATEGORIES_LISTE.map((c) => /* @__PURE__ */ React.createElement("option", { key: c.key, value: c.key }, c.label)))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Statut"), /* @__PURE__ */ React.createElement("select", { value: filtreStatut, onChange: (e) => setFiltreStatut(e.target.value), className: "border rounded-lg p-1.5 bg-white outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Tous"), /* @__PURE__ */ React.createElement("option", { value: "actif" }, "Actif"), /* @__PURE__ */ React.createElement("option", { value: "suspendu" }, "Suspendu"), /* @__PURE__ */ React.createElement("option", { value: "reporte" }, "Report\xE9"), /* @__PURE__ */ React.createElement("option", { value: "archived" }, "Archiv\xE9")))), /* @__PURE__ */ React.createElement("div", { className: "flex justify-end" }, /* @__PURE__ */ React.createElement("button", { onClick: () => {
           setFiltreType("");
           setFiltreOng("");
           setRechercheNomPatient("");
@@ -3184,11 +3275,25 @@
           setFiltreDateFin("");
           setFiltreCategorie("");
           setFiltreStatut("");
-        }, className: "bg-gray-200 text-gray-700 px-3 py-1 rounded text-xs font-bold" }, "R\xE9initialiser")), peutExporter && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border border-purple-300 shadow-sm space-y-3" }, /* @__PURE__ */ React.createElement("h3", { className: "font-black text-purple-950 text-xs uppercase tracking-wider" }, "\u{1F4BC} Cl\xF4ture & Facturation"), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-2 items-end" }, /* @__PURE__ */ React.createElement("select", { value: dossierPourExport || "", onChange: (e) => setDossierPourExport(e.target.value || null), className: "border rounded-lg p-1.5 text-xs bg-white font-bold outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- Partenaire --"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o))), dossierPourExport && /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-4 items-center bg-white p-2 rounded-lg border border-dashed shadow-sm" }, /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1 font-bold text-purple-900 cursor-pointer" }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: appliqueRabais10, onChange: (e) => setAppliqueRabais10(e.target.checked), className: "rounded" }), " Rabais 10%"), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1" }, /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-gray-500" }, "Dons:"), /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", value: montantDonIntrants, onChange: (e) => setMontantDonIntrants(e.target.value), placeholder: "0", className: "border rounded p-1 w-24 font-mono font-bold text-right text-red-700 outline-none" })), /* @__PURE__ */ React.createElement("button", { onClick: () => exporterBlocDossiersExcelPartenaire(dossierPourExport), className: "bg-purple-700 text-white font-bold px-3 py-1.5 rounded flex items-center gap-1 shadow" }, /* @__PURE__ */ React.createElement(Download, { size: 13 }), " Excel")))), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm space-y-2" }, /* @__PURE__ */ React.createElement("h2", { className: "text-xs font-black text-gray-700 uppercase border-b pb-1" }, "\u{1F4C1} Dossiers (", dossiersFiltres.length, dossiersFiltres.length > nombreAffiche ? ` \u2014 ${nombreAffiche} affich\xE9s` : "", ")"), /* @__PURE__ */ React.createElement("div", { className: "overflow-x-auto max-h-96 overflow-y-auto" }, /* @__PURE__ */ React.createElement("table", { className: "w-full text-left" }, /* @__PURE__ */ React.createElement("thead", { className: "sticky top-0 bg-white shadow-sm" }, /* @__PURE__ */ React.createElement("tr", { className: "bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono" }, /* @__PURE__ */ React.createElement("th", { className: "p-2" }, "Date"), /* @__PURE__ */ React.createElement("th", { className: "p-2" }, "Patient"), /* @__PURE__ */ React.createElement("th", { className: "p-2" }, "Type"), /* @__PURE__ */ React.createElement("th", { className: "p-2" }, "ONG"), /* @__PURE__ */ React.createElement("th", { className: "p-2 text-center" }, "Vol."), /* @__PURE__ */ React.createElement("th", { className: "p-2 text-right" }, "Total"), /* @__PURE__ */ React.createElement("th", { className: "p-2 text-center" }, "Statut"), /* @__PURE__ */ React.createElement("th", { className: "p-2 text-center" }, "Actions"))), /* @__PURE__ */ React.createElement("tbody", { className: "divide-y divide-gray-100 font-mono text-[11px]" }, dossiersFiltres.slice(0, nombreAffiche).map((v) => {
+        }, className: "bg-gray-200 text-gray-700 px-3 py-1 rounded text-xs font-bold" }, "R\xE9initialiser")), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 border-b" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setSousOngletArchives("dossiers"), className: `px-4 py-2 text-xs font-bold rounded-t-lg ${sousOngletArchives === "dossiers" ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-500"}` }, "\u{1F4C1} Dossiers"), peutExporter && /* @__PURE__ */ React.createElement("button", { onClick: () => setSousOngletArchives("lots"), className: `px-4 py-2 text-xs font-bold rounded-t-lg ${sousOngletArchives === "lots" ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-500"}` }, "\u{1F4E6} Lots & Facturation")), sousOngletArchives === "lots" && peutExporter && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border border-purple-300 shadow-sm space-y-3" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Partenaire"), /* @__PURE__ */ React.createElement("select", { value: lotOngSelectionne, onChange: (e) => {
+          setLotOngSelectionne(e.target.value);
+          setLotFocusedNumero(null);
+        }, className: "border rounded-lg p-1.5 text-xs bg-white font-bold outline-none max-w-xs" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- S\xE9lectionner --"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o)))), lotOngSelectionne && !lotFocused && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-4 items-center bg-gray-50 p-3 rounded-lg border border-dashed" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-gray-700" }, "\u{1F195} ", dossiersEnAttenteDeLot.length, " dossier(s) en attente \u2014 ", formatGourdes(dossiersEnAttenteDeLot.reduce((s, v) => s + (v.totalGlobal || 0), 0)), " Gdes"), /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1 font-bold text-purple-900 cursor-pointer" }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: appliqueRabais10, onChange: (e) => setAppliqueRabais10(e.target.checked), className: "rounded" }), " Rabais 10%"), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1" }, /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-gray-500" }, "Dons:"), /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", value: montantDonIntrants, onChange: (e) => setMontantDonIntrants(e.target.value), placeholder: "0", className: "border rounded p-1 w-24 font-mono font-bold text-right text-red-700 outline-none" })), /* @__PURE__ */ React.createElement("button", { onClick: () => genererProchainLot(lotOngSelectionne), disabled: dossiersEnAttenteDeLot.length === 0, className: "bg-purple-700 text-white font-bold px-3 py-1.5 rounded flex items-center gap-1 shadow disabled:opacity-30" }, /* @__PURE__ */ React.createElement(Download, { size: 13 }), " G\xE9n\xE9rer le prochain lot")), /* @__PURE__ */ React.createElement("h3", { className: "font-black text-gray-700 text-xs uppercase border-b pb-1" }, "Lots d\xE9j\xE0 envoy\xE9s"), lotsDuPartenaire.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "text-gray-400 text-center py-3" }, "Aucun lot envoy\xE9 pour ce partenaire encore."), /* @__PURE__ */ React.createElement("div", { className: "divide-y" }, lotsDuPartenaire.map((lot) => /* @__PURE__ */ React.createElement("div", { key: lot.numero, className: "flex justify-between items-center py-2 text-xs" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-gray-700" }, "Lot ", lot.numero, " \u2014 ", lot.dossiers.length, " dossier(s) \u2014 ", formatGourdes(lot.total), " Gdes"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setLotFocusedNumero(lot.numero), className: "text-blue-600 font-bold underline" }, "Voir"), /* @__PURE__ */ React.createElement("button", { onClick: () => reimprimerLot(lotOngSelectionne, lot.numero), className: "text-purple-700 font-bold underline" }, "\u{1F504} R\xE9imprimer")))))), lotFocused && /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-center border-b pb-1" }, /* @__PURE__ */ React.createElement("h3", { className: "font-black text-gray-700 text-xs uppercase" }, "\u{1F4E6} Lot ", lotFocused.numero, " \u2014 ", lotOngSelectionne, " \u2014 ", formatGourdes(lotFocused.total), " Gdes"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => reimprimerLot(lotOngSelectionne, lotFocused.numero), className: "bg-purple-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Download, { size: 12 }), " R\xE9imprimer ce lot"), /* @__PURE__ */ React.createElement("button", { onClick: () => setLotFocusedNumero(null) }, /* @__PURE__ */ React.createElement(X, { size: 14 })))), dossiersEnAttenteDeLot.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 bg-gray-50 border border-dashed rounded-lg p-2" }, /* @__PURE__ */ React.createElement("select", { value: dossierAAjouterAuLot, onChange: (e) => setDossierAAjouterAuLot(e.target.value), className: "border rounded p-1.5 text-xs bg-white flex-1 outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- Ajouter un dossier libre \xE0 ce lot --"), dossiersEnAttenteDeLot.map((v) => /* @__PURE__ */ React.createElement("option", { key: v.id, value: v.id }, v.nomPatient, " \u2014 ", formatGourdes(v.totalGlobal || 0), " Gdes"))), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+          if (dossierAAjouterAuLot) {
+            ajouterDossierAuLot(dossierAAjouterAuLot, lotFocused.numero, lotOngSelectionne);
+            setDossierAAjouterAuLot("");
+          }
+        }, disabled: !dossierAAjouterAuLot, className: "bg-emerald-700 text-white font-bold px-2 py-1.5 rounded text-[10px] disabled:opacity-30 whitespace-nowrap" }, "\u2795 Ajouter")), /* @__PURE__ */ React.createElement("div", { className: "divide-y max-h-80 overflow-y-auto" }, lotFocused.dossiers.map((v) => /* @__PURE__ */ React.createElement("div", { key: v.id, className: "flex justify-between items-center py-2 text-xs font-mono" }, /* @__PURE__ */ React.createElement("span", null, v.nomPatient, " ", /* @__PURE__ */ React.createElement("span", { className: "text-gray-400" }, "\u2014 ", formatGourdes(v.totalGlobal || 0), " Gdes")), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1" }, peutModifier && /* @__PURE__ */ React.createElement("button", { onClick: () => {
+          if ((v.status || "archived") === "archived" && !confirm(`Ce dossier est d\xE9j\xE0 archiv\xE9 (Lot ${lotFocused.numero}). Le modifier corrigera ce dossier existant \u2014 pense \xE0 r\xE9imprimer le lot ensuite.
+
+Continuer ?`)) return;
+          onChargerPourModif(v);
+        }, className: "text-amber-700 p-1 bg-amber-50 rounded", title: "Modifier / corriger" }, /* @__PURE__ */ React.createElement(Pencil, { size: 13 })), peutModifier && /* @__PURE__ */ React.createElement("button", { onClick: () => retirerDossierDuLot(v), className: "text-red-600 p-1 bg-red-50 rounded", title: "Retirer du lot" }, "\u2796"))))))), sousOngletArchives === "dossiers" && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm space-y-2" }, /* @__PURE__ */ React.createElement("h2", { className: "text-xs font-black text-gray-700 uppercase border-b pb-1" }, "\u{1F4C1} Dossiers (", dossiersFiltres.length, dossiersFiltres.length > nombreAffiche ? ` \u2014 ${nombreAffiche} affich\xE9s` : "", ")"), /* @__PURE__ */ React.createElement("div", { className: "overflow-x-auto max-h-96 overflow-y-auto" }, /* @__PURE__ */ React.createElement("table", { className: "w-full text-left" }, /* @__PURE__ */ React.createElement("thead", { className: "sticky top-0 bg-white shadow-sm" }, /* @__PURE__ */ React.createElement("tr", { className: "bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono" }, /* @__PURE__ */ React.createElement("th", { className: "p-2" }, "Date"), /* @__PURE__ */ React.createElement("th", { className: "p-2" }, "Patient"), /* @__PURE__ */ React.createElement("th", { className: "p-2" }, "Type"), /* @__PURE__ */ React.createElement("th", { className: "p-2" }, "Partenaire"), /* @__PURE__ */ React.createElement("th", { className: "p-2 text-center" }, "Vol."), /* @__PURE__ */ React.createElement("th", { className: "p-2 text-right" }, "Total"), /* @__PURE__ */ React.createElement("th", { className: "p-2 text-center" }, "Statut"), /* @__PURE__ */ React.createElement("th", { className: "p-2 text-center" }, "Actions"))), /* @__PURE__ */ React.createElement("tbody", { className: "divide-y divide-gray-100 font-mono text-[11px]" }, dossiersFiltres.slice(0, nombreAffiche).map((v) => {
           const statut = v.status || "archived";
           const isSuspendu = statut === "suspendu";
+          const isReporte = statut === "reporte";
           const totalFiable = Number.isFinite(v.totalGlobal) && v.totalGlobal > 0 ? v.totalGlobal : (v.fiches || []).reduce((s, f) => s + (Number(f.totalGlobal) || 0), 0);
-          return /* @__PURE__ */ React.createElement("tr", { key: v.id, className: isSuspendu ? "bg-amber-50/60 border-l-4 border-amber-400" : v.contientErreurs ? "bg-red-50/40 border-l-4 border-red-500" : "hover:bg-gray-50/50" }, /* @__PURE__ */ React.createElement("td", { className: "p-2 text-gray-500" }, v.dateHeure), /* @__PURE__ */ React.createElement("td", { className: "p-2 font-bold font-sans flex items-center gap-1" }, v.verrouilleFacture && /* @__PURE__ */ React.createElement("span", null, "\u{1F512}"), v.nomPatient), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-center" }, (v.typePatient || "ONG") === "ONG" ? "\u{1F3E5} ONG" : "\u{1F4B3} Priv\xE9"), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-purple-800 font-bold" }, v.ongPartenaire), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-center text-gray-600" }, (v.fiches || []).length), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-right font-bold text-emerald-800", title: v.totalGlobal !== totalFiable ? "Recalcul\xE9 \xE0 partir des fiches \u2014 la valeur stock\xE9e \xE9tait absente ou \xE0 z\xE9ro" : "" }, formatDH(totalFiable), " DH", v.totalGlobal !== totalFiable && /* @__PURE__ */ React.createElement("span", { className: "text-amber-500" }, " \u26A0\uFE0F")), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-center" }, statut === "suspendu" ? /* @__PURE__ */ React.createElement("span", { className: "text-amber-600 font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Clock, { size: 12 }), " Suspendu") : statut === "actif" ? /* @__PURE__ */ React.createElement("span", { className: "text-blue-600" }, "Actif") : /* @__PURE__ */ React.createElement("span", { className: "text-gray-400" }, "Archiv\xE9")), /* @__PURE__ */ React.createElement("td", { className: "p-2 flex justify-center gap-1 flex-wrap" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setFocusedVerif(v), className: "text-blue-600 p-1 bg-blue-50 rounded", title: "Voir" }, /* @__PURE__ */ React.createElement(Eye, { size: 13 })), peutModifier && /* @__PURE__ */ React.createElement("button", { onClick: () => {
+          return /* @__PURE__ */ React.createElement("tr", { key: v.id, className: isSuspendu ? "bg-amber-50/60 border-l-4 border-amber-400" : isReporte ? "bg-indigo-50/60 border-l-4 border-indigo-400" : v.contientErreurs ? "bg-red-50/40 border-l-4 border-red-500" : "hover:bg-gray-50/50" }, /* @__PURE__ */ React.createElement("td", { className: "p-2 text-gray-500" }, v.dateHeure), /* @__PURE__ */ React.createElement("td", { className: "p-2 font-bold font-sans flex items-center gap-1" }, v.verrouilleFacture && /* @__PURE__ */ React.createElement("span", null, "\u{1F512}"), v.nomPatient), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-center" }, (v.typePatient || "ONG") === "ONG" ? "\u{1F3E5} Partenaire" : "\u{1F4B3} Priv\xE9"), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-purple-800 font-bold" }, v.ongPartenaire), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-center text-gray-600" }, (v.fiches || []).length), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-right font-bold text-emerald-800", title: v.totalGlobal !== totalFiable ? "Recalcul\xE9 \xE0 partir des fiches \u2014 la valeur stock\xE9e \xE9tait absente ou \xE0 z\xE9ro" : "" }, formatDH(totalFiable), " DH", v.totalGlobal !== totalFiable && /* @__PURE__ */ React.createElement("span", { className: "text-amber-500" }, " \u26A0\uFE0F")), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-center" }, statut === "suspendu" ? /* @__PURE__ */ React.createElement("span", { className: "text-amber-600 font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Clock, { size: 12 }), " Suspendu") : statut === "reporte" ? /* @__PURE__ */ React.createElement("span", { className: "text-indigo-600 font-bold flex items-center gap-1", title: v.moisReport ? `Report\xE9 \xE0 ${v.moisReport}` : "" }, "\u{1F4C5} Report\xE9", v.moisReport ? ` (${v.moisReport})` : "") : statut === "actif" ? /* @__PURE__ */ React.createElement("span", { className: "text-blue-600" }, "Actif") : /* @__PURE__ */ React.createElement("span", { className: "text-gray-400" }, "Archiv\xE9")), /* @__PURE__ */ React.createElement("td", { className: "p-2 flex justify-center gap-1 flex-wrap" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setFocusedVerif(v), className: "text-blue-600 p-1 bg-blue-50 rounded", title: "Voir" }, /* @__PURE__ */ React.createElement(Eye, { size: 13 })), peutModifier && /* @__PURE__ */ React.createElement("button", { onClick: () => {
             const statut2 = v.status || "archived";
             if (statut2 === "archived" && !confirm(`Ce dossier est d\xE9j\xE0 archiv\xE9. Le modifier corrigera CE dossier existant (pas une nouvelle visite).
 
@@ -3197,11 +3302,11 @@ Pour une nouvelle visite de ${v.nomPatient}, utilise plut\xF4t "Rechercher un pa
 Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             onChargerPourModif(v);
           }, className: "text-amber-700 p-1 bg-amber-50 rounded", title: "Modifier / corriger" }, /* @__PURE__ */ React.createElement(Pencil, { size: 13 })), peutSupprimer && /* @__PURE__ */ React.createElement("button", { onClick: () => onSupprimer(v.id), disabled: v.verrouilleFacture, className: "text-gray-300 hover:text-red-600 p-1 disabled:opacity-20" }, /* @__PURE__ */ React.createElement(Trash2, { size: 13 })), /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerArchive(v), className: "text-gray-600 p-1 bg-gray-50 rounded", title: "Imprimer" }, /* @__PURE__ */ React.createElement(Printer, { size: 13 })), isSuspendu && peutRouvrir && /* @__PURE__ */ React.createElement("button", { onClick: () => rouvrirDossierSuspendu(v), className: "text-emerald-600 p-1 bg-emerald-50 rounded", title: "Rouvrir" }, /* @__PURE__ */ React.createElement(FolderOpen, { size: 13 }))));
-        })))), dossiersFiltres.length > nombreAffiche && /* @__PURE__ */ React.createElement("div", { className: "flex justify-center pt-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setNombreAffiche((n) => n + 100), className: "bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-1.5 rounded-lg text-xs font-bold" }, "Charger plus (", dossiersFiltres.length - nombreAffiche, " restants)"))), focusedVerif && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border border-blue-200 shadow-md space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-center border-b pb-1" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-blue-900 text-xs uppercase" }, "\u{1F50D} ", focusedVerif.nomPatient), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerArchive(focusedVerif), className: "bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Imprimer dossier"), /* @__PURE__ */ React.createElement("button", { onClick: () => setFocusedVerif(null) }, /* @__PURE__ */ React.createElement(X, { size: 14 })))), onChangerTypeOng && peutModifier && (!editTypeArchiveOuvert ? /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 text-xs bg-gray-50 border rounded-lg p-2" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-purple-700" }, focusedVerif.ongPartenaire || "Priv\xE9", " - ", focusedVerif.typePatient || "ONG"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+        })))), dossiersFiltres.length > nombreAffiche && /* @__PURE__ */ React.createElement("div", { className: "flex justify-center pt-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setNombreAffiche((n) => n + 100), className: "bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-1.5 rounded-lg text-xs font-bold" }, "Charger plus (", dossiersFiltres.length - nombreAffiche, " restants)"))), focusedVerif && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border border-blue-200 shadow-md space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-center border-b pb-1" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-blue-900 text-xs uppercase" }, "\u{1F50D} ", focusedVerif.nomPatient), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerArchive(focusedVerif), className: "bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Imprimer dossier"), /* @__PURE__ */ React.createElement("button", { onClick: () => setFocusedVerif(null) }, /* @__PURE__ */ React.createElement(X, { size: 14 })))), focusedVerif.numeroLot != null && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 text-xs bg-indigo-50 border border-indigo-200 rounded-lg p-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-indigo-800" }, "\u{1F4E6} Ce dossier fait partie du ", /* @__PURE__ */ React.createElement("strong", null, "Lot ", focusedVerif.numeroLot), " de ", focusedVerif.ongPartenaire, '. Une correction reste possible via "Modifier/corriger" \u2014 pense \xE0 r\xE9imprimer le lot ensuite pour que le partenaire re\xE7oive la version \xE0 jour.')), onChangerTypeOng && peutModifier && (!editTypeArchiveOuvert ? /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 text-xs bg-gray-50 border rounded-lg p-2" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-purple-700" }, focusedVerif.ongPartenaire || "Priv\xE9", " - ", focusedVerif.typePatient === "ONG" ? "Partenaire" : "Priv\xE9"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
           setNouveauTypeArchive(focusedVerif.typePatient || "ONG");
           setNouvelOngArchive(focusedVerif.ongPartenaire || "");
           setEditTypeArchiveOuvert(true);
-        }, className: "text-[10px] font-bold text-blue-600 underline" }, "\u270F\uFE0F Changer Priv\xE9/ONG")) : /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5 items-center bg-gray-50 border rounded-lg p-2 flex-wrap" }, /* @__PURE__ */ React.createElement("select", { value: nouveauTypeArchive, onChange: (e) => setNouveauTypeArchive(e.target.value), className: "border rounded p-1 text-xs bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "ONG" }, "\u{1F3E5} ONG"), /* @__PURE__ */ React.createElement("option", { value: "PRIVE" }, "\u{1F4B3} Priv\xE9")), nouveauTypeArchive === "ONG" && /* @__PURE__ */ React.createElement("select", { value: nouvelOngArchive, onChange: (e) => setNouvelOngArchive(e.target.value), className: "border rounded p-1 text-xs bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- ONG --"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o))), /* @__PURE__ */ React.createElement("button", { onClick: async () => {
+        }, className: "text-[10px] font-bold text-blue-600 underline" }, "\u270F\uFE0F Changer Priv\xE9/Partenaire")) : /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5 items-center bg-gray-50 border rounded-lg p-2 flex-wrap" }, /* @__PURE__ */ React.createElement("select", { value: nouveauTypeArchive, onChange: (e) => setNouveauTypeArchive(e.target.value), className: "border rounded p-1 text-xs bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "ONG" }, "\u{1F3E5} Partenaire"), /* @__PURE__ */ React.createElement("option", { value: "PRIVE" }, "\u{1F4B3} Priv\xE9")), nouveauTypeArchive === "ONG" && /* @__PURE__ */ React.createElement("select", { value: nouvelOngArchive, onChange: (e) => setNouvelOngArchive(e.target.value), className: "border rounded p-1 text-xs bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- Partenaire --"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o))), /* @__PURE__ */ React.createElement("button", { onClick: async () => {
           await onChangerTypeOng(focusedVerif.id, nouveauTypeArchive, nouveauTypeArchive === "ONG" ? nouvelOngArchive : "");
           setFocusedVerif((f) => f ? { ...f, typePatient: nouveauTypeArchive, ongPartenaire: nouveauTypeArchive === "ONG" ? nouvelOngArchive : "" } : f);
           setEditTypeArchiveOuvert(false);
@@ -3385,7 +3490,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
         setInputTelephone,
         listeOng
       }) {
-        return /* @__PURE__ */ React.createElement("div", { className: "bg-white p-6 rounded-xl border shadow-sm space-y-4" }, /* @__PURE__ */ React.createElement("h3", { className: "text-base font-black text-center border-b pb-2" }, "\u{1F195} Nouveau Dossier (\xC9pisode)"), /* @__PURE__ */ React.createElement("div", { className: "relative" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Rechercher un patient existant"), /* @__PURE__ */ React.createElement("input", { type: "text", value: searchPatientText, onChange: (e) => setSearchPatientText(e.target.value), placeholder: "Nom ou num\xE9ro de dossier...", className: "border rounded-lg p-2 w-full text-xs outline-none pl-8" }), /* @__PURE__ */ React.createElement("span", { className: "absolute left-2 top-7 text-gray-400" }, /* @__PURE__ */ React.createElement(Search, { size: 14 })), suggestionsPatients.length > 0 && /* @__PURE__ */ React.createElement("ul", { className: "absolute z-20 left-0 right-0 bg-white border rounded-lg shadow-2xl mt-1 text-xs max-h-48 overflow-y-auto divide-y" }, suggestionsPatients.map((p) => /* @__PURE__ */ React.createElement("li", { key: p.id }, /* @__PURE__ */ React.createElement("button", { type: "button", onClick: () => choisirPatientExistant(p), className: "w-full text-left px-3 py-2 hover:bg-gray-100 flex justify-between" }, /* @__PURE__ */ React.createElement("span", null, p.nomPatient), /* @__PURE__ */ React.createElement("span", { className: "text-gray-500" }, p.numDossier || "N/R", " - ", p.ongPartenaire || "Priv\xE9")))))), /* @__PURE__ */ React.createElement("div", { className: "text-center text-gray-400 text-[10px]" }, "\u2014 ou cr\xE9er un nouveau \u2014"), peutCreerDossier ? /* @__PURE__ */ React.createElement("form", { onSubmit: onSoumettre, className: "space-y-3" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Nom complet"), /* @__PURE__ */ React.createElement("input", { type: "text", value: inputNom, onChange: (e) => setInputNom(e.target.value), placeholder: "Nom et pr\xE9nom...", className: "border rounded-lg p-2 text-xs outline-none", required: true })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Type de patient"), /* @__PURE__ */ React.createElement("select", { value: inputTypePatient, onChange: (e) => setInputTypePatient(e.target.value), className: "border rounded-lg p-2 text-xs bg-white outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "ONG" }, "\u{1F3E5} Patient ONG"), /* @__PURE__ */ React.createElement("option", { value: "PRIVE" }, "\u{1F4B3} Patient Priv\xE9"))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Service pr\xE9vu"), /* @__PURE__ */ React.createElement("select", { value: serviceChoisi, onChange: (e) => setServiceChoisi(e.target.value), className: "border rounded-lg p-2 text-xs bg-white outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- Non pr\xE9cis\xE9 (d\xE9duit automatiquement) --"), /* @__PURE__ */ React.createElement("option", { value: "Urgences" }, "\u{1F6A8} Urgences"), /* @__PURE__ */ React.createElement("option", { value: "P\xE9diatrie" }, "\u{1F9D2} P\xE9diatrie"), /* @__PURE__ */ React.createElement("option", { value: "G\xE9n\xE9ral" }, "\u{1FA7A} G\xE9n\xE9ral"), /* @__PURE__ */ React.createElement("option", { value: "Chirurgie" }, "\u{1F52A} Chirurgie"), /* @__PURE__ */ React.createElement("option", { value: "Maternit\xE9" }, "\u{1F930} Maternit\xE9"), /* @__PURE__ */ React.createElement("option", { value: "N\xE9onatologie" }, "\u{1F476} N\xE9onatologie")), /* @__PURE__ */ React.createElement("p", { className: "text-[9px] text-gray-400" }, "Aide le tableau de bord Pilotage CHF \xE0 classer ce dossier tout de suite, m\xEAme avant qu'un acte soit factur\xE9.")), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "ONG partenaire"), /* @__PURE__ */ React.createElement("select", { value: inputOng, onChange: (e) => setInputOng(e.target.value), className: "border rounded-lg p-2 text-xs bg-white outline-none", disabled: inputTypePatient !== "ONG" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- S\xE9lectionner --"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o)))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Num\xE9ro de dossier"), /* @__PURE__ */ React.createElement("input", { type: "text", value: inputNumDossier, onChange: (e) => setInputNumDossier(e.target.value), placeholder: "ex: F-2024-045", className: "border rounded-lg p-2 text-xs outline-none" })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Date de naissance"), /* @__PURE__ */ React.createElement("input", { type: "date", value: inputDateNaissance, onChange: (e) => setInputDateNaissance(e.target.value), className: "border rounded-lg p-2 text-xs outline-none" })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "T\xE9l\xE9phone"), /* @__PURE__ */ React.createElement("input", { type: "text", value: inputTelephone, onChange: (e) => setInputTelephone(e.target.value), placeholder: "509-1234-5678", className: "border rounded-lg p-2 text-xs outline-none" })), /* @__PURE__ */ React.createElement("button", { type: "submit", className: "w-full bg-[#1E2A24] text-white py-2 rounded-lg text-xs font-bold" }, "\u{1F680} Ouvrir le dossier")) : /* @__PURE__ */ React.createElement("p", { className: "text-gray-500 text-center" }, "Vous n'avez pas la permission de cr\xE9er un dossier."));
+        return /* @__PURE__ */ React.createElement("div", { className: "bg-white p-6 rounded-xl border shadow-sm space-y-4" }, /* @__PURE__ */ React.createElement("h3", { className: "text-base font-black text-center border-b pb-2" }, "\u{1F195} Nouveau Dossier (\xC9pisode)"), /* @__PURE__ */ React.createElement("div", { className: "relative" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Rechercher un patient existant"), /* @__PURE__ */ React.createElement("input", { type: "text", value: searchPatientText, onChange: (e) => setSearchPatientText(e.target.value), placeholder: "Nom ou num\xE9ro de dossier...", className: "border rounded-lg p-2 w-full text-xs outline-none pl-8" }), /* @__PURE__ */ React.createElement("span", { className: "absolute left-2 top-7 text-gray-400" }, /* @__PURE__ */ React.createElement(Search, { size: 14 })), suggestionsPatients.length > 0 && /* @__PURE__ */ React.createElement("ul", { className: "absolute z-20 left-0 right-0 bg-white border rounded-lg shadow-2xl mt-1 text-xs max-h-48 overflow-y-auto divide-y" }, suggestionsPatients.map((p) => /* @__PURE__ */ React.createElement("li", { key: p.id }, /* @__PURE__ */ React.createElement("button", { type: "button", onClick: () => choisirPatientExistant(p), className: "w-full text-left px-3 py-2 hover:bg-gray-100 flex justify-between" }, /* @__PURE__ */ React.createElement("span", null, p.nomPatient), /* @__PURE__ */ React.createElement("span", { className: "text-gray-500" }, p.numDossier || "N/R", " - ", p.ongPartenaire || "Priv\xE9")))))), /* @__PURE__ */ React.createElement("div", { className: "text-center text-gray-400 text-[10px]" }, "\u2014 ou cr\xE9er un nouveau \u2014"), peutCreerDossier ? /* @__PURE__ */ React.createElement("form", { onSubmit: onSoumettre, className: "space-y-3" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Nom complet"), /* @__PURE__ */ React.createElement("input", { type: "text", value: inputNom, onChange: (e) => setInputNom(e.target.value), placeholder: "Nom et pr\xE9nom...", className: "border rounded-lg p-2 text-xs outline-none", required: true })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Type de patient"), /* @__PURE__ */ React.createElement("select", { value: inputTypePatient, onChange: (e) => setInputTypePatient(e.target.value), className: "border rounded-lg p-2 text-xs bg-white outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "ONG" }, "\u{1F3E5} Patient Partenaire"), /* @__PURE__ */ React.createElement("option", { value: "PRIVE" }, "\u{1F4B3} Patient Priv\xE9"))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Service pr\xE9vu"), /* @__PURE__ */ React.createElement("select", { value: serviceChoisi, onChange: (e) => setServiceChoisi(e.target.value), className: "border rounded-lg p-2 text-xs bg-white outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- Non pr\xE9cis\xE9 (d\xE9duit automatiquement) --"), /* @__PURE__ */ React.createElement("option", { value: "Urgences" }, "\u{1F6A8} Urgences"), /* @__PURE__ */ React.createElement("option", { value: "P\xE9diatrie" }, "\u{1F9D2} P\xE9diatrie"), /* @__PURE__ */ React.createElement("option", { value: "G\xE9n\xE9ral" }, "\u{1FA7A} G\xE9n\xE9ral"), /* @__PURE__ */ React.createElement("option", { value: "Chirurgie" }, "\u{1F52A} Chirurgie"), /* @__PURE__ */ React.createElement("option", { value: "Maternit\xE9" }, "\u{1F930} Maternit\xE9"), /* @__PURE__ */ React.createElement("option", { value: "N\xE9onatologie" }, "\u{1F476} N\xE9onatologie")), /* @__PURE__ */ React.createElement("p", { className: "text-[9px] text-gray-400" }, "Aide le tableau de bord Pilotage CHF \xE0 classer ce dossier tout de suite, m\xEAme avant qu'un acte soit factur\xE9.")), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Partenaire"), /* @__PURE__ */ React.createElement("select", { value: inputOng, onChange: (e) => setInputOng(e.target.value), className: "border rounded-lg p-2 text-xs bg-white outline-none", disabled: inputTypePatient !== "ONG" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- S\xE9lectionner --"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o)))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Num\xE9ro de dossier"), /* @__PURE__ */ React.createElement("input", { type: "text", value: inputNumDossier, onChange: (e) => setInputNumDossier(e.target.value), placeholder: "ex: F-2024-045", className: "border rounded-lg p-2 text-xs outline-none" })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Date de naissance"), /* @__PURE__ */ React.createElement("input", { type: "date", value: inputDateNaissance, onChange: (e) => setInputDateNaissance(e.target.value), className: "border rounded-lg p-2 text-xs outline-none" })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "T\xE9l\xE9phone"), /* @__PURE__ */ React.createElement("input", { type: "text", value: inputTelephone, onChange: (e) => setInputTelephone(e.target.value), placeholder: "509-1234-5678", className: "border rounded-lg p-2 text-xs outline-none" })), /* @__PURE__ */ React.createElement("button", { type: "submit", className: "w-full bg-[#1E2A24] text-white py-2 rounded-lg text-xs font-bold" }, "\u{1F680} Ouvrir le dossier")) : /* @__PURE__ */ React.createElement("p", { className: "text-gray-500 text-center" }, "Vous n'avez pas la permission de cr\xE9er un dossier."));
       }
       module.exports = NouveauDossierForm;
     }
@@ -3501,6 +3606,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
         setPaiementEffectue,
         showToast,
         onSuspendreDossier,
+        onReporterDossier,
         onChangerTypeOng,
         onChangerNomPatient,
         listeOng
@@ -3529,7 +3635,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
         const [depots, setDepots] = useState([]);
         const [searchPatientText, setSearchPatientText] = useState("");
         const [suggestionsPatients, setSuggestionsPatients] = useState([]);
-        const [confirmModal, setConfirmModal] = useState(null);
+        const [confirmModal, setConfirmModal2] = useState(null);
         const [editTypeOuvert, setEditTypeOuvert] = useState(false);
         const [nouveauTypeEdit, setNouveauTypeEdit] = useState("ONG");
         const [nouvelOngEdit, setNouvelOngEdit] = useState("");
@@ -3738,7 +3844,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
           const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N\xB0${fiche.numeroFiche}</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p><p>R\xC9IMPRESSION \u2014 ${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")} ${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p></div><div style="font-weight:bold;font-size:11px;margin-bottom:6px;">Patient: ${echapperHTML(nomPatient)} \u2014 Fiche N\xB0${fiche.numeroFiche}</div><div style="font-size:10px;margin-bottom:6px;">Type: ${typePatient === "ONG" ? "Partenaire" : "Priv\xE9"}${typePatient === "ONG" && selectedOng ? ` \u2014 Partenaire: ${echapperHTML(selectedOng)}` : ""}</div><table><thead><tr><th>D\xE9signation</th><th class="qte">Qt\xE9</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${lignesDetaillees.map((l) => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte * l.prix)}</td></tr>`).join("")}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes (${formatDH(fiche.totalGlobal)} DH)</div><p style="font-size:10px;margin-top:4px;">Mode: ${echapperHTML((fiche.modePaiement || "cash").toUpperCase())} | Encaiss\xE9 par: ${echapperHTML(fiche.creePar || "inconnu")}</p><div class="footer">Merci de votre visite !<br/>CHF Syst\xE8me Hospitalier \u2013 ${(/* @__PURE__ */ new Date()).getFullYear()}</div></body></html>`;
           const win = window.open("", "_blank", "width=500,height=700");
           if (!win) {
-            showToast("Autorisez les pop-ups.", "error");
+            showToast("Impression bloqu\xE9e par le navigateur. R\xE9essaie en cliquant sur Imprimer \u2014 si \xE7a ne marche toujours pas, demande \xE0 quelqu'un de v\xE9rifier les r\xE9glages.", "error");
             return;
           }
           win.document.write(contenu);
@@ -3783,10 +3889,10 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             solde: modePaiement === "credit" ? montantRestantApresDepots : 0,
             depots: totalDepots
           };
-          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket CHF</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:13px;margin-bottom:6px;}.info-patient{font-size:12px;margin-bottom:4px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.exoneration{color:red;font-weight:bold;font-size:16px;}.monnaie{font-size:16px;color:#006600;}.solde{color:#cc0000;font-weight:bold;}.depot-info{font-size:14px;color:#555;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p><p>${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")} ${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p></div><div class="info"><span>Patient: ${echapperHTML(data.nomPatient)}</span><span>${data.typePatient === "ONG" ? echapperHTML(data.selectedOng) : "Priv\xE9"}</span></div><div class="info"><span>Dossier: ${echapperHTML(data.numDossier)}</span><span>Mode: ${echapperHTML(data.modePaiement).toUpperCase()}</span></div><div class="info info-patient"><span>\u{1F4DE} ${echapperHTML(data.telephone)}</span><span>Type: ${data.typePatient === "ONG" ? "Partenaire" : "Priv\xE9"}</span></div><div class="info info-patient"><span>Enregistr\xE9 par: ${echapperHTML(data.creePar)}</span></div>${data.dateEntree1 && data.dateSortie1 ? `<p style="font-size:10px; margin:4px 0;"><strong>S\xE9jour:</strong> ${data.dateEntree1.split("-").reverse().slice(0, 2).join("/")} \u2192 ${data.dateSortie1.split("-").reverse().slice(0, 2).join("/")}</p>` : ""}<table><thead><tr><th>D\xE9signation</th><th class="qte">Qt\xE9</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${data.dateEntree1 && data.dateSortie1 ? `<tr><td>H\xE9bergement</td><td class="qte">${data.j1}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit1].prix)}</td><td class="sous-total">${formatGourdes(data.totalE1)}</td></tr>` : ""}${data.multiPeriode && data.dateEntree2 && data.dateSortie2 ? `<tr><td>H\xE9bergement P2</td><td class="qte">${data.j2}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit2].prix)}</td><td class="sous-total">${formatGourdes(data.totalE2)}</td></tr>` : ""}${data.hasChirSpec && data.nomChirSpec ? `<tr><td>Chirurgie: ${echapperHTML(data.nomChirSpec)}</td><td class="qte">1</td><td class="prix">${formatGourdes(data.totalChirSpec)}</td><td class="sous-total">${formatGourdes(data.totalChirSpec)}</td></tr>` : ""}${data.lignes.map((l) => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte * l.prix)}</td></tr>`).join("")}</tbody></table>${data.exoneration ? `<div class="exoneration">Exon\xE9ration: ${data.exoneration.pourcentage}% (${formatGourdes(data.exoneration.montantExonere)} Gdes)</div>` : ""}${data.depots > 0 ? `<div class="depot-info">D\xE9p\xF4ts d\xE9j\xE0 effectu\xE9s: ${formatGourdes(data.depots)} Gdes</div>` : ""}<div class="total">TOTAL \xC0 PAYER (apr\xE8s d\xE9duction des d\xE9p\xF4ts): ${formatGourdes(montantRestantApresDepots)} Gdes<br/>${formatDH(montantRestantApresDepots)} DH</div>${data.solde > 0 ? `<p class="solde">Solde restant : ${formatGourdes(data.solde)} Gdes</p>` : ""}<div style="margin-top:6px; border-top:2px dashed #000; padding-top:6px;">${data.modePaiement === "cash" ? `<div style="display:flex; justify-content:space-between; font-size:12px;"><span>Montant vers\xE9:</span><span>${formatGourdes(data.montantVerse)} Gdes</span></div><div style="display:flex; justify-content:space-between; font-size:16px; font-weight:bold; color:#006600;"><span>Monnaie \xE0 rendre:</span><span>${formatGourdes(data.monnaieARendre)} Gdes</span></div>` : ""}</div><div class="footer">Merci de votre visite !<br/>CHF Syst\xE8me Hospitalier \u2013 ${(/* @__PURE__ */ new Date()).getFullYear()}</div></body></html>`;
+          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket CHF</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:17px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:27px;margin:4px 0;}.entete p{margin:2px 0;font-size:16px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:16px;margin-bottom:6px;}.info-patient{font-size:15px;margin-bottom:4px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:16px;}th,td{padding:5px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:14px;text-transform:uppercase;}.total{font-weight:bold;font-size:23px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:13px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.exoneration{color:red;font-weight:bold;font-size:19px;}.monnaie{font-size:19px;color:#006600;}.solde{color:#cc0000;font-weight:bold;}.depot-info{font-size:17px;color:#555;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p><p>${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")} ${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p></div><div class="info"><span>Patient: ${echapperHTML(data.nomPatient)}</span><span>${data.typePatient === "ONG" ? `Partenaire: ${echapperHTML(data.selectedOng || "N/R")}` : "Priv\xE9"}</span></div><div class="info"><span>Dossier: ${echapperHTML(data.numDossier)}</span><span>Mode: ${echapperHTML(data.modePaiement).toUpperCase()}</span></div><div class="info info-patient"><span>\u{1F4DE} ${echapperHTML(data.telephone)}</span><span>Type: ${data.typePatient === "ONG" ? "Partenaire" : "Priv\xE9"}</span></div><div class="info info-patient"><span>Enregistr\xE9 par: ${echapperHTML(data.creePar)}</span></div>${data.dateEntree1 && data.dateSortie1 ? `<p style="font-size:10px; margin:4px 0;"><strong>S\xE9jour:</strong> ${data.dateEntree1.split("-").reverse().slice(0, 2).join("/")} \u2192 ${data.dateSortie1.split("-").reverse().slice(0, 2).join("/")}</p>` : ""}<table><thead><tr><th>D\xE9signation</th><th class="qte">Qt\xE9</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${data.dateEntree1 && data.dateSortie1 ? `<tr><td>H\xE9bergement</td><td class="qte">${data.j1}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit1].prix)}</td><td class="sous-total">${formatGourdes(data.totalE1)}</td></tr>` : ""}${data.multiPeriode && data.dateEntree2 && data.dateSortie2 ? `<tr><td>H\xE9bergement P2</td><td class="qte">${data.j2}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit2].prix)}</td><td class="sous-total">${formatGourdes(data.totalE2)}</td></tr>` : ""}${data.hasChirSpec && data.nomChirSpec ? `<tr><td>Chirurgie: ${echapperHTML(data.nomChirSpec)}</td><td class="qte">1</td><td class="prix">${formatGourdes(data.totalChirSpec)}</td><td class="sous-total">${formatGourdes(data.totalChirSpec)}</td></tr>` : ""}${data.lignes.map((l) => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte * l.prix)}</td></tr>`).join("")}</tbody></table>${data.exoneration ? `<div class="exoneration">Exon\xE9ration: ${data.exoneration.pourcentage}% (${formatGourdes(data.exoneration.montantExonere)} Gdes)</div>` : ""}${data.depots > 0 ? `<div class="depot-info">D\xE9p\xF4ts d\xE9j\xE0 effectu\xE9s: ${formatGourdes(data.depots)} Gdes</div>` : ""}<div class="total">TOTAL \xC0 PAYER (apr\xE8s d\xE9duction des d\xE9p\xF4ts): ${formatGourdes(montantRestantApresDepots)} Gdes<br/>${formatDH(montantRestantApresDepots)} DH</div>${data.solde > 0 ? `<p class="solde">Solde restant : ${formatGourdes(data.solde)} Gdes</p>` : ""}<div style="margin-top:6px; border-top:2px dashed #000; padding-top:6px;">${data.modePaiement === "cash" ? `<div style="display:flex; justify-content:space-between; font-size:12px;"><span>Montant vers\xE9:</span><span>${formatGourdes(data.montantVerse)} Gdes</span></div><div style="display:flex; justify-content:space-between; font-size:16px; font-weight:bold; color:#006600;"><span>Monnaie \xE0 rendre:</span><span>${formatGourdes(data.monnaieARendre)} Gdes</span></div>` : ""}</div><div class="footer">Merci de votre visite !<br/>CHF Syst\xE8me Hospitalier \u2013 ${(/* @__PURE__ */ new Date()).getFullYear()}</div></body></html>`;
           const win = window.open("", "_blank", "width=500,height=700");
           if (!win) {
-            showToast("Veuillez autoriser les fen\xEAtres pop-up.", "error");
+            showToast("Impression bloqu\xE9e par le navigateur. R\xE9essaie en cliquant sur Imprimer \u2014 si \xE7a ne marche toujours pas, demande \xE0 quelqu'un de v\xE9rifier les r\xE9glages.", "error");
             return;
           }
           win.document.write(contenu);
@@ -3827,7 +3933,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             }
           }
           if (modePaiement === "ong" && !ongPartenaireFiche) {
-            showToast("Veuillez s\xE9lectionner l'ONG partenaire.", "error");
+            showToast("Veuillez s\xE9lectionner le partenaire.", "error");
             return;
           }
           try {
@@ -3888,16 +3994,16 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             setMotifExoneration("");
             setAutorisationExoneration(false);
             setPaiementEffectue(true);
-            setConfirmModal({
+            setConfirmModal2({
               titre: "\u{1F5A8}\uFE0F Imprimer le ticket ?",
               message: "Le paiement a bien \xE9t\xE9 enregistr\xE9.",
               confirmLabel: "Imprimer",
               cancelLabel: "Plus tard",
               onConfirm: () => {
-                setConfirmModal(null);
+                setConfirmModal2(null);
                 imprimerTicket(true);
               },
-              onCancel: () => setConfirmModal(null)
+              onCancel: () => setConfirmModal2(null)
             });
           } catch (error) {
             showToast("Erreur: " + error.message, "error");
@@ -3908,8 +4014,8 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             showToast("Impossible d'encaisser : le montant de la fiche est \xE0 0 Gdes.", "error");
             return;
           }
-          const libellesMode = { cash: "\u{1F4B5} Cash", credit: "\u{1F4DD} Cr\xE9dit", ong: "\u{1F3E5} ONG", exoneration: "\u{1F3AF} Exon\xE9ration" };
-          setConfirmModal({
+          const libellesMode = { cash: "\u{1F4B5} Cash", credit: "\u{1F4DD} Cr\xE9dit", ong: "\u{1F3E5} Partenaire", exoneration: "\u{1F3AF} Exon\xE9ration" };
+          setConfirmModal2({
             titre: "Confirmer l'encaissement",
             message: `Patient : ${nomPatient}
 Mode de paiement : ${libellesMode[modePaiement] || modePaiement}`,
@@ -3917,10 +4023,10 @@ Mode de paiement : ${libellesMode[modePaiement] || modePaiement}`,
             confirmLabel: "\u{1F4B3} Encaisser",
             cancelLabel: "Annuler",
             onConfirm: () => {
-              setConfirmModal(null);
+              setConfirmModal2(null);
               executerEncaissement();
             },
-            onCancel: () => setConfirmModal(null)
+            onCancel: () => setConfirmModal2(null)
           });
         };
         const peutCreerDossier = userRole === "comptable" || userRole === "direction" || userRole === "administrateur";
@@ -3966,14 +4072,14 @@ Mode de paiement : ${libellesMode[modePaiement] || modePaiement}`,
         }, className: "text-[9px] font-bold text-blue-600 underline" }, "\u270F\uFE0F Changer")) : /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5 items-center flex-wrap" }, /* @__PURE__ */ React.createElement("input", { type: "text", value: nouveauNomEdit, onChange: (e) => setNouveauNomEdit(e.target.value), className: "border rounded p-1 text-xs", autoFocus: true }), /* @__PURE__ */ React.createElement("button", { onClick: () => {
           if (onChangerNomPatient) onChangerNomPatient(nouveauNomEdit);
           setEditNomOuvert(false);
-        }, className: "bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(Check, { size: 10 })), /* @__PURE__ */ React.createElement("button", { onClick: () => setEditNomOuvert(false), className: "border text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(X, { size: 10 }))), !editTypeOuvert ? /* @__PURE__ */ React.createElement("p", { className: "text-xs font-bold text-purple-700 flex items-center gap-2" }, selectedOng || "Priv\xE9", " - ", typePatient || "ONG", peutCreerDossier && /* @__PURE__ */ React.createElement("button", { onClick: () => {
+        }, className: "bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(Check, { size: 10 })), /* @__PURE__ */ React.createElement("button", { onClick: () => setEditNomOuvert(false), className: "border text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(X, { size: 10 }))), !editTypeOuvert ? /* @__PURE__ */ React.createElement("p", { className: "text-xs font-bold text-purple-700 flex items-center gap-2" }, selectedOng || "Priv\xE9", " - ", typePatient === "ONG" ? "Partenaire" : "Priv\xE9", peutCreerDossier && /* @__PURE__ */ React.createElement("button", { onClick: () => {
           setNouveauTypeEdit(typePatient || "ONG");
           setNouvelOngEdit(selectedOng || "");
           setEditTypeOuvert(true);
-        }, className: "text-[9px] font-bold text-blue-600 underline" }, "\u270F\uFE0F Changer")) : /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5 items-center mt-1 flex-wrap" }, /* @__PURE__ */ React.createElement("select", { value: nouveauTypeEdit, onChange: (e) => setNouveauTypeEdit(e.target.value), className: "border rounded p-1 text-xs bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "ONG" }, "\u{1F3E5} ONG"), /* @__PURE__ */ React.createElement("option", { value: "PRIVE" }, "\u{1F4B3} Priv\xE9")), nouveauTypeEdit === "ONG" && /* @__PURE__ */ React.createElement("select", { value: nouvelOngEdit, onChange: (e) => setNouvelOngEdit(e.target.value), className: "border rounded p-1 text-xs bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- ONG --"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o))), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+        }, className: "text-[9px] font-bold text-blue-600 underline" }, "\u270F\uFE0F Changer")) : /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5 items-center mt-1 flex-wrap" }, /* @__PURE__ */ React.createElement("select", { value: nouveauTypeEdit, onChange: (e) => setNouveauTypeEdit(e.target.value), className: "border rounded p-1 text-xs bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "ONG" }, "\u{1F3E5} Partenaire"), /* @__PURE__ */ React.createElement("option", { value: "PRIVE" }, "\u{1F4B3} Priv\xE9")), nouveauTypeEdit === "ONG" && /* @__PURE__ */ React.createElement("select", { value: nouvelOngEdit, onChange: (e) => setNouvelOngEdit(e.target.value), className: "border rounded p-1 text-xs bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- Partenaire --"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o))), /* @__PURE__ */ React.createElement("button", { onClick: () => {
           if (onChangerTypeOng) onChangerTypeOng(nouveauTypeEdit, nouveauTypeEdit === "ONG" ? nouvelOngEdit : "");
           setEditTypeOuvert(false);
-        }, className: "bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(Check, { size: 10 })), /* @__PURE__ */ React.createElement("button", { onClick: () => setEditTypeOuvert(false), className: "border text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(X, { size: 10 })))), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 flex-wrap" }, peutAnnulerDossier && /* @__PURE__ */ React.createElement("button", { onClick: onAnnulerDossier, className: "bg-red-50 text-red-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-red-200" }, "Abandonner"), peutSuspendre && /* @__PURE__ */ React.createElement("button", { onClick: onSuspendreDossier, className: "bg-amber-50 text-amber-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-amber-200 flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Clock, { size: 12 }), " Suspendre"), peutArchiver && /* @__PURE__ */ React.createElement("button", { onClick: onCloturerDossier, className: "bg-emerald-700 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg" }, "\u{1F3C1} Cl\xF4turer"))), fichesDossier.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm space-y-1.5" }, /* @__PURE__ */ React.createElement("span", { className: "text-[9px] uppercase font-black text-gray-400" }, "Fiches valid\xE9es ", idFicheEnCoursDEdition ? "(modification en cours)" : ""), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-1.5" }, fichesDossier.map((f) => {
+        }, className: "bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(Check, { size: 10 })), /* @__PURE__ */ React.createElement("button", { onClick: () => setEditTypeOuvert(false), className: "border text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(X, { size: 10 })))), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 flex-wrap" }, peutAnnulerDossier && /* @__PURE__ */ React.createElement("button", { onClick: onAnnulerDossier, className: "bg-red-50 text-red-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-red-200" }, "Abandonner"), peutSuspendre && /* @__PURE__ */ React.createElement("button", { onClick: onSuspendreDossier, className: "bg-amber-50 text-amber-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-amber-200 flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Clock, { size: 12 }), " Suspendre"), peutSuspendre && onReporterDossier && /* @__PURE__ */ React.createElement("button", { onClick: onReporterDossier, className: "bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-indigo-200 flex items-center gap-1" }, "\u{1F4C5} Reporter au mois suivant"), peutArchiver && /* @__PURE__ */ React.createElement("button", { onClick: onCloturerDossier, className: "bg-emerald-700 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg" }, "\u{1F3C1} Cl\xF4turer"))), fichesDossier.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm space-y-1.5" }, /* @__PURE__ */ React.createElement("span", { className: "text-[9px] uppercase font-black text-gray-400" }, "Fiches valid\xE9es ", idFicheEnCoursDEdition ? "(modification en cours)" : ""), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-1.5" }, fichesDossier.map((f) => {
           const isEditing = f.id === idFicheEnCoursDEdition;
           return /* @__PURE__ */ React.createElement("div", { key: f.id, className: `flex items-center rounded-lg font-mono text-[11px] font-bold border overflow-hidden shadow-sm ${isEditing ? "bg-blue-100 border-blue-400" : "bg-gray-50 border-gray-200"}` }, /* @__PURE__ */ React.createElement("button", { onClick: () => reimprimerFicheValidee(f), className: "pl-2.5 pr-2 py-1 hover:text-blue-700", title: "R\xE9imprimer cette fiche" }, "\u{1F5A8}\uFE0F Fiche N\xB0", f.numeroFiche, " (", formatGourdes(f.totalGlobal), " Gdes)"), onEditerFiche && /* @__PURE__ */ React.createElement(
             "button",
@@ -4038,7 +4144,7 @@ Mode de paiement : ${libellesMode[modePaiement] || modePaiement}`,
           setTimeout(actionAjouterSoin, 40);
         }, className: "w-full text-left px-3 py-2 hover:bg-gray-100 flex justify-between" }, /* @__PURE__ */ React.createElement("span", null, i.nom), /* @__PURE__ */ React.createElement("span", { className: "text-gray-500 font-mono" }, formatGourdes(i.prix), " Gdes")))))), /* @__PURE__ */ React.createElement("input", { type: "number", min: "1", value: quantite, onChange: (e) => setQuantite(e.target.value), onKeyDown: (e) => {
           if (e.key === "Enter") actionAjouterSoin();
-        }, className: "w-16 border rounded-lg p-2 text-xs text-center font-mono font-bold bg-gray-50", disabled: !peutAjouterLignes }), /* @__PURE__ */ React.createElement("button", { onClick: actionAjouterSoin, disabled: !selection || !peutAjouterLignes, className: "bg-[#1E2A24] text-white px-4 py-2 rounded-lg text-xs font-bold disabled:opacity-30 flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Plus, null), " Ajouter"))), /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl border overflow-hidden shadow-sm" }, /* @__PURE__ */ React.createElement("table", { className: "w-full text-xs text-left" }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", { className: "bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono" }, /* @__PURE__ */ React.createElement("th", { className: "p-3" }, "D\xE9signation"), /* @__PURE__ */ React.createElement("th", { className: "p-3 w-16 text-center" }, "Qt\xE9"), /* @__PURE__ */ React.createElement("th", { className: "p-3 text-right w-24" }, "Prix"), /* @__PURE__ */ React.createElement("th", { className: "p-3 text-right w-24" }, "Total"), /* @__PURE__ */ React.createElement("th", { className: "w-8" }))), /* @__PURE__ */ React.createElement("tbody", { className: "divide-y divide-gray-100" }, dateEntree1 && dateSortie1 && /* @__PURE__ */ React.createElement("tr", { className: "bg-amber-50/20" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-amber-900" }, "S\xE9jour : ", CONFIG_LITS[typeLit1].nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-bold" }, j1, " jrs"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(CONFIG_LITS[typeLit1].prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalE1)), /* @__PURE__ */ React.createElement("td", null)), multiPeriode && dateEntree2 && dateSortie2 && /* @__PURE__ */ React.createElement("tr", { className: "bg-amber-50/40" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-amber-900" }, "S\xE9jour P2 : ", CONFIG_LITS[typeLit2].nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-bold" }, j2, " jrs"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(CONFIG_LITS[typeLit2].prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalE2)), /* @__PURE__ */ React.createElement("td", null)), hasChirSpec && nomChirSpec && /* @__PURE__ */ React.createElement("tr", { className: "bg-red-50/20" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-red-900" }, "Chirurgie : ", nomChirSpec), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center" }, "1"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(totalChirSpec)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalChirSpec)), /* @__PURE__ */ React.createElement("td", null)), lignes.map((l) => /* @__PURE__ */ React.createElement("tr", { key: l.id, className: "zebra-row" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-gray-800" }, /* @__PURE__ */ React.createElement("span", { className: `text-[8px] font-bold uppercase px-1 rounded mr-1 ${l.type === "med" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}` }, l.type === "med" ? "Pharma" : "Acte"), l.nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-mono font-bold" }, l.qte), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(l.prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(l.qte * l.prix)), /* @__PURE__ */ React.createElement("td", { className: "text-center" }, peutSupprimerFiche && /* @__PURE__ */ React.createElement("button", { onClick: () => setLignes((p) => p.filter((x) => x.id !== l.id)), className: "text-gray-300 hover:text-red-600" }, /* @__PURE__ */ React.createElement(X, { size: 12 }))))))), /* @__PURE__ */ React.createElement("div", { className: "p-4 bg-gray-50 border-t border-b text-[11px] text-gray-600 font-mono space-y-1 shadow-inner" }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 font-bold text-[#1E2A24] border-b pb-1 mb-2" }, /* @__PURE__ */ React.createElement("span", null, "R\xC9CAPITULATIF DE LA FICHE"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "Gdes"), /* @__PURE__ */ React.createElement("span", { className: "text-right text-emerald-800" }, "\u{1F4B5} DH")), require_constants().CATEGORIES_LISTE.map((srv) => {
+        }, className: "w-16 border rounded-lg p-2 text-xs text-center font-mono font-bold bg-gray-50", disabled: !peutAjouterLignes }), /* @__PURE__ */ React.createElement("button", { onClick: actionAjouterSoin, disabled: !selection || !peutAjouterLignes, className: "bg-[#1E2A24] text-white px-4 py-2 rounded-lg text-xs font-bold disabled:opacity-30 flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Plus, null), " Ajouter")), /* @__PURE__ */ React.createElement("p", { className: "text-[9px] text-gray-400" }, "\u{1F4A1} Astuce : double-clique un r\xE9sultat dans la liste pour l'ajouter tout de suite, sans passer par le bouton Ajouter.")), /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl border overflow-hidden shadow-sm" }, /* @__PURE__ */ React.createElement("table", { className: "w-full text-xs text-left" }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", { className: "bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono" }, /* @__PURE__ */ React.createElement("th", { className: "p-3" }, "D\xE9signation"), /* @__PURE__ */ React.createElement("th", { className: "p-3 w-16 text-center" }, "Qt\xE9"), /* @__PURE__ */ React.createElement("th", { className: "p-3 text-right w-24" }, "Prix"), /* @__PURE__ */ React.createElement("th", { className: "p-3 text-right w-24" }, "Total"), /* @__PURE__ */ React.createElement("th", { className: "w-8" }))), /* @__PURE__ */ React.createElement("tbody", { className: "divide-y divide-gray-100" }, dateEntree1 && dateSortie1 && /* @__PURE__ */ React.createElement("tr", { className: "bg-amber-50/20" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-amber-900" }, "S\xE9jour : ", CONFIG_LITS[typeLit1].nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-bold" }, j1, " jrs"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(CONFIG_LITS[typeLit1].prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalE1)), /* @__PURE__ */ React.createElement("td", null)), multiPeriode && dateEntree2 && dateSortie2 && /* @__PURE__ */ React.createElement("tr", { className: "bg-amber-50/40" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-amber-900" }, "S\xE9jour P2 : ", CONFIG_LITS[typeLit2].nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-bold" }, j2, " jrs"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(CONFIG_LITS[typeLit2].prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalE2)), /* @__PURE__ */ React.createElement("td", null)), hasChirSpec && nomChirSpec && /* @__PURE__ */ React.createElement("tr", { className: "bg-red-50/20" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-red-900" }, "Chirurgie : ", nomChirSpec), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center" }, "1"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(totalChirSpec)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalChirSpec)), /* @__PURE__ */ React.createElement("td", null)), lignes.map((l) => /* @__PURE__ */ React.createElement("tr", { key: l.id, className: "zebra-row" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-gray-800" }, /* @__PURE__ */ React.createElement("span", { className: `text-[8px] font-bold uppercase px-1 rounded mr-1 ${l.type === "med" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}` }, l.type === "med" ? "Pharma" : "Acte"), l.nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-mono font-bold" }, l.qte), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(l.prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(l.qte * l.prix)), /* @__PURE__ */ React.createElement("td", { className: "text-center" }, peutSupprimerFiche && /* @__PURE__ */ React.createElement("button", { onClick: () => setLignes((p) => p.filter((x) => x.id !== l.id)), className: "text-gray-300 hover:text-red-600" }, /* @__PURE__ */ React.createElement(X, { size: 12 }))))))), /* @__PURE__ */ React.createElement("div", { className: "p-4 bg-gray-50 border-t border-b text-[11px] text-gray-600 font-mono space-y-1 shadow-inner" }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 font-bold text-[#1E2A24] border-b pb-1 mb-2" }, /* @__PURE__ */ React.createElement("span", null, "R\xC9CAPITULATIF DE LA FICHE"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "Gdes"), /* @__PURE__ */ React.createElement("span", { className: "text-right text-emerald-800" }, "\u{1F4B5} DH")), require_constants().CATEGORIES_LISTE.map((srv) => {
           const m = totalsParService[srv.key];
           if (m === 0) return null;
           return /* @__PURE__ */ React.createElement("div", { key: srv.key, className: "grid grid-cols-3 py-0.5" }, /* @__PURE__ */ React.createElement("span", null, "\u2022 ", srv.label), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, formatGourdes(m)), /* @__PURE__ */ React.createElement("span", { className: "text-right font-bold" }, formatDH(m), " DH"));
@@ -4051,19 +4157,19 @@ Mode de paiement : ${libellesMode[modePaiement] || modePaiement}`,
         }, className: `px-4 py-1.5 rounded-lg text-xs font-bold ${modePaiement === "credit" ? "bg-orange-600 text-white" : "bg-gray-100"}` }, "\u{1F4DD} Cr\xE9dit"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
           setModePaiement("ong");
           setModeDepot(false);
-        }, className: `px-4 py-1.5 rounded-lg text-xs font-bold ${modePaiement === "ong" ? "bg-purple-700 text-white" : "bg-gray-100"}`, disabled: typePatient !== "ONG" }, "\u{1F3E5} ONG"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+        }, className: `px-4 py-1.5 rounded-lg text-xs font-bold ${modePaiement === "ong" ? "bg-purple-700 text-white" : "bg-gray-100"}`, disabled: typePatient !== "ONG" }, "\u{1F3E5} Partenaire"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
           setModePaiement("exoneration");
           setModeDepot(false);
         }, className: `px-4 py-1.5 rounded-lg text-xs font-bold ${modePaiement === "exoneration" ? "bg-red-600 text-white" : "bg-gray-100"}`, disabled: userRole !== "direction" && userRole !== "administrateur" && userRole !== "comptable" }, "\u{1F3AF} Exon\xE9ration"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
           setModeDepot(!modeDepot);
           if (!modeDepot) setModePaiement("depot");
           else setModePaiement("cash");
-        }, className: `px-4 py-1.5 rounded-lg text-xs font-bold ${modeDepot ? "bg-blue-700 text-white" : "bg-gray-100"}` }, "\u{1F4B0} D\xE9p\xF4t/Acompte")), modeDepot && /* @__PURE__ */ React.createElement("div", { className: "bg-blue-50 p-3 rounded-lg border border-blue-200 space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("label", { className: "text-xs font-bold text-blue-800" }, "Montant du d\xE9p\xF4t :"), /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", step: "100", value: montantDepot, onChange: (e) => setMontantDepot(e.target.value), placeholder: "0", className: "border rounded p-1.5 w-32 font-mono" }), /* @__PURE__ */ React.createElement("span", { className: "text-xs text-gray-600" }, "Solde restant apr\xE8s d\xE9p\xF4t : ", formatGourdes(soldeRestantDepot), " Gdes")), /* @__PURE__ */ React.createElement("button", { onClick: enregistrerDepot, disabled: !dossierId, className: "bg-blue-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold" }, "\u{1F4BE} Enregistrer le d\xE9p\xF4t"), /* @__PURE__ */ React.createElement("p", { className: "text-[10px] text-gray-500" }, "D\xE9p\xF4ts d\xE9j\xE0 effectu\xE9s : ", formatGourdes(totalDepots), " Gdes")), modePaiement === "ong" && !modeDepot && /* @__PURE__ */ React.createElement("div", { className: "mt-2" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-purple-800" }, "ONG"), /* @__PURE__ */ React.createElement("select", { value: ongPartenaireFiche, onChange: (e) => setOngPartenaireFiche(e.target.value), className: "border rounded-lg p-1.5 text-xs w-full bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "S\xE9lectionner"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o)))), modePaiement === "exoneration" && !modeDepot && /* @__PURE__ */ React.createElement("div", { className: "mt-2 space-y-2 bg-red-50 p-2 rounded-lg" }, /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", max: "100", value: pourcentageExoneration, onChange: (e) => setPourcentageExoneration(e.target.value), placeholder: "%", className: "w-20 border rounded-lg p-1.5 text-xs" }), /* @__PURE__ */ React.createElement("input", { type: "text", value: motifExoneration, onChange: (e) => setMotifExoneration(e.target.value), placeholder: "Motif...", className: "flex-1 border rounded-lg p-1.5 text-xs" })), userRole === "direction" || userRole === "administrateur" ? /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1 text-xs" }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: autorisationExoneration, onChange: (e) => {
+        }, className: `px-4 py-1.5 rounded-lg text-xs font-bold ${modeDepot ? "bg-blue-700 text-white" : "bg-gray-100"}` }, "\u{1F4B0} D\xE9p\xF4t/Acompte")), modeDepot && /* @__PURE__ */ React.createElement("div", { className: "bg-blue-50 p-3 rounded-lg border border-blue-200 space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("label", { className: "text-xs font-bold text-blue-800" }, "Montant du d\xE9p\xF4t :"), /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", step: "100", value: montantDepot, onChange: (e) => setMontantDepot(e.target.value), placeholder: "0", className: "border rounded p-1.5 w-32 font-mono" }), /* @__PURE__ */ React.createElement("span", { className: "text-xs text-gray-600" }, "Solde restant apr\xE8s d\xE9p\xF4t : ", formatGourdes(soldeRestantDepot), " Gdes")), /* @__PURE__ */ React.createElement("button", { onClick: enregistrerDepot, disabled: !dossierId, className: "bg-blue-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold" }, "\u{1F4BE} Enregistrer le d\xE9p\xF4t"), /* @__PURE__ */ React.createElement("p", { className: "text-[10px] text-gray-500" }, "D\xE9p\xF4ts d\xE9j\xE0 effectu\xE9s : ", formatGourdes(totalDepots), " Gdes")), modePaiement === "ong" && !modeDepot && /* @__PURE__ */ React.createElement("div", { className: "mt-2" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-purple-800" }, "Partenaire"), /* @__PURE__ */ React.createElement("select", { value: ongPartenaireFiche, onChange: (e) => setOngPartenaireFiche(e.target.value), className: "border rounded-lg p-1.5 text-xs w-full bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "S\xE9lectionner"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o)))), modePaiement === "exoneration" && !modeDepot && /* @__PURE__ */ React.createElement("div", { className: "mt-2 space-y-2 bg-red-50 p-2 rounded-lg" }, /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", max: "100", value: pourcentageExoneration, onChange: (e) => setPourcentageExoneration(e.target.value), placeholder: "%", className: "w-20 border rounded-lg p-1.5 text-xs" }), /* @__PURE__ */ React.createElement("input", { type: "text", value: motifExoneration, onChange: (e) => setMotifExoneration(e.target.value), placeholder: "Motif...", className: "flex-1 border rounded-lg p-1.5 text-xs" })), userRole === "direction" || userRole === "administrateur" ? /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1 text-xs" }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: autorisationExoneration, onChange: (e) => {
           if (!e.target.checked) {
             setAutorisationExoneration(false);
             return;
           }
-          setConfirmModal({
+          setConfirmModal2({
             titre: "Autoriser l'exon\xE9ration ?",
             message: `Patient : ${nomPatient}
 Motif : ${motifExoneration || "(non pr\xE9cis\xE9)"}
@@ -4079,9 +4185,9 @@ Pourcentage : ${pourcentageExoneration}%`,
                 motif: motifExoneration
               });
               setAutorisationExoneration(true);
-              setConfirmModal(null);
+              setConfirmModal2(null);
             },
-            onCancel: () => setConfirmModal(null)
+            onCancel: () => setConfirmModal2(null)
           });
         } }), " Autoriser") : /* @__PURE__ */ React.createElement("button", { onClick: demanderExoneration, disabled: !pourcentageExoneration || pourcentageExoneration == 0, className: "bg-amber-500 text-white px-3 py-1 rounded text-xs disabled:opacity-30" }, "\u{1F4E8} Demander")), modePaiement === "cash" && !modeDepot && /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-3" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-500" }, "Montant vers\xE9"), /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", value: montantVerse, onChange: (e) => setMontantVerse(e.target.value), placeholder: "0", className: "border rounded-lg p-2 w-full text-sm font-mono", disabled: !peutEncaisser })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-500" }, "Monnaie"), /* @__PURE__ */ React.createElement("div", { className: "bg-gray-100 p-2 rounded-lg text-right font-mono font-bold text-lg text-emerald-700" }, formatGourdes(monnaieARendre), " Gdes"))), !modeDepot && /* @__PURE__ */ React.createElement("button", { onClick: demanderConfirmationEncaissement, disabled: !peutEncaisser || modePaiement === "exoneration" && !(userRole === "direction" || userRole === "administrateur"), className: "w-full bg-emerald-700 hover:bg-emerald-800 text-white py-2.5 rounded-lg text-sm font-bold shadow-md disabled:opacity-50" }, "\u{1F4B3} Encaisser cette fiche"))), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 flex-wrap" }, /* @__PURE__ */ React.createElement("button", { onClick: onViderFicheActive, className: "flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl py-3 text-xs font-bold" }, "\u{1F9F9} Vider l'\xE9cran"), /* @__PURE__ */ React.createElement("button", { onClick: imprimerFicheA4, disabled: !paiementEffectue, className: `flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}` }, "\u{1F5A8}\uFE0F A4"), /* @__PURE__ */ React.createElement("button", { onClick: imprimerTicket, disabled: !paiementEffectue, className: `flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? "bg-green-600 hover:bg-green-700 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}` }, "\u{1F9FE} Ticket"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
           var _a;
@@ -4177,7 +4283,7 @@ Pourcentage : ${pourcentageExoneration}%`,
           const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket CHF - Achat Express</title><style>@page{size:80mm 200mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:13px;color:#000;width:70mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:20px;margin:4px 0;}.entete p{margin:2px 0;font-size:12px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:12px;}th,td{padding:4px;text-align:left;border-bottom:1px dotted #ccc;}.total{font-weight:bold;font-size:17px;text-align:right;border-top:2px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:10px;font-size:10px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>Achat Express \u2014 Comptoir</p><p>${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")} ${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p></div><p>Client: ${echapperHTML(nom || "Comptoir")}</p><table><thead><tr><th>Article</th><th>Qt\xE9</th><th>Total</th></tr></thead><tbody>${lignes.map((l) => `<tr><td>${echapperHTML(l.nom)}</td><td>${l.qte}</td><td>${formatGourdes(l.qte * l.prix)}</td></tr>`).join("")}</tbody></table><div class="total">TOTAL : ${formatGourdes(totalVente)} Gdes (${formatDH(totalVente)} DH)</div><p>Vers\xE9: ${formatGourdes(verseVal)} Gdes<br/>Monnaie: ${formatGourdes(renduVal)} Gdes</p><div class="footer">Merci de votre visite !</div></body></html>`;
           const win = window.open("", "_blank", "width=400,height=600");
           if (!win) {
-            showToast("Autorisez les pop-ups.", "error");
+            showToast("Impression bloqu\xE9e par le navigateur. R\xE9essaie en cliquant sur Imprimer \u2014 si \xE7a ne marche toujours pas, demande \xE0 quelqu'un de v\xE9rifier les r\xE9glages.", "error");
             return;
           }
           win.document.write(contenu);
@@ -4638,11 +4744,11 @@ Pourcentage : ${pourcentageExoneration}%`,
           var _a, _b;
           const nom = nouveauNom.trim();
           if (!nom) {
-            showToast("Entrez un nom d'ONG.", "error");
+            showToast("Entrez un nom de partenaire.", "error");
             return;
           }
           if (listeOngDocs.some((o) => o.nom.toLowerCase() === nom.toLowerCase())) {
-            showToast("Cette ONG existe d\xE9j\xE0.", "error");
+            showToast("Ce partenaire existe d\xE9j\xE0.", "error");
             return;
           }
           try {
@@ -4653,22 +4759,22 @@ Pourcentage : ${pourcentageExoneration}%`,
             });
             enregistrerAudit("ajout_ong_partenaire", { nom });
             setNouveauNom("");
-            showToast("ONG ajout\xE9e avec succ\xE8s", "success");
+            showToast("Partenaire ajout\xE9 avec succ\xE8s", "success");
           } catch (e) {
             showToast("Erreur lors de l'ajout.", "error");
           }
         };
         const supprimer = async (id, nom) => {
-          if (!confirm(`Retirer "${nom}" de la liste des ONG partenaires ?`)) return;
+          if (!confirm(`Retirer "${nom}" de la liste des partenaires ?`)) return;
           try {
             await db.collection("ong_partenaires").doc(id).delete();
             enregistrerAudit("suppression_ong_partenaire", { nom });
-            showToast("ONG retir\xE9e", "success");
+            showToast("Partenaire retir\xE9", "success");
           } catch (e) {
             showToast("Erreur lors de la suppression.", "error");
           }
         };
-        return /* @__PURE__ */ React.createElement("div", { className: "space-y-4 text-xs" }, /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm space-y-2" }, /* @__PURE__ */ React.createElement("h2", { className: "font-black text-gray-800 mb-1" }, "\u{1F91D} ONG partenaires"), /* @__PURE__ */ React.createElement("p", { className: "text-gray-500" }, "Ajoute une ONG pour qu'elle apparaisse dans les listes de s\xE9lection (nouveau dossier, factures, archives, caisse)."), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement(
+        return /* @__PURE__ */ React.createElement("div", { className: "space-y-4 text-xs" }, /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm space-y-2" }, /* @__PURE__ */ React.createElement("h2", { className: "font-black text-gray-800 mb-1" }, "\u{1F91D} Partenaires"), /* @__PURE__ */ React.createElement("p", { className: "text-gray-500" }, "Ajoute un partenaire pour qu'il apparaisse dans les listes de s\xE9lection (nouveau dossier, factures, archives, caisse)."), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement(
           "input",
           {
             type: "text",
@@ -4677,10 +4783,10 @@ Pourcentage : ${pourcentageExoneration}%`,
             onKeyDown: (e) => {
               if (e.key === "Enter") ajouter();
             },
-            placeholder: "Nom de l'ONG...",
+            placeholder: "Nom du partenaire...",
             className: "border rounded-lg p-2 flex-1 outline-none"
           }
-        ), /* @__PURE__ */ React.createElement("button", { onClick: ajouter, className: "bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold" }, "Ajouter"))), /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl border overflow-hidden divide-y" }, listeOngDocs.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "text-gray-500 p-3" }, "Aucune ONG enregistr\xE9e."), listeOngDocs.map((o) => /* @__PURE__ */ React.createElement("div", { key: o.id, className: "p-3 flex justify-between items-center hover:bg-gray-50" }, /* @__PURE__ */ React.createElement("span", { className: "font-medium text-gray-700" }, o.nom), /* @__PURE__ */ React.createElement("button", { onClick: () => supprimer(o.id, o.nom), className: "text-gray-300 hover:text-red-600 p-1" }, /* @__PURE__ */ React.createElement(Trash2, { size: 12 }))))));
+        ), /* @__PURE__ */ React.createElement("button", { onClick: ajouter, className: "bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold" }, "Ajouter"))), /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl border overflow-hidden divide-y" }, listeOngDocs.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "text-gray-500 p-3" }, "Aucun partenaire enregistr\xE9."), listeOngDocs.map((o) => /* @__PURE__ */ React.createElement("div", { key: o.id, className: "p-3 flex justify-between items-center hover:bg-gray-50" }, /* @__PURE__ */ React.createElement("span", { className: "font-medium text-gray-700" }, o.nom), /* @__PURE__ */ React.createElement("button", { onClick: () => supprimer(o.id, o.nom), className: "text-gray-300 hover:text-red-600 p-1" }, /* @__PURE__ */ React.createElement(Trash2, { size: 12 }))))));
       }
       module.exports = GestionOngPanel;
     }
@@ -4748,14 +4854,14 @@ Pourcentage : ${pourcentageExoneration}%`,
         const [nomChirSpec, setNomChirSpec] = useState("");
         const [prixChirSpec, setPrixChirSpec] = useState("");
         const [filtreArchivesInitialNom, setFiltreArchivesInitialNom] = useState("");
-        const [dossierPourExport, setDossierPourExport] = useState(null);
         const [needsBackupWarning, setNeedsBackupWarning] = useState(false);
         const [modeSimulation, setModeSimulation] = useState(false);
         const [dossierId, setDossierId] = useState(null);
         const [dossierUpdatedAtOuverture, setDossierUpdatedAtOuverture] = useState(null);
         const [paiementEffectue, setPaiementEffectue] = useState(false);
         const [achatExpressOuvert, setAchatExpressOuvert] = useState(false);
-        const [confirmModal, setConfirmModal] = useState(null);
+        const [confirmModal, setConfirmModal2] = useState(null);
+        const [avertissementInactivite, setAvertissementInactivite] = useState(false);
         const [toasts, setToasts] = useState([]);
         const showToast = (message, type = "info") => {
           const id = Date.now() + Math.random();
@@ -5013,37 +5119,47 @@ Pourcentage : ${pourcentageExoneration}%`,
           setOnglet("calcul");
           showToast(`Dossier de ${patientDoc.nomPatient} charg\xE9`, "success");
         };
-        const declencherPreValidationDossier = () => {
+        const avecFicheEnCoursAjoutee = (callback) => {
           const activeEstVide = lignesCalcul.length === 0 && j1 === 0 && !hasChirSpec && !dateEntree1;
-          const proceder = (fichesFinales) => {
+          if (activeEstVide) {
+            callback(fichesDossier);
+            return;
+          }
+          const ficheOriginale = idFicheEnCoursDEdition ? fichesDossier.find((f) => f.id === idFicheEnCoursDEdition) : null;
+          setConfirmModal2({
+            titre: idFicheEnCoursDEdition ? "Modification non enregistr\xE9e" : "Fiche en cours d\xE9tect\xE9e",
+            message: idFicheEnCoursDEdition ? `Tu modifies la Fiche N\xB0${(ficheOriginale == null ? void 0 : ficheOriginale.numeroFiche) || ""} et ces changements ne sont pas encore enregistr\xE9s.` : "Tu as une fiche en cours de saisie qui n'a pas encore \xE9t\xE9 ajout\xE9e au dossier.",
+            detail: `${formatGourdes(grandTotalGlobalFiche)} Gdes`,
+            confirmLabel: idFicheEnCoursDEdition ? "Oui, enregistrer la modification" : "Oui, l'ajouter",
+            cancelLabel: "Non, continuer sans",
+            onConfirm: () => {
+              setConfirmModal2(null);
+              const fiche = {
+                id: idFicheEnCoursDEdition || "fiche-" + Date.now(),
+                numeroFiche: idFicheEnCoursDEdition ? (ficheOriginale == null ? void 0 : ficheOriginale.numeroFiche) || numeroFicheCourante : numeroFicheCourante,
+                breakdown: { ...totalsParService },
+                totalGlobal: grandTotalGlobalFiche,
+                contientErreurs: false,
+                rawState: { lignesCalcul: [...lignesCalcul], dateEntree1, dateSortie1, typeLit1, multiPeriode, dateEntree2, dateSortie2, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
+              };
+              const fichesFinales = idFicheEnCoursDEdition ? fichesDossier.map((f) => f.id === idFicheEnCoursDEdition ? fiche : f) : [...fichesDossier, fiche];
+              setFichesDossier(fichesFinales);
+              viderLeCalculateurFicheUniquement();
+              callback(fichesFinales);
+            },
+            onCancel: () => {
+              setConfirmModal2(null);
+              callback(fichesDossier);
+            }
+          });
+        };
+        const declencherPreValidationDossier = () => {
+          avecFicheEnCoursAjoutee((fichesFinales) => {
             if (fichesFinales.length === 0) {
               showToast("Dossier vide.", "error");
               return;
             }
             setModePreValidation(true);
-          };
-          if (activeEstVide) {
-            proceder(fichesDossier);
-            return;
-          }
-          setConfirmModal({
-            titre: "Fiche en cours d\xE9tect\xE9e",
-            message: "Tu as une fiche en cours de saisie qui n'a pas encore \xE9t\xE9 ajout\xE9e au dossier.",
-            detail: `${formatGourdes(grandTotalGlobalFiche)} Gdes`,
-            confirmLabel: "Oui, l'ajouter",
-            cancelLabel: "Non, continuer sans",
-            onConfirm: () => {
-              setConfirmModal(null);
-              const fiche = { id: "fiche-" + Date.now(), numeroFiche: numeroFicheCourante, breakdown: { ...totalsParService }, totalGlobal: grandTotalGlobalFiche, contientErreurs: false, rawState: { lignesCalcul: [...lignesCalcul], dateEntree1, dateSortie1, typeLit1, multiPeriode, dateEntree2, dateSortie2, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec } };
-              const fichesFinales = [...fichesDossier, fiche];
-              setFichesDossier(fichesFinales);
-              viderLeCalculateurFicheUniquement();
-              proceder(fichesFinales);
-            },
-            onCancel: () => {
-              setConfirmModal(null);
-              proceder(fichesDossier);
-            }
           });
         };
         const executerArchivage = async () => {
@@ -5055,7 +5171,7 @@ Pourcentage : ${pourcentageExoneration}%`,
             if (((_b = f.rawState) == null ? void 0 : _b.multiPeriode) && ((_c = f.rawState) == null ? void 0 : _c.dateEntree2)) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
           });
           let sejourTexte = "\u2014";
-          if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map((d) => d.in === d.out ? d.in.split("-").reverse().join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`).join(" et ");
+          if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map((d) => d.in === d.out ? d.in.split("-").reverse().slice(0, 2).join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`).join(" et ");
           const dossierArchiver = {
             nomPatient,
             ongPartenaire: selectedOng,
@@ -5127,44 +5243,45 @@ Pourcentage : ${pourcentageExoneration}%`,
         };
         const finaliserEtArchiverDossierOfficiel = async () => {
           const somme = fichesDossier.reduce((s, f) => s + f.totalGlobal, 0);
-          const demanderConfirmation = () => setConfirmModal({
+          const demanderConfirmation = () => setConfirmModal2({
             titre: "Archiver ce dossier ?",
             message: `Patient : ${nomPatient}
 ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\xE9.`,
             detail: `${formatGourdes(somme)} Gdes  (${formatDH(somme)} DH)`,
             confirmLabel: "\u{1F7E2} Archiver",
             onConfirm: () => {
-              setConfirmModal(null);
+              setConfirmModal2(null);
               executerArchivage();
             },
-            onCancel: () => setConfirmModal(null)
+            onCancel: () => setConfirmModal2(null)
           });
           if (await verifierConflit()) {
-            setConfirmModal({
+            setConfirmModal2({
               titre: "\u26A0\uFE0F Ce dossier a \xE9t\xE9 modifi\xE9 entre-temps",
               message: "Une autre personne (ou un autre appareil) a modifi\xE9 ce dossier depuis que tu l'as ouvert ici. Continuer risque d'\xE9craser ses changements.",
               confirmLabel: "Continuer quand m\xEAme",
               danger: true,
               onConfirm: () => {
-                setConfirmModal(null);
+                setConfirmModal2(null);
                 demanderConfirmation();
               },
-              onCancel: () => setConfirmModal(null)
+              onCancel: () => setConfirmModal2(null)
             });
             return;
           }
           demanderConfirmation();
         };
-        const executerSuspension = async () => {
-          const somme = fichesDossier.reduce((s, f) => s + f.totalGlobal, 0);
+        const executerSuspension = async (fichesAUtiliser) => {
+          const listeFiches = fichesAUtiliser || fichesDossier;
+          const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
           const datesTrouvees = [];
-          fichesDossier.forEach((f) => {
+          listeFiches.forEach((f) => {
             var _a, _b, _c;
             if ((_a = f.rawState) == null ? void 0 : _a.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
             if (((_b = f.rawState) == null ? void 0 : _b.multiPeriode) && ((_c = f.rawState) == null ? void 0 : _c.dateEntree2)) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
           });
           let sejourTexte = "\u2014";
-          if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map((d) => d.in === d.out ? d.in.split("-").reverse().join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`).join(" et ");
+          if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map((d) => d.in === d.out ? d.in.split("-").reverse().slice(0, 2).join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`).join(" et ");
           const dossierSuspendu = {
             nomPatient,
             ongPartenaire: selectedOng,
@@ -5179,7 +5296,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             totalSaisiePapierDH: 0,
             contientErreurs: false,
             verrouilleFacture: false,
-            fiches: [...fichesDossier],
+            fiches: [...listeFiches],
             // ⬅️ CONSERVE LES FICHES
             status: "suspendu",
             dateSuspension: (/* @__PURE__ */ new Date()).toISOString(),
@@ -5189,7 +5306,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             await chf.updateEpisode(dossierId, toEpisodeApi(dossierSuspendu));
             const updatedItems = verifications.map((v) => v.id === dossierId ? { ...v, ...dossierSuspendu } : v);
             setVerifications(updatedItems);
-            showToast(`Dossier suspendu avec ${fichesDossier.length} fiche(s)`, "success");
+            showToast(`Dossier suspendu avec ${listeFiches.length} fiche(s)`, "success");
           } catch (error) {
             if (!error.isOfflineQueue) {
               showToast("Erreur suspension: " + error.message, "error");
@@ -5215,31 +5332,133 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             showToast("Aucun dossier actif.", "error");
             return;
           }
-          const demanderConfirmation = () => setConfirmModal({
-            titre: "Suspendre ce dossier ?",
-            message: `Le dossier de ${nomPatient} sera mis en pause. Il pourra \xEAtre rouvert plus tard depuis les Archives.`,
-            confirmLabel: "\u23F8\uFE0F Suspendre",
-            onConfirm: () => {
-              setConfirmModal(null);
-              executerSuspension();
-            },
-            onCancel: () => setConfirmModal(null)
-          });
-          if (await verifierConflit()) {
-            setConfirmModal({
-              titre: "\u26A0\uFE0F Ce dossier a \xE9t\xE9 modifi\xE9 entre-temps",
-              message: "Une autre personne (ou un autre appareil) a modifi\xE9 ce dossier depuis que tu l'as ouvert ici. Continuer risque d'\xE9craser ses changements.",
-              confirmLabel: "Continuer quand m\xEAme",
-              danger: true,
+          avecFicheEnCoursAjoutee((fichesFinales) => {
+            const demanderConfirmation = () => setConfirmModal2({
+              titre: "Suspendre ce dossier ?",
+              message: `Le dossier de ${nomPatient} sera mis en pause. Il pourra \xEAtre rouvert plus tard depuis les Archives.`,
+              confirmLabel: "\u23F8\uFE0F Suspendre",
               onConfirm: () => {
-                setConfirmModal(null);
-                demanderConfirmation();
+                setConfirmModal2(null);
+                executerSuspension(fichesFinales);
               },
-              onCancel: () => setConfirmModal(null)
+              onCancel: () => setConfirmModal2(null)
             });
+            (async () => {
+              if (await verifierConflit()) {
+                setConfirmModal2({
+                  titre: "\u26A0\uFE0F Ce dossier a \xE9t\xE9 modifi\xE9 entre-temps",
+                  message: "Une autre personne (ou un autre appareil) a modifi\xE9 ce dossier depuis que tu l'as ouvert ici. Continuer risque d'\xE9craser ses changements.",
+                  confirmLabel: "Continuer quand m\xEAme",
+                  danger: true,
+                  onConfirm: () => {
+                    setConfirmModal2(null);
+                    demanderConfirmation();
+                  },
+                  onCancel: () => setConfirmModal2(null)
+                });
+                return;
+              }
+              demanderConfirmation();
+            })();
+          });
+        };
+        const executerReport = async (fichesAUtiliser) => {
+          const listeFiches = fichesAUtiliser || fichesDossier;
+          const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
+          const datesTrouvees = [];
+          listeFiches.forEach((f) => {
+            var _a, _b, _c;
+            if ((_a = f.rawState) == null ? void 0 : _a.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
+            if (((_b = f.rawState) == null ? void 0 : _b.multiPeriode) && ((_c = f.rawState) == null ? void 0 : _c.dateEntree2)) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
+          });
+          let sejourTexte = "\u2014";
+          if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map((d) => d.in === d.out ? d.in.split("-").reverse().slice(0, 2).join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`).join(" et ");
+          const cibleMois = /* @__PURE__ */ new Date();
+          cibleMois.setMonth(cibleMois.getMonth() + 1);
+          const moisReport = `${cibleMois.getFullYear()}-${String(cibleMois.getMonth() + 1).padStart(2, "0")}`;
+          const dossierReporte = {
+            nomPatient,
+            ongPartenaire: selectedOng,
+            typePatient,
+            numDossier: numDossierPatient,
+            dateNaissance,
+            telephone,
+            dateHeure: (/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR"),
+            periodeSejourString: sejourTexte,
+            dateEntreePourTri: datesTrouvees.length > 0 ? datesTrouvees[0].in : "9999-12-31",
+            totalGlobal: somme,
+            totalSaisiePapierDH: 0,
+            contientErreurs: false,
+            verrouilleFacture: false,
+            fiches: [...listeFiches],
+            // ⬅️ CONSERVE LES FICHES (dossier non complet, pas encore facturable)
+            status: "reporte",
+            moisReport,
+            dateSuspension: (/* @__PURE__ */ new Date()).toISOString(),
+            timestamp: Date.now()
+          };
+          try {
+            await chf.updateEpisode(dossierId, toEpisodeApi(dossierReporte));
+            const updatedItems = verifications.map((v) => v.id === dossierId ? { ...v, ...dossierReporte } : v);
+            setVerifications(updatedItems);
+            showToast(`Dossier report\xE9 \xE0 ${cibleMois.toLocaleString("fr-FR", { month: "long", year: "numeric" })}`, "success");
+          } catch (error) {
+            if (!error.isOfflineQueue) {
+              showToast("Erreur report: " + error.message, "error");
+              return;
+            }
+            const updatedItems = verifications.map((v) => v.id === dossierId ? { ...v, ...dossierReporte } : v);
+            setVerifications(updatedItems);
+            showToast("\u{1F4F4} Report enregistr\xE9 hors ligne \u2014 sera synchronis\xE9 au retour d'internet", "info");
+          }
+          setDossierActif(false);
+          setNomPatient("");
+          setSelectedOng("");
+          setNumDossierPatient("");
+          sessionStorage.removeItem("numDossierPatient");
+          setFichesDossier([]);
+          setModePreValidation(false);
+          viderLeCalculateurFicheUniquement();
+          setDossierId(null);
+          localStorage.removeItem(LOG_DOSSIER_BROUILLON_KEY);
+        };
+        const reporterDossierAuMoisSuivant = async () => {
+          if (!dossierId) {
+            showToast("Aucun dossier actif.", "error");
             return;
           }
-          demanderConfirmation();
+          avecFicheEnCoursAjoutee((fichesFinales) => {
+            const cibleMois = /* @__PURE__ */ new Date();
+            cibleMois.setMonth(cibleMois.getMonth() + 1);
+            const libelleMois = cibleMois.toLocaleString("fr-FR", { month: "long", year: "numeric" });
+            const demanderConfirmation = () => setConfirmModal2({
+              titre: "Reporter ce dossier au mois suivant ?",
+              message: `Le dossier de ${nomPatient} n'est pas complet. Il sera report\xE9 \xE0 ${libelleMois} avec ses ${fichesFinales.length} fiche(s), et exclu du rapport Excel du mois en cours.`,
+              confirmLabel: "\u{1F4C5} Reporter",
+              onConfirm: () => {
+                setConfirmModal2(null);
+                executerReport(fichesFinales);
+              },
+              onCancel: () => setConfirmModal2(null)
+            });
+            (async () => {
+              if (await verifierConflit()) {
+                setConfirmModal2({
+                  titre: "\u26A0\uFE0F Ce dossier a \xE9t\xE9 modifi\xE9 entre-temps",
+                  message: "Une autre personne (ou un autre appareil) a modifi\xE9 ce dossier depuis que tu l'as ouvert ici. Continuer risque d'\xE9craser ses changements.",
+                  confirmLabel: "Continuer quand m\xEAme",
+                  danger: true,
+                  onConfirm: () => {
+                    setConfirmModal2(null);
+                    demanderConfirmation();
+                  },
+                  onCancel: () => setConfirmModal2(null)
+                });
+                return;
+              }
+              demanderConfirmation();
+            })();
+          });
         };
         const executerAnnulation = async () => {
           enregistrerAudit("annulation_dossier", { dossierId, nomPatient, ongPartenaire: selectedOng, nombreFiches: fichesDossier.length });
@@ -5272,29 +5491,29 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             showToast("Aucun dossier actif.", "error");
             return;
           }
-          setConfirmModal({
+          setConfirmModal2({
             titre: "Annuler ce dossier ?",
             message: `Le dossier de ${nomPatient} et toutes ses fiches (${fichesDossier.length}) seront d\xE9finitivement supprim\xE9s. Cette action est irr\xE9versible.`,
             confirmLabel: "\u{1F5D1}\uFE0F Annuler le dossier",
             danger: true,
             onConfirm: () => {
-              setConfirmModal(null);
+              setConfirmModal2(null);
               executerAnnulation();
             },
-            onCancel: () => setConfirmModal(null)
+            onCancel: () => setConfirmModal2(null)
           });
         };
         const r\u00E9importerDossierDepuisArchives = (doc) => chargerDossierExistant(doc);
         const supprimerDossierArchive = (id) => {
           const dossier = verifications.find((v) => v.id === id);
-          setConfirmModal({
+          setConfirmModal2({
             titre: "Supprimer d\xE9finitivement ce dossier ?",
             message: `${dossier ? `Patient : ${dossier.nomPatient}
 ` : ""}Cette action est irr\xE9versible \u2014 le dossier et son historique de facturation seront perdus pour de bon.`,
             confirmLabel: "\u{1F5D1}\uFE0F Supprimer d\xE9finitivement",
             danger: true,
             onConfirm: async () => {
-              setConfirmModal(null);
+              setConfirmModal2(null);
               enregistrerAudit("suppression_archive", { dossierId: id, nomPatient: (dossier == null ? void 0 : dossier.nomPatient) || null, totalGlobal: (dossier == null ? void 0 : dossier.totalGlobal) || null });
               try {
                 await chf.deleteEpisode(id);
@@ -5305,7 +5524,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
                 showToast("Erreur suppression: " + e.message, "error");
               }
             },
-            onCancel: () => setConfirmModal(null)
+            onCancel: () => setConfirmModal2(null)
           });
         };
         const executerSauvegardeGlobaleJSON = async () => {
@@ -5458,19 +5677,44 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             showToast("S\xE9lectionne une ONG.", "error");
             return;
           }
-          if (idCible === dossierId) {
-            setTypePatient(nouveauType);
-            setSelectedOng(nouveauType === "ONG" ? nouvelOng : "");
+          const executerChangement = async () => {
+            const dossierAvant = verifications.find((v) => v.id === idCible);
+            const sortDuLot = (dossierAvant == null ? void 0 : dossierAvant.numeroLot) != null;
+            const maj = { typePatient: nouveauType, ongPartenaire: nouveauType === "ONG" ? nouvelOng : "" };
+            if (sortDuLot) {
+              maj.numeroLot = null;
+              maj.verrouilleFacture = false;
+            }
+            if (idCible === dossierId) {
+              setTypePatient(nouveauType);
+              setSelectedOng(nouveauType === "ONG" ? nouvelOng : "");
+            }
+            setVerifications((prev) => prev.map((v) => v.id === idCible ? { ...v, ...maj } : v));
+            try {
+              await chf.updateEpisode(idCible, toEpisodeApi(maj));
+              enregistrerAudit("changement_type_ong", { dossierId: idCible, nouveauType, nouvelOng, sortDuLot });
+              showToast(sortDuLot ? `Type mis \xE0 jour \u2014 retir\xE9 du Lot ${dossierAvant.numeroLot}` : "Type de patient mis \xE0 jour", "success");
+            } catch (error) {
+              if (error.isOfflineQueue) showToast("\u{1F4F4} Changement enregistr\xE9 hors ligne", "info");
+              else showToast("Erreur: " + error.message, "error");
+            }
+          };
+          const dossierActuel = verifications.find((v) => v.id === idCible);
+          if ((dossierActuel == null ? void 0 : dossierActuel.numeroLot) != null) {
+            setConfirmModal2({
+              titre: "\u26A0\uFE0F Ce dossier fait partie d'un lot d\xE9j\xE0 envoy\xE9",
+              message: `Changer son partenaire le retirera du Lot ${dossierActuel.numeroLot} de ${dossierActuel.ongPartenaire}. Il faudra ensuite le rattacher \xE0 un nouveau lot s\xE9par\xE9ment (avec le nouveau partenaire). Continuer ?`,
+              confirmLabel: "Oui, changer et retirer du lot",
+              danger: true,
+              onConfirm: () => {
+                setConfirmModal2(null);
+                executerChangement();
+              },
+              onCancel: () => setConfirmModal2(null)
+            });
+            return;
           }
-          setVerifications((prev) => prev.map((v) => v.id === idCible ? { ...v, typePatient: nouveauType, ongPartenaire: nouveauType === "ONG" ? nouvelOng : "" } : v));
-          try {
-            await chf.updateEpisode(idCible, toEpisodeApi({ typePatient: nouveauType, ongPartenaire: nouveauType === "ONG" ? nouvelOng : "" }));
-            enregistrerAudit("changement_type_ong", { dossierId: idCible, nouveauType, nouvelOng });
-            showToast("Type de patient mis \xE0 jour", "success");
-          } catch (error) {
-            if (error.isOfflineQueue) showToast("\u{1F4F4} Changement enregistr\xE9 hors ligne", "info");
-            else showToast("Erreur: " + error.message, "error");
-          }
+          executerChangement();
         };
         const changerTypeOng = (nouveauType, nouvelOng) => changerTypeOngPourDossier(dossierId, nouveauType, nouvelOng);
         const changerNomPatientPourDossier = async (idCible, nouveauNom) => {
@@ -5518,10 +5762,16 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
         }, [dossierActif]);
         useEffect(() => {
           const LIMITE_INACTIVITE_MS = 15 * 60 * 1e3;
-          let minuteur;
+          const DELAI_AVERTISSEMENT_MS = 2 * 60 * 1e3;
+          let minuteurAvertissement, minuteurDeconnexion;
           const reinitialiserMinuteur = () => {
-            clearTimeout(minuteur);
-            minuteur = setTimeout(() => {
+            clearTimeout(minuteurAvertissement);
+            clearTimeout(minuteurDeconnexion);
+            setAvertissementInactivite(false);
+            minuteurAvertissement = setTimeout(() => {
+              setAvertissementInactivite(true);
+            }, LIMITE_INACTIVITE_MS - DELAI_AVERTISSEMENT_MS);
+            minuteurDeconnexion = setTimeout(() => {
               showToast("\u{1F512} D\xE9connexion automatique apr\xE8s 15 minutes d'inactivit\xE9", "info");
               onQuitter();
             }, LIMITE_INACTIVITE_MS);
@@ -5530,12 +5780,13 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
           evenementsActivite.forEach((ev) => window.addEventListener(ev, reinitialiserMinuteur));
           reinitialiserMinuteur();
           return () => {
-            clearTimeout(minuteur);
+            clearTimeout(minuteurAvertissement);
+            clearTimeout(minuteurDeconnexion);
             evenementsActivite.forEach((ev) => window.removeEventListener(ev, reinitialiserMinuteur));
           };
         }, []);
         if (chargement) return /* @__PURE__ */ React.createElement("div", { className: "min-h-screen flex items-center justify-center" }, "Chargement...");
-        return /* @__PURE__ */ React.createElement("div", { className: "min-h-screen w-full flex flex-col font-sans text-[#1E2A24]" }, /* @__PURE__ */ React.createElement(ToastManager, { toasts, removeToast }), /* @__PURE__ */ React.createElement(ConnectionStatus, null), /* @__PURE__ */ React.createElement(StockAlertBadge, { items: lowStockItems }), confirmModal && /* @__PURE__ */ React.createElement(ConfirmModal, { ...confirmModal }), achatExpressOuvert && /* @__PURE__ */ React.createElement(
+        return /* @__PURE__ */ React.createElement("div", { className: "min-h-screen w-full flex flex-col font-sans text-[#1E2A24]" }, /* @__PURE__ */ React.createElement(ToastManager, { toasts, removeToast }), /* @__PURE__ */ React.createElement(ConnectionStatus, null), /* @__PURE__ */ React.createElement(StockAlertBadge, { items: lowStockItems }), avertissementInactivite && /* @__PURE__ */ React.createElement("div", { className: "fixed top-4 left-1/2 -translate-x-1/2 z-[60] bg-amber-500 text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-3 text-sm font-bold" }, /* @__PURE__ */ React.createElement("span", null, "\u23F3 Tu vas \xEAtre d\xE9connect\xE9(e) dans 2 minutes si tu ne fais rien."), /* @__PURE__ */ React.createElement("button", { onClick: () => setAvertissementInactivite(false), className: "bg-white text-amber-700 px-3 py-1 rounded-lg text-xs font-black whitespace-nowrap" }, "Je suis toujours l\xE0")), confirmModal && /* @__PURE__ */ React.createElement(ConfirmModal, { ...confirmModal }), achatExpressOuvert && /* @__PURE__ */ React.createElement(
           AchatExpress,
           {
             medicaments,
@@ -5555,7 +5806,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
         }, className: `px-4 py-2 font-medium border-b-2 ${onglet === "verifie" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4C1} Archives"), (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement("button", { onClick: () => {
           setOnglet("analyse");
           setModePreValidation(false);
-        }, className: `px-4 py-2 font-medium border-b-2 ${onglet === "analyse" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4CA} Pilotage CHF"), (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("meds"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "meds" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "Tarifs Pharma"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("actes"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "actes" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "Tarifs Actes"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("stock"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "stock" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4E6} Stock"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("ong"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "ong" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F91D} ONG")), userRole === "administrateur" && /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("users"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "users" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F465} Utilisateurs"), (userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("dashboard_direction"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "dashboard_direction" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4CA} Direction"), (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("dashboard_caisse"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "dashboard_caisse" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4B5} Caisse"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("demandes"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "demandes" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4E8} Demandes")))), /* @__PURE__ */ React.createElement("main", { className: "flex-1 max-w-3xl w-full mx-auto p-4 pb-24" }, onglet === "accueil" && /* @__PURE__ */ React.createElement(
+        }, className: `px-4 py-2 font-medium border-b-2 ${onglet === "analyse" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4CA} Pilotage CHF"), (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("meds"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "meds" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "Tarifs Pharma"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("actes"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "actes" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "Tarifs Actes"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("stock"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "stock" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4E6} Stock"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("ong"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "ong" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F91D} Partenaires")), userRole === "administrateur" && /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("users"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "users" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F465} Utilisateurs"), (userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("dashboard_direction"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "dashboard_direction" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4CA} Direction"), (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("dashboard_caisse"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "dashboard_caisse" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4B5} Caisse"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("demandes"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "demandes" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4E8} Demandes")))), /* @__PURE__ */ React.createElement("main", { className: "flex-1 max-w-3xl w-full mx-auto p-4 pb-24" }, onglet === "accueil" && /* @__PURE__ */ React.createElement(
           AccueilPanel,
           {
             verifications,
@@ -5569,7 +5820,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             },
             onOuvrirAchatExpress: () => setAchatExpressOuvert(true)
           }
-        ), onglet === "dashboard_direction" && (userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(DashboardDirectionPanel, { verifications, paiements, medicaments }), onglet === "dashboard_caisse" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(DashboardCaissePanel, { verifications, paiements, userDisplayName, listeOng: listeOngNoms }), onglet === "calcul" && modePreValidation && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-6 rounded-xl border border-emerald-400 shadow-xl space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "text-center border-b pb-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-emerald-800 font-bold uppercase text-[11px]" }, "Contr\xF4le final"), /* @__PURE__ */ React.createElement("h3", { className: "text-lg font-black" }, "\u{1F4CB} Totaux analytiques"), /* @__PURE__ */ React.createElement("p", { className: "text-xs text-gray-500" }, nomPatient, " | ", selectedOng)), /* @__PURE__ */ React.createElement("div", { className: "bg-gray-50 p-4 rounded-xl border shadow-inner space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 font-bold font-mono text-xs border-b pb-2 mb-2" }, /* @__PURE__ */ React.createElement("span", null, "CAT\xC9GORIE"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "Gdes"), /* @__PURE__ */ React.createElement("span", { className: "text-right text-emerald-800" }, "DH")), CATEGORIES_LISTE.map((cat) => {
+        ), onglet === "dashboard_direction" && (userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(DashboardDirectionPanel, { verifications, paiements, medicaments }), onglet === "dashboard_caisse" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(DashboardCaissePanel, { verifications, paiements, userDisplayName, listeOng: listeOngNoms, showToast }), onglet === "calcul" && modePreValidation && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-6 rounded-xl border border-emerald-400 shadow-xl space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "text-center border-b pb-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-emerald-800 font-bold uppercase text-[11px]" }, "Contr\xF4le final"), /* @__PURE__ */ React.createElement("h3", { className: "text-lg font-black" }, "\u{1F4CB} Totaux analytiques"), /* @__PURE__ */ React.createElement("p", { className: "text-xs text-gray-500" }, nomPatient, " | ", selectedOng)), /* @__PURE__ */ React.createElement("div", { className: "bg-gray-50 p-4 rounded-xl border shadow-inner space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 font-bold font-mono text-xs border-b pb-2 mb-2" }, /* @__PURE__ */ React.createElement("span", null, "CAT\xC9GORIE"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "Gdes"), /* @__PURE__ */ React.createElement("span", { className: "text-right text-emerald-800" }, "DH")), CATEGORIES_LISTE.map((cat) => {
           const m = cumulCategoriesDossierActif[cat.key];
           if (m === 0) return null;
           return /* @__PURE__ */ React.createElement("div", { key: cat.key, className: "grid grid-cols-3 font-mono text-[12px] py-1 border-b border-dashed" }, /* @__PURE__ */ React.createElement("span", null, cat.label), /* @__PURE__ */ React.createElement("span", { className: "text-right font-bold" }, formatGourdes(m)), /* @__PURE__ */ React.createElement("span", { className: "text-right font-bold text-emerald-800" }, formatDH(m)));
@@ -5638,11 +5889,12 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             setPaiementEffectue,
             showToast,
             onSuspendreDossier: suspendreDossier,
+            onReporterDossier: reporterDossierAuMoisSuivant,
             onChangerTypeOng: changerTypeOng,
             onChangerNomPatient: changerNomPatient,
             listeOng: listeOngNoms
           }
-        )), onglet === "verifie" && /* @__PURE__ */ React.createElement(HistoriqueVerifPanel, { verifications, setVerifications, onChargerPourModif: r\u00E9importerDossierDepuisArchives, onSupprimer: supprimerDossierArchive, filtreInitialNom: filtreArchivesInitialNom, clearFiltreInitialNom: () => setFiltreArchivesInitialNom(""), dossierPourExport, setDossierPourExport, userRole, showToast, onChangerTypeOng: changerTypeOngPourDossier, listeOng: listeOngNoms }), onglet === "analyse" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(AnalyticsPanel, { verifications }), onglet === "meds" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GrilleEditionPanel, { titre: "de la Pharmacie", items: medicaments, setItems: setMedicaments, collectionName: "medicaments", showToast }), onglet === "actes" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GrilleEditionPanel, { titre: "des Actes", items: actes, setItems: setActes, collectionName: "actes", showToast }), onglet === "stock" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GestionStockPanel, { items: medicaments, setItems: setMedicaments, showToast }), onglet === "ong" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GestionOngPanel, { listeOngDocs, showToast }), onglet === "users" && userRole === "administrateur" && /* @__PURE__ */ React.createElement(GestionUtilisateursPanel, { showToast }), onglet === "demandes" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(DemandesPanel, { userRole, showToast })));
+        )), onglet === "verifie" && /* @__PURE__ */ React.createElement(HistoriqueVerifPanel, { verifications, setVerifications, onChargerPourModif: r\u00E9importerDossierDepuisArchives, onSupprimer: supprimerDossierArchive, filtreInitialNom: filtreArchivesInitialNom, clearFiltreInitialNom: () => setFiltreArchivesInitialNom(""), userRole, showToast, onChangerTypeOng: changerTypeOngPourDossier, listeOng: listeOngNoms }), onglet === "analyse" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(AnalyticsPanel, { verifications }), onglet === "meds" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GrilleEditionPanel, { titre: "de la Pharmacie", items: medicaments, setItems: setMedicaments, collectionName: "medicaments", showToast }), onglet === "actes" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GrilleEditionPanel, { titre: "des Actes", items: actes, setItems: setActes, collectionName: "actes", showToast }), onglet === "stock" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GestionStockPanel, { items: medicaments, setItems: setMedicaments, showToast }), onglet === "ong" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GestionOngPanel, { listeOngDocs, showToast }), onglet === "users" && userRole === "administrateur" && /* @__PURE__ */ React.createElement(GestionUtilisateursPanel, { showToast }), onglet === "demandes" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(DemandesPanel, { userRole, showToast })));
       }
       function ApplicationRoot() {
         var _a;
