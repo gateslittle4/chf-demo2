@@ -27,8 +27,8 @@ function CalculateurPanel({
   dossierId, setDossierId, patientsExistants, onChargerPatientExistant,
   paiementEffectue, setPaiementEffectue,
   showToast,
-  onSuspendreDossier,
-  onChangerTypeOng,
+  onSuspendreDossier, onReporterDossier,
+  onChangerTypeOng, onChangerNomPatient,
   listeOng
 }) {
   const [inputNom, setInputNom] = useState("");
@@ -62,6 +62,8 @@ function CalculateurPanel({
   const [editTypeOuvert, setEditTypeOuvert] = useState(false);
   const [nouveauTypeEdit, setNouveauTypeEdit] = useState("ONG");
   const [nouvelOngEdit, setNouvelOngEdit] = useState("");
+  const [editNomOuvert, setEditNomOuvert] = useState(false);
+  const [nouveauNomEdit, setNouveauNomEdit] = useState("");
 
   const refZone = useRef(null);
   const inputRechercheRef = useRef(null);
@@ -221,9 +223,9 @@ function CalculateurPanel({
   // Réimpression d'une fiche (inchangée)
   const reimprimerFicheValidee = (fiche) => {
     const lignesDetaillees = fiche.rawState?.lignesCalcul || [];
-    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N°${fiche.numeroFiche}</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p><p>RÉIMPRESSION — ${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</p></div><div style="font-weight:bold;font-size:11px;margin-bottom:6px;">Patient: ${echapperHTML(nomPatient)} — Fiche N°${fiche.numeroFiche}</div><table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${lignesDetaillees.map(l => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte*l.prix)}</td></tr>`).join('')}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes (${formatDH(fiche.totalGlobal)} DH)</div><p style="font-size:10px;margin-top:4px;">Mode: ${echapperHTML((fiche.modePaiement||'cash').toUpperCase())} | Encaissé par: ${echapperHTML(fiche.creePar||'inconnu')}</p><div class="footer">Merci de votre visite !<br/>CHF Système Hospitalier – ${new Date().getFullYear()}</div></body></html>`;
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N°${fiche.numeroFiche}</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p><p>RÉIMPRESSION — ${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</p></div><div style="font-weight:bold;font-size:11px;margin-bottom:6px;">Patient: ${echapperHTML(nomPatient)} — Fiche N°${fiche.numeroFiche}</div><div style="font-size:10px;margin-bottom:6px;">Type: ${typePatient === 'ONG' ? 'Partenaire' : 'Privé'}${(typePatient === 'ONG' && selectedOng) ? ` — Partenaire: ${echapperHTML(selectedOng)}` : ''}</div><table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${lignesDetaillees.map(l => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte*l.prix)}</td></tr>`).join('')}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes (${formatDH(fiche.totalGlobal)} DH)</div><p style="font-size:10px;margin-top:4px;">Mode: ${echapperHTML((fiche.modePaiement||'cash').toUpperCase())} | Encaissé par: ${echapperHTML(fiche.creePar||'inconnu')}</p><div class="footer">Merci de votre visite !<br/>CHF Système Hospitalier – ${new Date().getFullYear()}</div></body></html>`;
     const win = window.open('', '_blank', 'width=500,height=700');
-    if (!win) { showToast("Autorisez les pop-ups.", "error"); return; }
+    if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
     win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 400);
   };
 
@@ -241,6 +243,7 @@ function CalculateurPanel({
       monnaieARendre: monnaieARendre || 0,
       exoneration: autorisationExoneration && modePaiement === "exoneration" ? { pourcentage: pourcentageExoneration, montantExonere: montantExonere } : null,
       dateEntree1, dateSortie1, totalE1, totalE2, j1, j2, typeLit1, typeLit2,
+      multiPeriode, dateEntree2, dateSortie2,
       hasChirSpec, nomChirSpec, totalChirSpec,
       telephone: telephone || 'N/R',
       dateNaissance: dateNaissance || 'N/R',
@@ -249,9 +252,9 @@ function CalculateurPanel({
       solde: (modePaiement === 'credit') ? montantRestantApresDepots : 0,
       depots: totalDepots
     };
-    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket CHF</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:13px;margin-bottom:6px;}.info-patient{font-size:12px;margin-bottom:4px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.exoneration{color:red;font-weight:bold;font-size:16px;}.monnaie{font-size:16px;color:#006600;}.solde{color:#cc0000;font-weight:bold;}.depot-info{font-size:14px;color:#555;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p><p>${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</p></div><div class="info"><span>Patient: ${echapperHTML(data.nomPatient)}</span><span>${echapperHTML(data.selectedOng)}</span></div><div class="info"><span>Dossier: ${echapperHTML(data.numDossier)}</span><span>Mode: ${echapperHTML(data.modePaiement).toUpperCase()}</span></div><div class="info info-patient"><span>📞 ${echapperHTML(data.telephone)}</span><span>Type: ${data.typePatient}</span></div><div class="info info-patient"><span>Enregistré par: ${echapperHTML(data.creePar)}</span></div>${data.dateEntree1 && data.dateSortie1 ? `<p style="font-size:10px; margin:4px 0;"><strong>Séjour:</strong> ${data.dateEntree1.split('-').reverse().slice(0,2).join('/')} → ${data.dateSortie1.split('-').reverse().slice(0,2).join('/')}</p>` : ''}<table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${data.j1 > 0 ? `<tr><td>Hébergement</td><td class="qte">${data.j1}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit1].prix)}</td><td class="sous-total">${formatGourdes(data.totalE1)}</td></tr>` : ''}${data.j2 > 0 ? `<tr><td>Hébergement P2</td><td class="qte">${data.j2}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit2].prix)}</td><td class="sous-total">${formatGourdes(data.totalE2)}</td></tr>` : ''}${data.hasChirSpec && data.nomChirSpec ? `<tr><td>Chirurgie: ${echapperHTML(data.nomChirSpec)}</td><td class="qte">1</td><td class="prix">${formatGourdes(data.totalChirSpec)}</td><td class="sous-total">${formatGourdes(data.totalChirSpec)}</td></tr>` : ''}${data.lignes.map(l => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte * l.prix)}</td></tr>`).join('')}</tbody></table>${data.exoneration ? `<div class="exoneration">Exonération: ${data.exoneration.pourcentage}% (${formatGourdes(data.exoneration.montantExonere)} Gdes)</div>` : ''}${data.depots > 0 ? `<div class="depot-info">Dépôts déjà effectués: ${formatGourdes(data.depots)} Gdes</div>` : ''}<div class="total">TOTAL À PAYER (après déduction des dépôts): ${formatGourdes(montantRestantApresDepots)} Gdes<br/>${formatDH(montantRestantApresDepots)} DH</div>${data.solde > 0 ? `<p class="solde">Solde restant : ${formatGourdes(data.solde)} Gdes</p>` : ''}<div style="margin-top:6px; border-top:2px dashed #000; padding-top:6px;">${data.modePaiement === 'cash' ? `<div style="display:flex; justify-content:space-between; font-size:12px;"><span>Montant versé:</span><span>${formatGourdes(data.montantVerse)} Gdes</span></div><div style="display:flex; justify-content:space-between; font-size:16px; font-weight:bold; color:#006600;"><span>Monnaie à rendre:</span><span>${formatGourdes(data.monnaieARendre)} Gdes</span></div>` : ''}</div><div class="footer">Merci de votre visite !<br/>CHF Système Hospitalier – ${new Date().getFullYear()}</div></body></html>`;
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket CHF</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:17px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:27px;margin:4px 0;}.entete p{margin:2px 0;font-size:16px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:16px;margin-bottom:6px;}.info-patient{font-size:15px;margin-bottom:4px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:16px;}th,td{padding:5px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:14px;text-transform:uppercase;}.total{font-weight:bold;font-size:23px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:13px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.exoneration{color:red;font-weight:bold;font-size:19px;}.monnaie{font-size:19px;color:#006600;}.solde{color:#cc0000;font-weight:bold;}.depot-info{font-size:17px;color:#555;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p><p>${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</p></div><div class="info"><span>Patient: ${echapperHTML(data.nomPatient)}</span><span>${data.typePatient === 'ONG' ? `Partenaire: ${echapperHTML(data.selectedOng || 'N/R')}` : 'Privé'}</span></div><div class="info"><span>Dossier: ${echapperHTML(data.numDossier)}</span><span>Mode: ${echapperHTML(data.modePaiement).toUpperCase()}</span></div><div class="info info-patient"><span>📞 ${echapperHTML(data.telephone)}</span><span>Type: ${data.typePatient === 'ONG' ? 'Partenaire' : 'Privé'}</span></div><div class="info info-patient"><span>Enregistré par: ${echapperHTML(data.creePar)}</span></div>${data.dateEntree1 && data.dateSortie1 ? `<p style="font-size:10px; margin:4px 0;"><strong>Séjour:</strong> ${data.dateEntree1.split('-').reverse().slice(0,2).join('/')} → ${data.dateSortie1.split('-').reverse().slice(0,2).join('/')}</p>` : ''}<table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${data.dateEntree1 && data.dateSortie1 ? `<tr><td>Hébergement</td><td class="qte">${data.j1}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit1].prix)}</td><td class="sous-total">${formatGourdes(data.totalE1)}</td></tr>` : ''}${data.multiPeriode && data.dateEntree2 && data.dateSortie2 ? `<tr><td>Hébergement P2</td><td class="qte">${data.j2}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit2].prix)}</td><td class="sous-total">${formatGourdes(data.totalE2)}</td></tr>` : ''}${data.hasChirSpec && data.nomChirSpec ? `<tr><td>Chirurgie: ${echapperHTML(data.nomChirSpec)}</td><td class="qte">1</td><td class="prix">${formatGourdes(data.totalChirSpec)}</td><td class="sous-total">${formatGourdes(data.totalChirSpec)}</td></tr>` : ''}${data.lignes.map(l => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte * l.prix)}</td></tr>`).join('')}</tbody></table>${data.exoneration ? `<div class="exoneration">Exonération: ${data.exoneration.pourcentage}% (${formatGourdes(data.exoneration.montantExonere)} Gdes)</div>` : ''}${data.depots > 0 ? `<div class="depot-info">Dépôts déjà effectués: ${formatGourdes(data.depots)} Gdes</div>` : ''}<div class="total">TOTAL À PAYER (après déduction des dépôts): ${formatGourdes(montantRestantApresDepots)} Gdes<br/>${formatDH(montantRestantApresDepots)} DH</div>${data.solde > 0 ? `<p class="solde">Solde restant : ${formatGourdes(data.solde)} Gdes</p>` : ''}<div style="margin-top:6px; border-top:2px dashed #000; padding-top:6px;">${data.modePaiement === 'cash' ? `<div style="display:flex; justify-content:space-between; font-size:12px;"><span>Montant versé:</span><span>${formatGourdes(data.montantVerse)} Gdes</span></div><div style="display:flex; justify-content:space-between; font-size:16px; font-weight:bold; color:#006600;"><span>Monnaie à rendre:</span><span>${formatGourdes(data.monnaieARendre)} Gdes</span></div>` : ''}</div><div class="footer">Merci de votre visite !<br/>CHF Système Hospitalier – ${new Date().getFullYear()}</div></body></html>`;
     const win = window.open('', '_blank', 'width=500,height=700');
-    if (!win) { showToast("Veuillez autoriser les fenêtres pop-up.", "error"); return; }
+    if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
     win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 500);
   };
 
@@ -276,7 +279,7 @@ function CalculateurPanel({
       }
     }
     if (modePaiement === "ong" && !ongPartenaireFiche) {
-      showToast("Veuillez sélectionner l'ONG partenaire.", "error");
+      showToast("Veuillez sélectionner le partenaire.", "error");
       return;
     }
     try {
@@ -339,7 +342,7 @@ function CalculateurPanel({
 
   const demanderConfirmationEncaissement = () => {
     if (!grandTotal || grandTotal <= 0) { showToast("Impossible d'encaisser : le montant de la fiche est à 0 Gdes.", "error"); return; }
-    const libellesMode = { cash: '💵 Cash', credit: '📝 Crédit', ong: '🏥 ONG', exoneration: '🎯 Exonération' };
+    const libellesMode = { cash: '💵 Cash', credit: '📝 Crédit', ong: '🏥 Partenaire', exoneration: '🎯 Exonération' };
     setConfirmModal({
       titre: "Confirmer l'encaissement",
       message: `Patient : ${nomPatient}\nMode de paiement : ${libellesMode[modePaiement] || modePaiement}`,
@@ -383,21 +386,32 @@ function CalculateurPanel({
         <div className="space-y-4">
           <div className="bg-white p-4 rounded-xl border border-emerald-300 flex justify-between items-center shadow-sm flex-wrap gap-2">
             <div>
-              <h3 className="text-base font-black">{nomPatient}</h3>
+              {!editNomOuvert ? (
+                <h3 className="text-base font-black flex items-center gap-2">
+                  {nomPatient}
+                  <button onClick={()=>{ setNouveauNomEdit(nomPatient||""); setEditNomOuvert(true); }} className="text-[9px] font-bold text-blue-600 underline">✏️ Changer</button>
+                </h3>
+              ) : (
+                <div className="flex gap-1.5 items-center flex-wrap">
+                  <input type="text" value={nouveauNomEdit} onChange={e=>setNouveauNomEdit(e.target.value)} className="border rounded p-1 text-xs" autoFocus />
+                  <button onClick={()=>{ if (onChangerNomPatient) onChangerNomPatient(nouveauNomEdit); setEditNomOuvert(false); }} className="bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded"><Check size={10}/></button>
+                  <button onClick={()=>setEditNomOuvert(false)} className="border text-[10px] font-bold px-2 py-1 rounded"><X size={10}/></button>
+                </div>
+              )}
               {!editTypeOuvert ? (
                 <p className="text-xs font-bold text-purple-700 flex items-center gap-2">
-                  {selectedOng || 'Privé'} - {(typePatient||'ONG')}
+                  {selectedOng || 'Privé'} - {typePatient === 'ONG' ? 'Partenaire' : 'Privé'}
                   {peutCreerDossier && <button onClick={()=>{ setNouveauTypeEdit(typePatient||'ONG'); setNouvelOngEdit(selectedOng||''); setEditTypeOuvert(true); }} className="text-[9px] font-bold text-blue-600 underline">✏️ Changer</button>}
                 </p>
               ) : (
                 <div className="flex gap-1.5 items-center mt-1 flex-wrap">
                   <select value={nouveauTypeEdit} onChange={e=>setNouveauTypeEdit(e.target.value)} className="border rounded p-1 text-xs bg-white">
-                    <option value="ONG">🏥 ONG</option>
+                    <option value="ONG">🏥 Partenaire</option>
                     <option value="PRIVE">💳 Privé</option>
                   </select>
                   {nouveauTypeEdit === "ONG" && (
                     <select value={nouvelOngEdit} onChange={e=>setNouvelOngEdit(e.target.value)} className="border rounded p-1 text-xs bg-white">
-                      <option value="">-- ONG --</option>
+                      <option value="">-- Partenaire --</option>
                       {listeOng.map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
                   )}
@@ -409,6 +423,7 @@ function CalculateurPanel({
             <div className="flex gap-2 flex-wrap">
               {peutAnnulerDossier && <button onClick={onAnnulerDossier} className="bg-red-50 text-red-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-red-200">Abandonner</button>}
               {peutSuspendre && <button onClick={onSuspendreDossier} className="bg-amber-50 text-amber-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-amber-200 flex items-center gap-1"><Clock size={12}/> Suspendre</button>}
+              {peutSuspendre && onReporterDossier && <button onClick={onReporterDossier} className="bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-indigo-200 flex items-center gap-1">📅 Reporter au mois suivant</button>}
               {peutArchiver && <button onClick={onCloturerDossier} className="bg-emerald-700 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg">🏁 Clôturer</button>}
             </div>
           </div>
@@ -471,13 +486,14 @@ function CalculateurPanel({
               <input type="number" min="1" value={quantite} onChange={e=>setQuantite(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') actionAjouterSoin(); }} className="w-16 border rounded-lg p-2 text-xs text-center font-mono font-bold bg-gray-50" disabled={!peutAjouterLignes} />
               <button onClick={actionAjouterSoin} disabled={!selection || !peutAjouterLignes} className="bg-[#1E2A24] text-white px-4 py-2 rounded-lg text-xs font-bold disabled:opacity-30 flex items-center gap-1"><Plus/> Ajouter</button>
             </div>
+            <p className="text-[9px] text-gray-400">💡 Astuce : double-clique un résultat dans la liste pour l'ajouter tout de suite, sans passer par le bouton Ajouter.</p>
           </div>
           <div className="bg-white rounded-xl border overflow-hidden shadow-sm">
             <table className="w-full text-xs text-left">
               <thead><tr className="bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono"><th className="p-3">Désignation</th><th className="p-3 w-16 text-center">Qté</th><th className="p-3 text-right w-24">Prix</th><th className="p-3 text-right w-24">Total</th><th className="w-8"></th></tr></thead>
               <tbody className="divide-y divide-gray-100">
-                {j1 > 0 && <tr className="bg-amber-50/20"><td className="p-3 text-amber-900">Séjour : {CONFIG_LITS[typeLit1].nom}</td><td className="p-3 text-center font-bold">{j1} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(CONFIG_LITS[typeLit1].prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE1)}</td><td></td></tr>}
-                {multiPeriode && j2 > 0 && <tr className="bg-amber-50/40"><td className="p-3 text-amber-900">Séjour P2 : {CONFIG_LITS[typeLit2].nom}</td><td className="p-3 text-center font-bold">{j2} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(CONFIG_LITS[typeLit2].prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE2)}</td><td></td></tr>}
+                {dateEntree1 && dateSortie1 && <tr className="bg-amber-50/20"><td className="p-3 text-amber-900">Séjour : {CONFIG_LITS[typeLit1].nom}</td><td className="p-3 text-center font-bold">{j1} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(CONFIG_LITS[typeLit1].prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE1)}</td><td></td></tr>}
+                {multiPeriode && dateEntree2 && dateSortie2 && <tr className="bg-amber-50/40"><td className="p-3 text-amber-900">Séjour P2 : {CONFIG_LITS[typeLit2].nom}</td><td className="p-3 text-center font-bold">{j2} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(CONFIG_LITS[typeLit2].prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE2)}</td><td></td></tr>}
                 {hasChirSpec && nomChirSpec && <tr className="bg-red-50/20"><td className="p-3 text-red-900">Chirurgie : {nomChirSpec}</td><td className="p-3 text-center">1</td><td className="p-3 text-right text-gray-400">{formatGourdes(totalChirSpec)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalChirSpec)}</td><td></td></tr>}
                 {lignes.map(l => <tr key={l.id} className="zebra-row"><td className="p-3 text-gray-800"><span className={`text-[8px] font-bold uppercase px-1 rounded mr-1 ${l.type==='med'?'bg-emerald-50 text-emerald-700':'bg-blue-50 text-blue-700'}`}>{l.type==='med'?'Pharma':'Acte'}</span>{l.nom}</td><td className="p-3 text-center font-mono font-bold">{l.qte}</td><td className="p-3 text-right text-gray-400">{formatGourdes(l.prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(l.qte * l.prix)}</td><td className="text-center">{peutSupprimerFiche && <button onClick={()=>setLignes(p=>p.filter(x=>x.id!==l.id))} className="text-gray-300 hover:text-red-600"><X size={12}/></button>}</td></tr>)}
               </tbody>
@@ -501,7 +517,7 @@ function CalculateurPanel({
               <div className="flex flex-wrap gap-2">
                 <button onClick={()=>{ setModePaiement("cash"); setModeDepot(false); }} className={`px-4 py-1.5 rounded-lg text-xs font-bold ${modePaiement==="cash"?"bg-emerald-700 text-white":"bg-gray-100"}`}>💵 Cash</button>
                 <button onClick={()=>{ setModePaiement("credit"); setModeDepot(false); }} className={`px-4 py-1.5 rounded-lg text-xs font-bold ${modePaiement==="credit"?"bg-orange-600 text-white":"bg-gray-100"}`}>📝 Crédit</button>
-                <button onClick={()=>{ setModePaiement("ong"); setModeDepot(false); }} className={`px-4 py-1.5 rounded-lg text-xs font-bold ${modePaiement==="ong"?"bg-purple-700 text-white":"bg-gray-100"}`} disabled={typePatient!=="ONG"}>🏥 ONG</button>
+                <button onClick={()=>{ setModePaiement("ong"); setModeDepot(false); }} className={`px-4 py-1.5 rounded-lg text-xs font-bold ${modePaiement==="ong"?"bg-purple-700 text-white":"bg-gray-100"}`} disabled={typePatient!=="ONG"}>🏥 Partenaire</button>
                 <button onClick={()=>{ setModePaiement("exoneration"); setModeDepot(false); }} className={`px-4 py-1.5 rounded-lg text-xs font-bold ${modePaiement==="exoneration"?"bg-red-600 text-white":"bg-gray-100"}`} disabled={userRole!=="direction" && userRole!=="administrateur" && userRole!=="comptable"}>🎯 Exonération</button>
                 <button onClick={()=>{ setModeDepot(!modeDepot); if(!modeDepot) setModePaiement("depot"); else setModePaiement("cash"); }} className={`px-4 py-1.5 rounded-lg text-xs font-bold ${modeDepot?"bg-blue-700 text-white":"bg-gray-100"}`}>💰 Dépôt/Acompte</button>
               </div>
@@ -512,7 +528,7 @@ function CalculateurPanel({
                   <p className="text-[10px] text-gray-500">Dépôts déjà effectués : {formatGourdes(totalDepots)} Gdes</p>
                 </div>
               )}
-              {modePaiement === "ong" && !modeDepot && <div className="mt-2"><label className="text-[10px] font-bold text-purple-800">ONG</label><select value={ongPartenaireFiche} onChange={e=>setOngPartenaireFiche(e.target.value)} className="border rounded-lg p-1.5 text-xs w-full bg-white"><option value="">Sélectionner</option>{listeOng.map(o=><option key={o} value={o}>{o}</option>)}</select></div>}
+              {modePaiement === "ong" && !modeDepot && <div className="mt-2"><label className="text-[10px] font-bold text-purple-800">Partenaire</label><select value={ongPartenaireFiche} onChange={e=>setOngPartenaireFiche(e.target.value)} className="border rounded-lg p-1.5 text-xs w-full bg-white"><option value="">Sélectionner</option>{listeOng.map(o=><option key={o} value={o}>{o}</option>)}</select></div>}
               {modePaiement === "exoneration" && !modeDepot && <div className="mt-2 space-y-2 bg-red-50 p-2 rounded-lg"><div className="flex gap-2"><input type="number" min="0" max="100" value={pourcentageExoneration} onChange={e=>setPourcentageExoneration(e.target.value)} placeholder="%" className="w-20 border rounded-lg p-1.5 text-xs" /><input type="text" value={motifExoneration} onChange={e=>setMotifExoneration(e.target.value)} placeholder="Motif..." className="flex-1 border rounded-lg p-1.5 text-xs" /></div>{(userRole==="direction" || userRole==="administrateur") ? <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={autorisationExoneration} onChange={e=>{
                 if (!e.target.checked) { setAutorisationExoneration(false); return; }
                 setConfirmModal({
@@ -542,7 +558,7 @@ function CalculateurPanel({
             <button onClick={imprimerFicheA4} disabled={!paiementEffectue} className={`flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>🖨️ A4</button>
             <button onClick={imprimerTicket} disabled={!paiementEffectue} className={`flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>🧾 Ticket</button>
             <button onClick={() => {
-              if (lignes.length === 0 && j1 === 0 && !hasChirSpec) { showToast("Fiche vide", "error"); return; }
+              if (lignes.length === 0 && j1 === 0 && !hasChirSpec && !dateEntree1) { showToast("Fiche vide", "error"); return; }
               // On crée l'objet fiche (si idFicheEnCoursDEdition, on l'utilise pour remplacer)
               const fiche = {
                 id: idFicheEnCoursDEdition || "fiche-" + Date.now(),

@@ -70,6 +70,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   const [paiementEffectue, setPaiementEffectue] = useState(false);
   const [achatExpressOuvert, setAchatExpressOuvert] = useState(false);
   const [confirmModal, setConfirmModal] = useState(null);
+  const [avertissementInactivite, setAvertissementInactivite] = useState(false);
   const [toasts, setToasts] = useState([]);
 
   const showToast = (message, type = "info") => {
@@ -287,28 +288,47 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
     showToast(`Dossier de ${patientDoc.nomPatient} chargé`, "success");
   };
 
-  const declencherPreValidationDossier = () => {
-    const activeEstVide = lignesCalcul.length === 0 && j1 === 0 && !hasChirSpec;
-    const proceder = (fichesFinales) => {
-      if (fichesFinales.length === 0) { showToast("Dossier vide.", "error"); return; }
-      setModePreValidation(true);
-    };
-    if (activeEstVide) { proceder(fichesDossier); return; }
+  // Détecte une fiche en cours de saisie non encore ajoutée/mise à jour dans le dossier (dates
+  // d'hébergement, lignes pharmacie/actes, chirurgie hors-catalogue) ; si elle existe, propose de
+  // l'enregistrer avant de continuer, pour ne rien perdre au moment de clôturer/suspendre/reporter.
+  // Si une fiche est EN COURS D'ÉDITION (idFicheEnCoursDEdition), la confirmation REMPLACE cette
+  // fiche existante (même id, même numéro) au lieu d'en ajouter une nouvelle en doublon.
+  // `callback` reçoit la liste de fiches à jour.
+  const avecFicheEnCoursAjoutee = (callback) => {
+    const activeEstVide = lignesCalcul.length === 0 && j1 === 0 && !hasChirSpec && !dateEntree1;
+    if (activeEstVide) { callback(fichesDossier); return; }
+    const ficheOriginale = idFicheEnCoursDEdition ? fichesDossier.find(f => f.id === idFicheEnCoursDEdition) : null;
     setConfirmModal({
-      titre: "Fiche en cours détectée",
-      message: "Tu as une fiche en cours de saisie qui n'a pas encore été ajoutée au dossier.",
+      titre: idFicheEnCoursDEdition ? "Modification non enregistrée" : "Fiche en cours détectée",
+      message: idFicheEnCoursDEdition
+        ? `Tu modifies la Fiche N°${ficheOriginale?.numeroFiche || ''} et ces changements ne sont pas encore enregistrés.`
+        : "Tu as une fiche en cours de saisie qui n'a pas encore été ajoutée au dossier.",
       detail: `${formatGourdes(grandTotalGlobalFiche)} Gdes`,
-      confirmLabel: "Oui, l'ajouter",
+      confirmLabel: idFicheEnCoursDEdition ? "Oui, enregistrer la modification" : "Oui, l'ajouter",
       cancelLabel: "Non, continuer sans",
       onConfirm: () => {
         setConfirmModal(null);
-        const fiche = { id: "fiche-" + Date.now(), numeroFiche: numeroFicheCourante, breakdown: { ...totalsParService }, totalGlobal: grandTotalGlobalFiche, contientErreurs: false, rawState: { lignesCalcul: [...lignesCalcul], dateEntree1, dateSortie1, typeLit1, multiPeriode, dateEntree2, dateSortie2, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec } };
-        const fichesFinales = [...fichesDossier, fiche];
+        const fiche = {
+          id: idFicheEnCoursDEdition || ("fiche-" + Date.now()),
+          numeroFiche: idFicheEnCoursDEdition ? (ficheOriginale?.numeroFiche || numeroFicheCourante) : numeroFicheCourante,
+          breakdown: { ...totalsParService }, totalGlobal: grandTotalGlobalFiche, contientErreurs: false,
+          rawState: { lignesCalcul: [...lignesCalcul], dateEntree1, dateSortie1, typeLit1, multiPeriode, dateEntree2, dateSortie2, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
+        };
+        const fichesFinales = idFicheEnCoursDEdition
+          ? fichesDossier.map(f => f.id === idFicheEnCoursDEdition ? fiche : f)
+          : [...fichesDossier, fiche];
         setFichesDossier(fichesFinales);
         viderLeCalculateurFicheUniquement();
-        proceder(fichesFinales);
+        callback(fichesFinales);
       },
-      onCancel: () => { setConfirmModal(null); proceder(fichesDossier); }
+      onCancel: () => { setConfirmModal(null); callback(fichesDossier); }
+    });
+  };
+
+  const declencherPreValidationDossier = () => {
+    avecFicheEnCoursAjoutee((fichesFinales) => {
+      if (fichesFinales.length === 0) { showToast("Dossier vide.", "error"); return; }
+      setModePreValidation(true);
     });
   };
 
@@ -317,7 +337,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
     const datesTrouvees = [];
     fichesDossier.forEach(f => { if (f.rawState?.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 }); if (f.rawState?.multiPeriode && f.rawState?.dateEntree2) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 }); });
     let sejourTexte = "—";
-    if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map(d => `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`).join(" et ");
+    if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map(d => d.in === d.out ? d.in.split("-").reverse().slice(0, 2).join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`).join(" et ");
     const dossierArchiver = {
       nomPatient, ongPartenaire: selectedOng, typePatient, numDossier: numDossierPatient,
       dateNaissance, telephone, dateHeure: new Date().toLocaleDateString("fr-FR"),
@@ -388,15 +408,16 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   };
 
   // --- CORRECTION DE LA SUSPENSION : sauvegarde les fiches ---
-  const executerSuspension = async () => {
-    const somme = fichesDossier.reduce((s, f) => s + f.totalGlobal, 0);
+  const executerSuspension = async (fichesAUtiliser) => {
+    const listeFiches = fichesAUtiliser || fichesDossier;
+    const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
     const datesTrouvees = [];
-    fichesDossier.forEach(f => {
+    listeFiches.forEach(f => {
       if (f.rawState?.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
       if (f.rawState?.multiPeriode && f.rawState?.dateEntree2) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
     });
     let sejourTexte = "—";
-    if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map(d => `du ${d.in.split("-").reverse().slice(0,2).join("/")} au ${d.out.split("-").reverse().slice(0,2).join("/")}`).join(" et ");
+    if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map(d => d.in === d.out ? d.in.split("-").reverse().slice(0,2).join("/") : `du ${d.in.split("-").reverse().slice(0,2).join("/")} au ${d.out.split("-").reverse().slice(0,2).join("/")}`).join(" et ");
 
     const dossierSuspendu = {
       nomPatient,
@@ -412,7 +433,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
       totalSaisiePapierDH: 0,
       contientErreurs: false,
       verrouilleFacture: false,
-      fiches: [...fichesDossier],  // ⬅️ CONSERVE LES FICHES
+      fiches: [...listeFiches],  // ⬅️ CONSERVE LES FICHES
       status: 'suspendu',
       dateSuspension: new Date().toISOString(),
       timestamp: Date.now()
@@ -422,7 +443,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
       await chf.updateEpisode(dossierId, toEpisodeApi(dossierSuspendu));
       const updatedItems = verifications.map(v => v.id === dossierId ? { ...v, ...dossierSuspendu } : v);
       setVerifications(updatedItems);
-      showToast(`Dossier suspendu avec ${fichesDossier.length} fiche(s)`, "success");
+      showToast(`Dossier suspendu avec ${listeFiches.length} fiche(s)`, "success");
     } catch (error) {
       if (!error.isOfflineQueue) {
         showToast("Erreur suspension: " + error.message, "error");
@@ -448,25 +469,121 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
 
   const suspendreDossier = async () => {
     if (!dossierId) { showToast("Aucun dossier actif.", "error"); return; }
-    const demanderConfirmation = () => setConfirmModal({
-      titre: "Suspendre ce dossier ?",
-      message: `Le dossier de ${nomPatient} sera mis en pause. Il pourra être rouvert plus tard depuis les Archives.`,
-      confirmLabel: "⏸️ Suspendre",
-      onConfirm: () => { setConfirmModal(null); executerSuspension(); },
-      onCancel: () => setConfirmModal(null)
-    });
-    if (await verifierConflit()) {
-      setConfirmModal({
-        titre: "⚠️ Ce dossier a été modifié entre-temps",
-        message: "Une autre personne (ou un autre appareil) a modifié ce dossier depuis que tu l'as ouvert ici. Continuer risque d'écraser ses changements.",
-        confirmLabel: "Continuer quand même",
-        danger: true,
-        onConfirm: () => { setConfirmModal(null); demanderConfirmation(); },
+    avecFicheEnCoursAjoutee((fichesFinales) => {
+      const demanderConfirmation = () => setConfirmModal({
+        titre: "Suspendre ce dossier ?",
+        message: `Le dossier de ${nomPatient} sera mis en pause. Il pourra être rouvert plus tard depuis les Archives.`,
+        confirmLabel: "⏸️ Suspendre",
+        onConfirm: () => { setConfirmModal(null); executerSuspension(fichesFinales); },
         onCancel: () => setConfirmModal(null)
       });
-      return;
+      (async () => {
+        if (await verifierConflit()) {
+          setConfirmModal({
+            titre: "⚠️ Ce dossier a été modifié entre-temps",
+            message: "Une autre personne (ou un autre appareil) a modifié ce dossier depuis que tu l'as ouvert ici. Continuer risque d'écraser ses changements.",
+            confirmLabel: "Continuer quand même",
+            danger: true,
+            onConfirm: () => { setConfirmModal(null); demanderConfirmation(); },
+            onCancel: () => setConfirmModal(null)
+          });
+          return;
+        }
+        demanderConfirmation();
+      })();
+    });
+  };
+
+  // --- REPORT AU MOIS SUIVANT : pour un dossier non complet en fin de mois. Garde les fiches
+  // déjà saisies (comme la suspension) mais marque le dossier avec le mois cible, pour qu'il soit
+  // exclu du rapport Excel du mois en cours et facilement retrouvable pour le mois suivant.
+  const executerReport = async (fichesAUtiliser) => {
+    const listeFiches = fichesAUtiliser || fichesDossier;
+    const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
+    const datesTrouvees = [];
+    listeFiches.forEach(f => {
+      if (f.rawState?.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
+      if (f.rawState?.multiPeriode && f.rawState?.dateEntree2) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
+    });
+    let sejourTexte = "—";
+    if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map(d => d.in === d.out ? d.in.split("-").reverse().slice(0,2).join("/") : `du ${d.in.split("-").reverse().slice(0,2).join("/")} au ${d.out.split("-").reverse().slice(0,2).join("/")}`).join(" et ");
+
+    const cibleMois = new Date(); cibleMois.setMonth(cibleMois.getMonth() + 1);
+    const moisReport = `${cibleMois.getFullYear()}-${String(cibleMois.getMonth() + 1).padStart(2, '0')}`;
+
+    const dossierReporte = {
+      nomPatient,
+      ongPartenaire: selectedOng,
+      typePatient,
+      numDossier: numDossierPatient,
+      dateNaissance,
+      telephone,
+      dateHeure: new Date().toLocaleDateString("fr-FR"),
+      periodeSejourString: sejourTexte,
+      dateEntreePourTri: datesTrouvees.length > 0 ? datesTrouvees[0].in : "9999-12-31",
+      totalGlobal: somme,
+      totalSaisiePapierDH: 0,
+      contientErreurs: false,
+      verrouilleFacture: false,
+      fiches: [...listeFiches],  // ⬅️ CONSERVE LES FICHES (dossier non complet, pas encore facturable)
+      status: 'reporte',
+      moisReport,
+      dateSuspension: new Date().toISOString(),
+      timestamp: Date.now()
+    };
+
+    try {
+      await chf.updateEpisode(dossierId, toEpisodeApi(dossierReporte));
+      const updatedItems = verifications.map(v => v.id === dossierId ? { ...v, ...dossierReporte } : v);
+      setVerifications(updatedItems);
+      showToast(`Dossier reporté à ${cibleMois.toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}`, "success");
+    } catch (error) {
+      if (!error.isOfflineQueue) { showToast("Erreur report: " + error.message, "error"); return; }
+      const updatedItems = verifications.map(v => v.id === dossierId ? { ...v, ...dossierReporte } : v);
+      setVerifications(updatedItems);
+      showToast("📴 Report enregistré hors ligne — sera synchronisé au retour d'internet", "info");
     }
-    demanderConfirmation();
+
+    // Nettoyer l'état local
+    setDossierActif(false);
+    setNomPatient("");
+    setSelectedOng("");
+    setNumDossierPatient("");
+    sessionStorage.removeItem('numDossierPatient');
+    setFichesDossier([]);
+    setModePreValidation(false);
+    viderLeCalculateurFicheUniquement();
+    setDossierId(null);
+    localStorage.removeItem(LOG_DOSSIER_BROUILLON_KEY);
+  };
+
+  const reporterDossierAuMoisSuivant = async () => {
+    if (!dossierId) { showToast("Aucun dossier actif.", "error"); return; }
+    avecFicheEnCoursAjoutee((fichesFinales) => {
+      const cibleMois = new Date(); cibleMois.setMonth(cibleMois.getMonth() + 1);
+      const libelleMois = cibleMois.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
+      const demanderConfirmation = () => setConfirmModal({
+        titre: "Reporter ce dossier au mois suivant ?",
+        message: `Le dossier de ${nomPatient} n'est pas complet. Il sera reporté à ${libelleMois} avec ses ${fichesFinales.length} fiche(s), et exclu du rapport Excel du mois en cours.`,
+        confirmLabel: "📅 Reporter",
+        onConfirm: () => { setConfirmModal(null); executerReport(fichesFinales); },
+        onCancel: () => setConfirmModal(null)
+      });
+      (async () => {
+        if (await verifierConflit()) {
+          setConfirmModal({
+            titre: "⚠️ Ce dossier a été modifié entre-temps",
+            message: "Une autre personne (ou un autre appareil) a modifié ce dossier depuis que tu l'as ouvert ici. Continuer risque d'écraser ses changements.",
+            confirmLabel: "Continuer quand même",
+            danger: true,
+            onConfirm: () => { setConfirmModal(null); demanderConfirmation(); },
+            onCancel: () => setConfirmModal(null)
+          });
+          return;
+        }
+        demanderConfirmation();
+      })();
+    });
   };
 
   const executerAnnulation = async () => {
@@ -571,14 +688,14 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
     setLignesCalcul(prev => {
       const index = prev.findIndex(l => l.itemId === item.id && l.type === cat);
       if (index !== -1) return prev.map((l, idx) => idx === index ? { ...l, qte: l.qte + qte } : l);
-      return [...prev, { id: "l-" + Math.random().toString(36).slice(2, 6), itemId: item.id, type: cat, sub: item.sub || "", nom: item.nom, qte, prix: item.prix }];
+      return [...prev, { id: "l-" + Math.random().toString(36).slice(2, 6), itemId: item.id, type: cat, sub: cat === "med" ? "" : (item.sub || ""), nom: item.nom, qte, prix: item.prix }];
     });
     setPaiementEffectue(false);
   };
 
-  const j1 = useMemo(() => { if (!dateEntree1 || !dateSortie1) return 0; const d = (new Date(dateSortie1) - new Date(dateEntree1)) / 86400000; if (d < 0) { setDateSortie1(""); return 0; } return d === 0 ? 1 : Math.floor(d); }, [dateEntree1, dateSortie1]);
+  const j1 = useMemo(() => { if (!dateEntree1 || !dateSortie1) return 0; const d = (new Date(dateSortie1) - new Date(dateEntree1)) / 86400000; if (d < 0) { setDateSortie1(""); return 0; } return Math.max(0, Math.floor(d)); }, [dateEntree1, dateSortie1]);
   const totalE1 = j1 * CONFIG_LITS[typeLit1].prix;
-  const j2 = useMemo(() => { if (!multiPeriode || !dateEntree2 || !dateSortie2) return 0; const d = (new Date(dateSortie2) - new Date(dateEntree2)) / 86400000; return d <= 0 ? 1 : Math.floor(d); }, [multiPeriode, dateEntree2, dateSortie2]);
+  const j2 = useMemo(() => { if (!multiPeriode || !dateEntree2 || !dateSortie2) return 0; const d = (new Date(dateSortie2) - new Date(dateEntree2)) / 86400000; return Math.max(0, Math.floor(d)); }, [multiPeriode, dateEntree2, dateSortie2]);
   const totalE2 = multiPeriode ? j2 * CONFIG_LITS[typeLit2].prix : 0;
   const totalGeneralExeat = totalE1 + totalE2;
   const totalChirSpec = useMemo(() => { const p = parseFloat(prixChirSpec); return isNaN(p) ? 0 : p; }, [hasChirSpec, prixChirSpec]);
@@ -637,21 +754,22 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   };
   const changerTypeOng = (nouveauType, nouvelOng) => changerTypeOngPourDossier(dossierId, nouveauType, nouvelOng);
 
-  // Reporte un dossier archivé vers un autre mois de facturation, sans toucher à sa date d'admission
-  // réelle (dateEntreePourTri) ni à son contenu : sert quand un dossier ne peut pas être facturé
-  // ce mois-ci (attente de pièce, litige avec le partenaire, etc.) — évite d'avoir à le supprimer.
-  // nouvelleDateISO === null annule le report (le dossier revient à son mois d'admission d'origine).
-  const reporterMoisDossierArchive = async (idCible, nouvelleDateISO) => {
-    setVerifications(prev => prev.map(v => v.id === idCible ? { ...v, dateFacturationReportee: nouvelleDateISO } : v));
+  const changerNomPatientPourDossier = async (idCible, nouveauNom) => {
+    const propre = (nouveauNom || "").trim();
+    if (!propre) { showToast("Le nom ne peut pas être vide.", "error"); return; }
+    if (idCible === dossierId) setNomPatient(propre);
+    setVerifications(prev => prev.map(v => v.id === idCible ? { ...v, nomPatient: propre } : v));
+    if (!idCible) { showToast("Nom du patient mis à jour", "success"); return; }
     try {
-      await chf.updateEpisode(idCible, toEpisodeApi({ dateFacturationReportee: nouvelleDateISO }));
-      enregistrerAudit('report_mois_facturation', { dossierId: idCible, nouvelleDateISO });
-      showToast(nouvelleDateISO ? "Dossier reporté à un autre mois" : "Report annulé — dossier revenu à son mois d'admission", "success");
+      await chf.updateEpisode(idCible, toEpisodeApi({ nomPatient: propre }));
+      enregistrerAudit('changement_nom_patient', { dossierId: idCible, nouveauNom: propre });
+      showToast("Nom du patient mis à jour", "success");
     } catch (error) {
-      if (error.isOfflineQueue) showToast("📴 Report enregistré hors ligne", "info");
+      if (error.isOfflineQueue) showToast("📴 Changement enregistré hors ligne", "info");
       else showToast("Erreur: " + error.message, "error");
     }
   };
+  const changerNomPatient = (nouveauNom) => changerNomPatientPourDossier(dossierId, nouveauNom);
 
   // --- Cette fonction est appelée par CalculateurPanel via onEnregistrerFiche ---
   // Elle est déjà définie plus haut comme enregistrerNouvelleFiche
@@ -673,10 +791,16 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
 
   useEffect(() => {
     const LIMITE_INACTIVITE_MS = 15 * 60 * 1000;
-    let minuteur;
+    const DELAI_AVERTISSEMENT_MS = 2 * 60 * 1000; // avertit 2 minutes avant la déconnexion
+    let minuteurAvertissement, minuteurDeconnexion;
     const reinitialiserMinuteur = () => {
-      clearTimeout(minuteur);
-      minuteur = setTimeout(() => {
+      clearTimeout(minuteurAvertissement);
+      clearTimeout(minuteurDeconnexion);
+      setAvertissementInactivite(false);
+      minuteurAvertissement = setTimeout(() => {
+        setAvertissementInactivite(true);
+      }, LIMITE_INACTIVITE_MS - DELAI_AVERTISSEMENT_MS);
+      minuteurDeconnexion = setTimeout(() => {
         showToast("🔒 Déconnexion automatique après 15 minutes d'inactivité", "info");
         onQuitter();
       }, LIMITE_INACTIVITE_MS);
@@ -685,7 +809,8 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
     evenementsActivite.forEach(ev => window.addEventListener(ev, reinitialiserMinuteur));
     reinitialiserMinuteur();
     return () => {
-      clearTimeout(minuteur);
+      clearTimeout(minuteurAvertissement);
+      clearTimeout(minuteurDeconnexion);
       evenementsActivite.forEach(ev => window.removeEventListener(ev, reinitialiserMinuteur));
     };
   }, []);
@@ -697,6 +822,12 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
       <ToastManager toasts={toasts} removeToast={removeToast} />
       <ConnectionStatus />
       <StockAlertBadge items={lowStockItems} />
+      {avertissementInactivite && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] bg-amber-500 text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-3 text-sm font-bold">
+          <span>⏳ Tu vas être déconnecté(e) dans 2 minutes si tu ne fais rien.</span>
+          <button onClick={() => setAvertissementInactivite(false)} className="bg-white text-amber-700 px-3 py-1 rounded-lg text-xs font-black whitespace-nowrap">Je suis toujours là</button>
+        </div>
+      )}
       {confirmModal && <ConfirmModal {...confirmModal} />}
       {achatExpressOuvert && (
         <AchatExpress
@@ -746,7 +877,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
             <><button onClick={() => setOnglet("meds")} className={`px-4 py-2 font-medium border-b-2 ${onglet === "meds" ? "border-white text-white" : "text-[#9FB8A8]"}`}>Tarifs Pharma</button>
               <button onClick={() => setOnglet("actes")} className={`px-4 py-2 font-medium border-b-2 ${onglet === "actes" ? "border-white text-white" : "text-[#9FB8A8]"}`}>Tarifs Actes</button>
               <button onClick={() => setOnglet("stock")} className={`px-4 py-2 font-medium border-b-2 ${onglet === "stock" ? "border-white text-white" : "text-[#9FB8A8]"}`}>📦 Stock</button>
-              <button onClick={() => setOnglet("ong")} className={`px-4 py-2 font-medium border-b-2 ${onglet === "ong" ? "border-white text-white" : "text-[#9FB8A8]"}`}>🤝 ONG</button></>
+              <button onClick={() => setOnglet("ong")} className={`px-4 py-2 font-medium border-b-2 ${onglet === "ong" ? "border-white text-white" : "text-[#9FB8A8]"}`}>🤝 Partenaires</button></>
           )}
           {userRole === "administrateur" && (
             <button onClick={() => setOnglet("users")} className={`px-4 py-2 font-medium border-b-2 ${onglet === "users" ? "border-white text-white" : "text-[#9FB8A8]"}`}>👥 Utilisateurs</button>
@@ -768,7 +899,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
           />
         )}
         {onglet === "dashboard_direction" && (userRole === "direction" || userRole === "administrateur") && <DashboardDirectionPanel verifications={verifications} paiements={paiements} medicaments={medicaments} />}
-        {onglet === "dashboard_caisse" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && <DashboardCaissePanel verifications={verifications} paiements={paiements} userDisplayName={userDisplayName} listeOng={listeOngNoms} />}
+        {onglet === "dashboard_caisse" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && <DashboardCaissePanel verifications={verifications} paiements={paiements} userDisplayName={userDisplayName} listeOng={listeOngNoms} showToast={showToast} />}
         {onglet === "calcul" && modePreValidation && (
           <div className="bg-white p-6 rounded-xl border border-emerald-400 shadow-xl space-y-4">
             <div className="text-center border-b pb-2"><span className="text-emerald-800 font-bold uppercase text-[11px]">Contrôle final</span><h3 className="text-lg font-black">📋 Totaux analytiques</h3><p className="text-xs text-gray-500">{nomPatient} | {selectedOng}</p></div>
@@ -803,11 +934,11 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
               dateNaissance={dateNaissance} telephone={telephone} numDossierPatient={numDossierPatient} typePatient={typePatient}
               dossierId={dossierId} setDossierId={setDossierId} patientsExistants={verifications} onChargerPatientExistant={chargerDossierExistant}
               paiementEffectue={paiementEffectue} setPaiementEffectue={setPaiementEffectue}
-              showToast={showToast} onSuspendreDossier={suspendreDossier} onChangerTypeOng={changerTypeOng}
+              showToast={showToast} onSuspendreDossier={suspendreDossier} onReporterDossier={reporterDossierAuMoisSuivant} onChangerTypeOng={changerTypeOng} onChangerNomPatient={changerNomPatient}
               listeOng={listeOngNoms}
             />
         )}
-        {onglet === "verifie" && <HistoriqueVerifPanel verifications={verifications} setVerifications={setVerifications} onChargerPourModif={réimporterDossierDepuisArchives} onSupprimer={supprimerDossierArchive} filtreInitialNom={filtreArchivesInitialNom} clearFiltreInitialNom={() => setFiltreArchivesInitialNom("")} dossierPourExport={dossierPourExport} setDossierPourExport={setDossierPourExport} userRole={userRole} showToast={showToast} onChangerTypeOng={changerTypeOngPourDossier} onReporterMois={reporterMoisDossierArchive} listeOng={listeOngNoms} />}
+        {onglet === "verifie" && <HistoriqueVerifPanel verifications={verifications} setVerifications={setVerifications} onChargerPourModif={réimporterDossierDepuisArchives} onSupprimer={supprimerDossierArchive} filtreInitialNom={filtreArchivesInitialNom} clearFiltreInitialNom={() => setFiltreArchivesInitialNom("")} dossierPourExport={dossierPourExport} setDossierPourExport={setDossierPourExport} userRole={userRole} showToast={showToast} onChangerTypeOng={changerTypeOngPourDossier} listeOng={listeOngNoms} />}
         {onglet === "analyse" && (userRole === "administrateur" || userRole === "direction") && <AnalyticsPanel verifications={verifications} />}
         {onglet === "meds" && (userRole === "administrateur" || userRole === "direction") && <GrilleEditionPanel titre="de la Pharmacie" items={medicaments} setItems={setMedicaments} collectionName="medicaments" showToast={showToast} />}
         {onglet === "actes" && (userRole === "administrateur" || userRole === "direction") && <GrilleEditionPanel titre="des Actes" items={actes} setItems={setActes} collectionName="actes" showToast={showToast} />}
