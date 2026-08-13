@@ -1447,7 +1447,7 @@ const ACTES_PAR_DEFAUT = [
   },
   {
     "id": "a71",
-    "nom": "Sedimentation",
+    "nom": "Vitesse de sédimentation (VS)",
     "prix": 250,
     "sub": "labo"
   },
@@ -1671,12 +1671,6 @@ const ACTES_PAR_DEFAUT = [
     "id": "a69",
     "nom": "Temps de Saignement (TS)",
     "prix": 300,
-    "sub": "labo"
-  },
-  {
-    "id": "a71b",
-    "nom": "Vitesse de sédimentation (VS)",
-    "prix": 250,
     "sub": "labo"
   },
   {

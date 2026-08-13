@@ -13,7 +13,7 @@ const HebergementForm = require('./HebergementForm');
 // Ce composant est long mais intégral. Il gère la création d'épisode, l'ajout de lignes, les paiements,
 // les dépôts, les impressions, etc. Toutes les conversions vers l'API sont faites.
 function CalculateurPanel({
-  medicaments, actes, lignes, setLignes, dossierActif, nomPatient, selectedOng, onNouveauDossier, onAnnulerDossier, onCloturerDossier,
+  medicaments, actes, setActes, lignes, setLignes, dossierActif, nomPatient, selectedOng, onNouveauDossier, onAnnulerDossier, onCloturerDossier,
   fichesDossier, onSupprimerFicheDossier,
   idFicheEnCoursDEdition,  // ID de la fiche en cours d'édition (passé par le parent)
   onEditerFiche,           // NOUVELLE PROP : fonction pour charger une fiche en édition
@@ -40,6 +40,7 @@ function CalculateurPanel({
   const [inputDateNaissance, setInputDateNaissance] = useState("");
   const [inputTelephone, setInputTelephone] = useState("");
   const [categorie, setCategorie] = useState("med");
+  const [detailOuvert, setDetailOuvert] = useState(false); // mobile : affiche le récapitulatif complet en plein écran au tap
   const [recherche, setRecherche] = useState("");
   const [ouvert, setOuvert] = useState(false);
   const [lettreActive, setLettreActive] = useState(null); // null = pas encore choisie -> aucune lettre affichée par défaut
@@ -77,6 +78,28 @@ function CalculateurPanel({
   const refZone = useRef(null);
   const inputRechercheRef = useRef(null);
 
+  // --- Répétition automatique des boutons +/- quand on reste appuyé (souris ou tactile) :
+  // 1 clic normal = +1 comme avant ; rester appuyé > ~400ms déclenche une répétition qui
+  // accélère progressivement, pour ne pas avoir à cliquer 60 fois pour une quantité de 60.
+  const holdDelaiRef = useRef(null);
+  const holdIntervalRef = useRef(null);
+  const demarrerRepetition = (fn) => {
+    fn(); // premier appui = +1 immédiat, comme un clic normal
+    holdDelaiRef.current = setTimeout(() => {
+      let vitesse = 180;
+      const tick = () => {
+        fn();
+        vitesse = Math.max(35, vitesse - 15); // accélère jusqu'à un plancher, sans devenir incontrôlable
+        holdIntervalRef.current = setTimeout(tick, vitesse);
+      };
+      tick();
+    }, 400);
+  };
+  const arreterRepetition = () => {
+    clearTimeout(holdDelaiRef.current);
+    clearTimeout(holdIntervalRef.current);
+  };
+
   const catalogueFiltre = categorie === "med" ? medicaments : actes;
   const suggestions = useMemo(() => {
     const q = recherche.trim().toLowerCase();
@@ -97,10 +120,10 @@ function CalculateurPanel({
   const catalogueGrille = useMemo(() => {
     if (categorie === "med") {
       const lettre = lettreActive || lettresDisponibles[0];
-      return medicaments.filter(m => premiereLettre(m.nom) === lettre).sort((a, b) => a.nom.localeCompare(b.nom));
+      return medicaments.filter(m => premiereLettre(m.nom) === lettre).sort((a, b) => (b.nbUtilisations || 0) - (a.nbUtilisations || 0) || a.nom.localeCompare(b.nom));
     }
     const filtres = sousCategorieActeActive ? actes.filter(a => (a.sub || 'chirurgie') === sousCategorieActeActive) : actes;
-    return [...filtres].sort((a, b) => a.nom.localeCompare(b.nom));
+    return [...filtres].sort((a, b) => (a.ordre ?? 9999) - (b.ordre ?? 9999) || (b.nbUtilisations || 0) - (a.nbUtilisations || 0) || a.nom.localeCompare(b.nom));
   }, [categorie, medicaments, actes, lettreActive, lettresDisponibles, sousCategorieActeActive]);
 
   useEffect(() => {
@@ -151,13 +174,21 @@ function CalculateurPanel({
     injecterLigne(item, categorie, q);
     if (categorie === "med" && item.quantite !== undefined) {
       const updated = medicaments.map(m => {
-        if (m.id === item.id) { return { ...m, quantite: Math.max(0, (m.quantite || 0) - q) }; }
+        if (m.id === item.id) { return { ...m, quantite: Math.max(0, (m.quantite || 0) - q), nbUtilisations: (m.nbUtilisations || 0) + 1 }; }
         return m;
       });
       setMedicaments(updated);
       const { LOG_MEDS_KEY } = require('../api/firebase');
       localStorage.setItem(LOG_MEDS_KEY, JSON.stringify(updated));
       chf.updateCatalog('medicaments', updated).catch(e => console.warn(e));
+    } else if (categorie === "acte" && setActes) {
+      // Les actes n'ont pas de stock à décrémenter, mais on suit quand même la fréquence d'usage
+      // pour faire remonter les plus utilisés en haut de leur lettre/catégorie (moins de clics).
+      const updated = actes.map(a => a.id === item.id ? { ...a, nbUtilisations: (a.nbUtilisations || 0) + 1 } : a);
+      setActes(updated);
+      const { LOG_ACTES_KEY } = require('../api/firebase');
+      localStorage.setItem(LOG_ACTES_KEY, JSON.stringify(updated));
+      chf.updateCatalog('actes', updated).catch(e => console.warn(e));
     }
     setRecherche(""); setSelection(null); setQuantite("1");
     if (inputRechercheRef.current) inputRechercheRef.current.focus();
@@ -516,7 +547,8 @@ function CalculateurPanel({
             dateEntree2={dateEntree2} setDateEntree2={setDateEntree2} dateSortie2={dateSortie2} setDateSortie2={setDateSortie2} typeLit2={typeLit2} setTypeLit2={setTypeLit2}
             hasChirSpec={hasChirSpec} setHasChirSpec={setHasChirSpec} nomChirSpec={nomChirSpec} setNomChirSpec={setNomChirSpec} prixChirSpec={prixChirSpec} setPrixChirSpec={setPrixChirSpec}
           />
-          <div className="bg-white p-4 rounded-xl border space-y-3 shadow-sm" ref={refZone}>
+          <div className={estMobile ? "" : "grid grid-cols-2 gap-4 items-start"}>
+          <div className={`bg-white p-4 rounded-xl border space-y-3 shadow-sm ${estMobile ? '' : 'max-h-[75vh] overflow-y-auto'}`} ref={refZone}>
             <div className="flex justify-between items-center">
               <p className="text-[11px] font-bold uppercase text-gray-400">2. Actes, Laboratoire & Ordonnance</p>
               {setTarifChoisi && (
@@ -560,25 +592,65 @@ function CalculateurPanel({
                 </div>
             </div>
           </div>
-          <div className="bg-white rounded-xl border overflow-hidden shadow-sm">
-            <table className="w-full text-xs text-left">
-              <thead><tr className="bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono"><th className="p-3">Désignation</th><th className="p-3 w-16 text-center">Qté</th><th className="p-3 text-right w-24">Prix</th><th className="p-3 text-right w-24">Total</th><th className="w-8"></th></tr></thead>
-              <tbody className="divide-y divide-gray-100">
-                {dateEntree1 && dateSortie1 && <tr className="bg-amber-50/20"><td className="p-3 text-amber-900">Séjour : {CONFIG_LITS[typeLit1].nom}</td><td className="p-3 text-center font-bold">{j1} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(CONFIG_LITS[typeLit1].prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE1)}</td><td></td></tr>}
-                {multiPeriode && dateEntree2 && dateSortie2 && <tr className="bg-amber-50/40"><td className="p-3 text-amber-900">Séjour P2 : {CONFIG_LITS[typeLit2].nom}</td><td className="p-3 text-center font-bold">{j2} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(CONFIG_LITS[typeLit2].prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE2)}</td><td></td></tr>}
-                {hasChirSpec && nomChirSpec && <tr className="bg-red-50/20"><td className="p-3 text-red-900">Chirurgie : {nomChirSpec}</td><td className="p-3 text-center">1</td><td className="p-3 text-right text-gray-400">{formatGourdes(totalChirSpec)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalChirSpec)}</td><td></td></tr>}
-                {lignes.map(l => <tr key={l.id} className="zebra-row"><td className="p-3 text-gray-800"><span className={`text-[8px] font-bold uppercase px-1 rounded mr-1 ${l.type==='med'?'bg-emerald-50 text-emerald-700':'bg-blue-50 text-blue-700'}`}>{l.type==='med'?'Pharma':'Acte'}</span>{l.nom}</td><td className="p-3 text-center"><div className="flex items-center justify-center gap-1"><button onClick={()=>setLignes(p=>p.map(x=>x.id===l.id?{...x,qte:Math.max(1,x.qte-1)}:x))} className="w-7 h-7 bg-gray-100 active:bg-gray-300 rounded-lg font-bold text-gray-700">−</button><span className="font-mono font-bold w-6 text-center">{l.qte}</span><button onClick={()=>setLignes(p=>p.map(x=>x.id===l.id?{...x,qte:x.qte+1}:x))} className="w-7 h-7 bg-gray-100 active:bg-gray-300 rounded-lg font-bold text-gray-700">+</button></div></td><td className="p-3 text-right text-gray-400">{formatGourdes(l.prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(l.qte * l.prix)}</td><td className="text-center">{peutSupprimerFiche && <button onClick={()=>setLignes(p=>p.filter(x=>x.id!==l.id))} className="text-gray-300 hover:text-red-600"><X size={12}/></button>}</td></tr>)}
-              </tbody>
-            </table>
-            <div className="p-4 bg-gray-50 border-t border-b text-[11px] text-gray-600 font-mono space-y-1 shadow-inner">
-              <div className="grid grid-cols-3 font-bold text-[#1E2A24] border-b pb-1 mb-2"><span>RÉCAPITULATIF DE LA FICHE</span><span className="text-right">Gdes</span><span className="text-right text-emerald-800">💵 DH</span></div>
-              {require('../utils/constants').CATEGORIES_LISTE.map(srv => { const m = totalsParService[srv.key]; if (m===0) return null; return <div key={srv.key} className="grid grid-cols-3 py-0.5"><span>• {srv.label}</span><span className="text-right">{formatGourdes(m)}</span><span className="text-right font-bold">{formatDH(m)} DH</span></div>; })}
+          {!estMobile && (
+            <div className="bg-white rounded-xl border overflow-hidden shadow-sm max-h-[75vh] overflow-y-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="sticky top-0"><tr className="bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono"><th className="p-3">Désignation</th><th className="p-3 w-16 text-center">Qté</th><th className="p-3 text-right w-24">Prix</th><th className="p-3 text-right w-24">Total</th><th className="w-8"></th></tr></thead>
+                <tbody className="divide-y divide-gray-100">
+                  {dateEntree1 && dateSortie1 && <tr className="bg-amber-50/20"><td className="p-3 text-amber-900">Séjour : {CONFIG_LITS[typeLit1].nom}</td><td className="p-3 text-center font-bold">{j1} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(CONFIG_LITS[typeLit1].prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE1)}</td><td></td></tr>}
+                  {multiPeriode && dateEntree2 && dateSortie2 && <tr className="bg-amber-50/40"><td className="p-3 text-amber-900">Séjour P2 : {CONFIG_LITS[typeLit2].nom}</td><td className="p-3 text-center font-bold">{j2} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(CONFIG_LITS[typeLit2].prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE2)}</td><td></td></tr>}
+                  {hasChirSpec && nomChirSpec && <tr className="bg-red-50/20"><td className="p-3 text-red-900">Chirurgie : {nomChirSpec}</td><td className="p-3 text-center">1</td><td className="p-3 text-right text-gray-400">{formatGourdes(totalChirSpec)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalChirSpec)}</td><td></td></tr>}
+                  {lignes.map(l => { const decrementer = () => setLignes(p=>p.map(x=>x.id===l.id?{...x,qte:Math.max(1,x.qte-1)}:x)); const incrementer = () => setLignes(p=>p.map(x=>x.id===l.id?{...x,qte:x.qte+1}:x)); return <tr key={l.id} className="zebra-row"><td className="p-3 text-gray-800"><span className={`text-[8px] font-bold uppercase px-1 rounded mr-1 ${l.type==='med'?'bg-emerald-50 text-emerald-700':'bg-blue-50 text-blue-700'}`}>{l.type==='med'?'Pharma':'Acte'}</span>{l.nom}</td><td className="p-3 text-center"><div className="flex items-center justify-center gap-1"><button onMouseDown={()=>demarrerRepetition(decrementer)} onMouseUp={arreterRepetition} onMouseLeave={arreterRepetition} onTouchStart={()=>demarrerRepetition(decrementer)} onTouchEnd={arreterRepetition} onTouchCancel={arreterRepetition} className="w-7 h-7 bg-gray-100 active:bg-gray-300 rounded-lg font-bold text-gray-700 select-none">−</button><span className="font-mono font-bold w-6 text-center">{l.qte}</span><button onMouseDown={()=>demarrerRepetition(incrementer)} onMouseUp={arreterRepetition} onMouseLeave={arreterRepetition} onTouchStart={()=>demarrerRepetition(incrementer)} onTouchEnd={arreterRepetition} onTouchCancel={arreterRepetition} className="w-7 h-7 bg-gray-100 active:bg-gray-300 rounded-lg font-bold text-gray-700 select-none">+</button></div></td><td className="p-3 text-right text-gray-400">{formatGourdes(l.prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(l.qte * l.prix)}</td><td className="text-center">{peutSupprimerFiche && <button onClick={()=>setLignes(p=>p.filter(x=>x.id!==l.id))} className="text-gray-300 hover:text-red-600"><X size={12}/></button>}</td></tr>; })}
+                </tbody>
+              </table>
+              <div className="p-4 bg-gray-50 border-t border-b text-[11px] text-gray-600 font-mono space-y-1 shadow-inner">
+                <div className="grid grid-cols-3 font-bold text-[#1E2A24] border-b pb-1 mb-2"><span>RÉCAPITULATIF DE LA FICHE</span><span className="text-right">Gdes</span><span className="text-right text-emerald-800">💵 DH</span></div>
+                {require('../utils/constants').CATEGORIES_LISTE.map(srv => { const m = totalsParService[srv.key]; if (m===0) return null; return <div key={srv.key} className="grid grid-cols-3 py-0.5"><span>• {srv.label}</span><span className="text-right">{formatGourdes(m)}</span><span className="text-right font-bold">{formatDH(m)} DH</span></div>; })}
+              </div>
+              <div className="bg-[#1E2A24] text-white p-4 flex justify-between items-center font-bold text-sm font-mono sticky bottom-0">
+                <span>SOUS-TOTAL FICHE {idFicheEnCoursDEdition ? 'EN MODIFICATION' : `N°${numeroFicheCourante}`} :</span>
+                <span>{formatGourdes(grandTotal)} Gdes ({formatDH(grandTotal)} DH)</span>
+              </div>
             </div>
-            <div className="bg-[#1E2A24] text-white p-4 flex justify-between items-center font-bold text-sm font-mono">
-              <span>SOUS-TOTAL FICHE {idFicheEnCoursDEdition ? 'EN MODIFICATION' : `N°${numeroFicheCourante}`} :</span>
-              <span>{formatGourdes(grandTotal)} Gdes ({formatDH(grandTotal)} DH)</span>
-            </div>
+          )}
           </div>
+
+          {/* --- Mobile : barre fixe en bas (toujours visible), tap = récapitulatif complet plein écran --- */}
+          {estMobile && dossierActif && (
+            <button onClick={() => setDetailOuvert(true)} className="fixed bottom-0 left-0 right-0 z-40 bg-[#1E2A24] text-white px-4 py-3 flex justify-between items-center font-bold text-sm shadow-2xl">
+              <span>{lignes.length + (dateEntree1 && dateSortie1 ? 1 : 0) + (multiPeriode && dateEntree2 && dateSortie2 ? 1 : 0) + (hasChirSpec && nomChirSpec ? 1 : 0)} article(s)</span>
+              <span>{formatGourdes(grandTotal)} Gdes ▲</span>
+            </button>
+          )}
+          {estMobile && detailOuvert && (
+            <div className="fixed inset-0 z-50 bg-black/40 flex items-end" onClick={() => setDetailOuvert(false)}>
+              <div className="bg-white w-full rounded-t-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                <div className="sticky top-0 bg-white p-3 border-b flex justify-between items-center z-10">
+                  <span className="font-bold text-sm text-gray-800">Récapitulatif de la fiche</span>
+                  <button onClick={() => setDetailOuvert(false)} className="p-2 text-gray-500"><X size={18}/></button>
+                </div>
+                <table className="w-full text-xs text-left">
+                  <thead><tr className="bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono"><th className="p-3">Désignation</th><th className="p-3 w-20 text-center">Qté</th><th className="p-3 text-right w-24">Prix</th><th className="p-3 text-right w-24">Total</th><th className="w-8"></th></tr></thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {dateEntree1 && dateSortie1 && <tr className="bg-amber-50/20"><td className="p-3 text-amber-900">Séjour : {CONFIG_LITS[typeLit1].nom}</td><td className="p-3 text-center font-bold">{j1} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(CONFIG_LITS[typeLit1].prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE1)}</td><td></td></tr>}
+                    {multiPeriode && dateEntree2 && dateSortie2 && <tr className="bg-amber-50/40"><td className="p-3 text-amber-900">Séjour P2 : {CONFIG_LITS[typeLit2].nom}</td><td className="p-3 text-center font-bold">{j2} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(CONFIG_LITS[typeLit2].prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE2)}</td><td></td></tr>}
+                    {hasChirSpec && nomChirSpec && <tr className="bg-red-50/20"><td className="p-3 text-red-900">Chirurgie : {nomChirSpec}</td><td className="p-3 text-center">1</td><td className="p-3 text-right text-gray-400">{formatGourdes(totalChirSpec)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalChirSpec)}</td><td></td></tr>}
+                    {lignes.map(l => { const decrementer = () => setLignes(p=>p.map(x=>x.id===l.id?{...x,qte:Math.max(1,x.qte-1)}:x)); const incrementer = () => setLignes(p=>p.map(x=>x.id===l.id?{...x,qte:x.qte+1}:x)); return <tr key={l.id} className="zebra-row"><td className="p-3 text-gray-800"><span className={`text-[8px] font-bold uppercase px-1 rounded mr-1 ${l.type==='med'?'bg-emerald-50 text-emerald-700':'bg-blue-50 text-blue-700'}`}>{l.type==='med'?'Pharma':'Acte'}</span>{l.nom}</td><td className="p-3 text-center"><div className="flex items-center justify-center gap-1"><button onMouseDown={()=>demarrerRepetition(decrementer)} onMouseUp={arreterRepetition} onMouseLeave={arreterRepetition} onTouchStart={()=>demarrerRepetition(decrementer)} onTouchEnd={arreterRepetition} onTouchCancel={arreterRepetition} className="w-8 h-8 bg-gray-100 active:bg-gray-300 rounded-lg font-bold text-gray-700 select-none">−</button><span className="font-mono font-bold w-6 text-center">{l.qte}</span><button onMouseDown={()=>demarrerRepetition(incrementer)} onMouseUp={arreterRepetition} onMouseLeave={arreterRepetition} onTouchStart={()=>demarrerRepetition(incrementer)} onTouchEnd={arreterRepetition} onTouchCancel={arreterRepetition} className="w-8 h-8 bg-gray-100 active:bg-gray-300 rounded-lg font-bold text-gray-700 select-none">+</button></div></td><td className="p-3 text-right text-gray-400">{formatGourdes(l.prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(l.qte * l.prix)}</td><td className="text-center">{peutSupprimerFiche && <button onClick={()=>setLignes(p=>p.filter(x=>x.id!==l.id))} className="text-gray-300 hover:text-red-600"><X size={12}/></button>}</td></tr>; })}
+                    {lignes.length === 0 && !dateEntree1 && !hasChirSpec && <tr><td colSpan={5} className="p-6 text-center text-gray-400">Fiche vide pour l'instant.</td></tr>}
+                  </tbody>
+                </table>
+                <div className="p-4 bg-gray-50 border-t border-b text-[11px] text-gray-600 font-mono space-y-1">
+                  <div className="grid grid-cols-3 font-bold text-[#1E2A24] border-b pb-1 mb-2"><span>RÉCAPITULATIF DE LA FICHE</span><span className="text-right">Gdes</span><span className="text-right text-emerald-800">💵 DH</span></div>
+                  {require('../utils/constants').CATEGORIES_LISTE.map(srv => { const m = totalsParService[srv.key]; if (m===0) return null; return <div key={srv.key} className="grid grid-cols-3 py-0.5"><span>• {srv.label}</span><span className="text-right">{formatGourdes(m)}</span><span className="text-right font-bold">{formatDH(m)} DH</span></div>; })}
+                </div>
+                <div className="bg-[#1E2A24] text-white p-4 flex justify-between items-center font-bold text-sm font-mono">
+                  <span>SOUS-TOTAL FICHE {idFicheEnCoursDEdition ? 'EN MODIFICATION' : `N°${numeroFicheCourante}`} :</span>
+                  <span>{formatGourdes(grandTotal)} Gdes ({formatDH(grandTotal)} DH)</span>
+                </div>
+                <button onClick={() => setDetailOuvert(false)} className="w-full py-3 text-center text-gray-500 text-xs font-bold border-t">Fermer</button>
+              </div>
+            </div>
+          )}
           <div className="flex gap-2 flex-wrap">
             <button onClick={onViderFicheActive} className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl py-3 text-xs font-bold">🧹 Vider l'écran</button>
             <button onClick={imprimerFicheA4} disabled={!paiementEffectue} className={`flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>🖨️ A4</button>

@@ -937,7 +937,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
         {onglet === "calcul" && !modePreValidation && (
           modeSimulation ? <Simulateur medicaments={medicaments} actes={actes} /> :
             <CalculateurPanel
-              medicaments={medicaments} actes={actes} lignes={lignesCalcul} setLignes={setLignesCalcul}
+              medicaments={medicaments} actes={actes} setActes={setActes} lignes={lignesCalcul} setLignes={setLignesCalcul}
               dossierActif={dossierActif} nomPatient={nomPatient} selectedOng={selectedOng}
               onNouveauDossier={initialiserNouveauDossier} onAnnulerDossier={annulerDossier} onCloturerDossier={declencherPreValidationDossier}
               fichesDossier={fichesDossier} onSupprimerFicheDossier={supprimerFicheDossier} 
