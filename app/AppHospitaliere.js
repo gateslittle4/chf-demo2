@@ -59,6 +59,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   const [dateSortie2, setDateSortie2] = useState("");
   const [typeLit2, setTypeLit2] = useState("normal");
   const [hasChirSpec, setHasChirSpec] = useState(false);
+  const [tarifChoisi, setTarifChoisi] = useState("actuel"); // "actuel" | "nouveau" — quel prix du catalogue utiliser
   const [nomChirSpec, setNomChirSpec] = useState("");
   const [prixChirSpec, setPrixChirSpec] = useState("");
   const [filtreArchivesInitialNom, setFiltreArchivesInitialNom] = useState("");
@@ -181,6 +182,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
     setNomChirSpec("");
     setPrixChirSpec("");
     setPaiementEffectue(false);
+    setTarifChoisi("actuel");
   };
 
   // --- NOUVEAU : Charger une fiche existante pour modification ---
@@ -684,10 +686,13 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   };
 
   const injecterLigneAuCalculateur = (item, cat, qte) => {
+    // Si "Nouveau prix" est choisi ET que l'article a bien un nouveau prix défini, on l'utilise ;
+    // sinon (article sans nouveau prix, ou "Actuel" choisi) on garde le prix actuel normalement.
+    const prixEffectif = (tarifChoisi === "nouveau" && item.nouveauPrix != null && item.nouveauPrix !== "") ? parseFloat(item.nouveauPrix) : item.prix;
     setLignesCalcul(prev => {
       const index = prev.findIndex(l => l.itemId === item.id && l.type === cat);
       if (index !== -1) return prev.map((l, idx) => idx === index ? { ...l, qte: l.qte + qte } : l);
-      return [...prev, { id: "l-" + Math.random().toString(36).slice(2, 6), itemId: item.id, type: cat, sub: cat === "med" ? "" : (item.sub || ""), nom: item.nom, qte, prix: item.prix }];
+      return [...prev, { id: "l-" + Math.random().toString(36).slice(2, 6), itemId: item.id, type: cat, sub: cat === "med" ? "" : (item.sub || ""), nom: item.nom, qte, prix: prixEffectif }];
     });
     setPaiementEffectue(false);
   };
@@ -946,7 +951,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
               hasChirSpec={hasChirSpec} setHasChirSpec={setHasChirSpec} nomChirSpec={nomChirSpec} setNomChirSpec={setNomChirSpec}
               prixChirSpec={prixChirSpec} setPrixChirSpec={setPrixChirSpec} totalsParService={totalsParService} grandTotal={grandTotalGlobalFiche}
               totalDossierGourdes={totalDossierGourdes} onEnregistrerFiche={enregistrerNouvelleFiche}
-              onViderFicheActive={viderLeCalculateurFicheUniquement} injecterLigne={injecterLigneAuCalculateur}
+              onViderFicheActive={viderLeCalculateurFicheUniquement} injecterLigne={injecterLigneAuCalculateur} tarifChoisi={tarifChoisi} setTarifChoisi={setTarifChoisi}
               modeSimulation={modeSimulation} userRole={userRole} userDisplayName={userDisplayName}
               setMedicaments={setMedicaments} medicamentsState={medicaments}
               dateNaissance={dateNaissance} telephone={telephone} numDossierPatient={numDossierPatient} typePatient={typePatient}
@@ -956,7 +961,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
               listeOng={listeOngNoms}
             />
         )}
-        {onglet === "verifie" && <HistoriqueVerifPanel verifications={verifications} setVerifications={setVerifications} onChargerPourModif={réimporterDossierDepuisArchives} onSupprimer={supprimerDossierArchive} filtreInitialNom={filtreArchivesInitialNom} clearFiltreInitialNom={() => setFiltreArchivesInitialNom("")} userRole={userRole} showToast={showToast} onChangerTypeOng={changerTypeOngPourDossier} listeOng={listeOngNoms} />}
+        {onglet === "verifie" && <HistoriqueVerifPanel verifications={verifications} setVerifications={setVerifications} onChargerPourModif={réimporterDossierDepuisArchives} onSupprimer={supprimerDossierArchive} filtreInitialNom={filtreArchivesInitialNom} clearFiltreInitialNom={() => setFiltreArchivesInitialNom("")} userRole={userRole} showToast={showToast} onChangerTypeOng={changerTypeOngPourDossier} listeOng={listeOngNoms} confirmModal={confirmModal} setConfirmModal={setConfirmModal} />}
         {onglet === "analyse" && (userRole === "administrateur" || userRole === "direction") && <AnalyticsPanel verifications={verifications} />}
         {onglet === "meds" && (userRole === "administrateur" || userRole === "direction") && <GrilleEditionPanel titre="de la Pharmacie" items={medicaments} setItems={setMedicaments} collectionName="medicaments" showToast={showToast} />}
         {onglet === "actes" && (userRole === "administrateur" || userRole === "direction") && <GrilleEditionPanel titre="des Actes" items={actes} setItems={setActes} collectionName="actes" showToast={showToast} />}

@@ -7,7 +7,7 @@ const { Eye, Pencil, Trash2, Printer, Clock, FolderOpen, X, Download, Check } = 
 const { chf, toEpisodeApi } = require('../api/supabase');
 const { LOGO_CHF_BASE64 } = require('../utils/logoChf');
 
-function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, userRole, showToast, onChangerTypeOng, listeOng }) {
+function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, userRole, showToast, onChangerTypeOng, listeOng, confirmModal, setConfirmModal }) {
   const [focusedVerif, setFocusedVerif] = useState(null);
   const [editTypeArchiveOuvert, setEditTypeArchiveOuvert] = useState(false);
   const [nouveauTypeArchive, setNouveauTypeArchive] = useState("ONG");
@@ -47,6 +47,14 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
   const dossiersEnAttenteDeLot = useMemo(() => {
     if (!lotOngSelectionne) return [];
     return verifications.filter(v => v.ongPartenaire === lotOngSelectionne && (v.status || 'archived') === 'archived' && v.numeroLot == null && !v.verrouilleFacture);
+  }, [verifications, lotOngSelectionne]);
+
+  // Dossiers déjà envoyés à ce partenaire AVANT la mise en place des lots (verrouillés par l'ancien
+  // système, mais sans numéro de lot) — il faut les rattacher rétroactivement à un lot pour que la
+  // numérotation soit cohérente avec ce qui a déjà été réellement envoyé.
+  const dossiersOrphelinsVerrouilles = useMemo(() => {
+    if (!lotOngSelectionne) return [];
+    return verifications.filter(v => v.ongPartenaire === lotOngSelectionne && (v.status || 'archived') === 'archived' && v.numeroLot == null && v.verrouilleFacture);
   }, [verifications, lotOngSelectionne]);
 
   const lotFocused = lotFocusedNumero != null ? (lotsDuPartenaire.find(l => l.numero === lotFocusedNumero) || null) : null;
@@ -296,6 +304,32 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     });
   };
 
+  // Rattache rétroactivement, SANS régénérer ni retélécharger de fichier (il a déjà été envoyé
+  // manuellement au partenaire), les dossiers déjà verrouillés par l'ancien système à un numéro de
+  // lot — pour que la numérotation future (via "Générer le prochain lot") reparte juste après.
+  const rattacherOrphelinsAUnLot = (ongCible) => {
+    const orphelins = verifications.filter(v => v.ongPartenaire === ongCible && (v.status || 'archived') === 'archived' && v.numeroLot == null && v.verrouilleFacture);
+    if (orphelins.length === 0) return;
+    const numerosExistants = verifications.filter(v => v.ongPartenaire === ongCible && v.numeroLot != null).map(v => v.numeroLot);
+    const numero = numerosExistants.length > 0 ? Math.max(...numerosExistants) + 1 : 1;
+    setConfirmModal({
+      titre: `Rattacher ces ${orphelins.length} dossier(s) déjà envoyés au Lot ${numero} ?`,
+      message: `Ces dossiers ont déjà été envoyés à ${ongCible} avant la mise en place des lots. Aucun fichier ne sera regénéré ni téléchargé ici — on marque juste qu'ils correspondent au Lot ${numero}, pour que le prochain lot généré démarre à ${numero + 1}.`,
+      confirmLabel: `Rattacher au Lot ${numero}`,
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setVerifications(prev => prev.map(v => orphelins.some(o => o.id === v.id) ? { ...v, numeroLot: numero } : v));
+        let echecs = 0;
+        await Promise.all(orphelins.map(async (v) => {
+          try { await chf.updateEpisode(v.id, toEpisodeApi({ numeroLot: numero })); }
+          catch (e) { if (!e.isOfflineQueue) echecs++; }
+        }));
+        showToast(`Lot ${numero} créé rétroactivement avec ${orphelins.length} dossier(s)${echecs > 0 ? ` — ⚠️ ${echecs} non enregistré(s), réessaie` : ''}`, "success");
+      },
+      onCancel: () => setConfirmModal(null)
+    });
+  };
+
   const reimprimerLot = (ongCible, numeroLot) => {
     const idsLot = verifications.filter(v => v.ongPartenaire === ongCible && v.numeroLot === numeroLot).map(v => v.id);
     if (idsLot.length === 0) { showToast("Lot introuvable.", "error"); return; }
@@ -396,11 +430,17 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
 
           {lotOngSelectionne && !lotFocused && (
             <>
+              {dossiersOrphelinsVerrouilles.length > 0 && (
+                <div className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-300 rounded-lg p-3">
+                  <span className="text-amber-800 font-bold">⚠️ {dossiersOrphelinsVerrouilles.length} dossier(s) déjà envoyés à {lotOngSelectionne} avant la mise en place des lots — {formatGourdes(dossiersOrphelinsVerrouilles.reduce((s,v)=>s+(v.totalGlobal||0),0))} Gdes</span>
+                  <button onClick={() => rattacherOrphelinsAUnLot(lotOngSelectionne)} className="bg-amber-600 text-white font-bold px-2 py-1.5 rounded text-[10px] whitespace-nowrap">Rattacher au prochain lot</button>
+                </div>
+              )}
               <div className="flex flex-wrap gap-4 items-center bg-gray-50 p-3 rounded-lg border border-dashed">
                 <span className="font-bold text-gray-700">🆕 {dossiersEnAttenteDeLot.length} dossier(s) en attente — {formatGourdes(dossiersEnAttenteDeLot.reduce((s,v)=>s+(v.totalGlobal||0),0))} Gdes</span>
                 <label className="flex items-center gap-1 font-bold text-purple-900 cursor-pointer"><input type="checkbox" checked={appliqueRabais10} onChange={e=>setAppliqueRabais10(e.target.checked)} className="rounded" /> Rabais 10%</label>
                 <div className="flex items-center gap-1"><span className="font-semibold text-gray-500">Dons:</span><input type="number" min="0" value={montantDonIntrants} onChange={e=>setMontantDonIntrants(e.target.value)} placeholder="0" className="border rounded p-1 w-24 font-mono font-bold text-right text-red-700 outline-none" /></div>
-                <button onClick={() => genererProchainLot(lotOngSelectionne)} disabled={dossiersEnAttenteDeLot.length === 0} className="bg-purple-700 text-white font-bold px-3 py-1.5 rounded flex items-center gap-1 shadow disabled:opacity-30"><Download size={13}/> Générer le prochain lot</button>
+                <button onClick={() => genererProchainLot(lotOngSelectionne)} className="bg-purple-700 text-white font-bold px-3 py-1.5 rounded flex items-center gap-1 shadow disabled:opacity-30"><Download size={13}/> Générer le prochain lot</button>
               </div>
 
               <h3 className="font-black text-gray-700 text-xs uppercase border-b pb-1">Lots déjà envoyés</h3>

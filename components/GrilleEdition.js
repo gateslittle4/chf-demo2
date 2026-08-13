@@ -11,6 +11,7 @@ function GrilleEditionPanel({ titre, items, setItems, collectionName, showToast 
   const [filtre, setFiltre] = useState("");
   const [idEdit, setIdEdit] = useState(null);
   const [prixEdit, setPrixEdit] = useState("");
+  const [nouveauPrixEdit, setNouveauPrixEdit] = useState("");
   const [nomEdit, setNomEdit] = useState("");
   const [sousCategorieEdit, setSousCategorieEdit] = useState("");
   const [nouveauNom, setNouveauNom] = useState("");
@@ -30,12 +31,14 @@ function GrilleEditionPanel({ titre, items, setItems, collectionName, showToast 
   };
 
   const correspondances = items.filter(i => i.nom.toLowerCase().includes(filtre.toLowerCase()));
+  const nombreEnAttente = items.filter(i => i.nouveauPrix != null && i.nouveauPrix !== "").length;
+
   const ajouterElement = () => {
     if (!nouveauNom.trim() || !nouveauPrix) { showToast("Veuillez remplir le nom et le prix.", "error"); return; }
     const prix = parseFloat(nouveauPrix);
     if (isNaN(prix) || prix < 0) { showToast("Prix invalide.", "error"); return; }
     const newItem = {
-      id: Date.now() + Math.random(), nom: nouveauNom.trim(), prix,
+      id: Date.now() + Math.random(), nom: nouveauNom.trim(), prix, nouveauPrix: null,
       quantite: parseFloat(quantiteStock) || 0, seuilAlerte: parseFloat(seuilAlerte) || 5,
       categorie: collectionName === 'medicaments' ? 'pharmacie' : '',
       sub: collectionName === 'medicaments' ? undefined : nouvelleSousCategorie
@@ -45,6 +48,16 @@ function GrilleEditionPanel({ titre, items, setItems, collectionName, showToast 
     showToast("Ajouté avec succès", "success");
   };
   const supprimerElement = (id) => { if (confirm("Supprimer définitivement ?")) { sauvegarderCatalogue(items.filter(i => i.id !== id)); showToast("Supprimé", "success"); } };
+
+  // Fait passer chaque "nouveau prix" en attente vers le prix officiel (les articles sans nouveau
+  // prix ne sont pas touchés — ils gardent leur prix actuel tel quel).
+  const appliquerNouveauxPrix = () => {
+    if (nombreEnAttente === 0) { showToast("Aucun nouveau prix en attente.", "error"); return; }
+    if (!confirm(`Appliquer le nouveau prix sur ${nombreEnAttente} article(s) ? Ce sera le prix utilisé pour toutes les nouvelles fiches à partir de maintenant.`)) return;
+    const updated = items.map(i => (i.nouveauPrix != null && i.nouveauPrix !== "") ? { ...i, prix: parseFloat(i.nouveauPrix), nouveauPrix: null } : i);
+    sauvegarderCatalogue(updated);
+    showToast(`${nombreEnAttente} prix mis à jour`, "success");
+  };
 
   return (
     <div className="space-y-3 text-xs">
@@ -65,6 +78,14 @@ function GrilleEditionPanel({ titre, items, setItems, collectionName, showToast 
           <button onClick={ajouterElement} className="bg-emerald-700 text-white px-3 py-1.5 rounded font-bold">Ajouter</button>
         </div>
       </div>
+
+      {nombreEnAttente > 0 && (
+        <div className="flex items-center justify-between gap-2 bg-indigo-50 border border-indigo-300 rounded-xl p-3">
+          <span className="text-indigo-800 font-bold">🕓 {nombreEnAttente} nouveau(x) prix en attente (visibles seulement dans le Simulateur pour l'instant)</span>
+          <button onClick={appliquerNouveauxPrix} className="bg-indigo-700 text-white font-bold px-3 py-1.5 rounded whitespace-nowrap">🔄 Appliquer tous les nouveaux prix</button>
+        </div>
+      )}
+
       <div className="space-y-2">
         <input type="text" value={filtre} onChange={e=>setFiltre(e.target.value)} placeholder="Filtrer..." className="w-full border rounded-lg p-2" />
         <div className="bg-white rounded-xl border overflow-hidden max-h-96 overflow-y-auto divide-y">
@@ -78,8 +99,9 @@ function GrilleEditionPanel({ titre, items, setItems, collectionName, showToast 
                       {categoriesActes.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
                     </select>
                   )}
-                  <input type="number" value={prixEdit} onChange={e=>setPrixEdit(e.target.value)} className="w-20 border rounded p-1 text-right font-mono" />
-                  <button onClick={()=>{ const p = parseFloat(prixEdit); if (!isNaN(p) && nomEdit.trim()) { const updated = items.map(x => x.id === i.id ? { ...x, nom: nomEdit.trim(), prix: p, ...(collectionName !== 'medicaments' ? { sub: sousCategorieEdit } : {}) } : x); sauvegarderCatalogue(updated); setIdEdit(null); showToast("Modifié", "success"); } }} className="bg-green-700 text-white p-1 rounded"><Check size={12}/></button>
+                  <div className="flex flex-col gap-0.5"><label className="text-[8px] text-gray-400 uppercase font-bold">Prix actuel</label><input type="number" value={prixEdit} onChange={e=>setPrixEdit(e.target.value)} className="w-20 border rounded p-1 text-right font-mono" /></div>
+                  <div className="flex flex-col gap-0.5"><label className="text-[8px] text-indigo-500 uppercase font-bold">Nv. prix (à venir)</label><input type="number" value={nouveauPrixEdit} onChange={e=>setNouveauPrixEdit(e.target.value)} placeholder="—" className="w-20 border border-indigo-300 rounded p-1 text-right font-mono" /></div>
+                  <button onClick={()=>{ const p = parseFloat(prixEdit); if (!isNaN(p) && nomEdit.trim()) { const np = nouveauPrixEdit.trim() === "" ? null : parseFloat(nouveauPrixEdit); const updated = items.map(x => x.id === i.id ? { ...x, nom: nomEdit.trim(), prix: p, nouveauPrix: (np != null && !isNaN(np)) ? np : null, ...(collectionName !== 'medicaments' ? { sub: sousCategorieEdit } : {}) } : x); sauvegarderCatalogue(updated); setIdEdit(null); showToast("Modifié", "success"); } }} className="bg-green-700 text-white p-1 rounded"><Check size={12}/></button>
                   <button onClick={()=>setIdEdit(null)} className="border p-1 rounded"><X size={12}/></button>
                 </div>
               ) : (
@@ -93,7 +115,8 @@ function GrilleEditionPanel({ titre, items, setItems, collectionName, showToast 
                       </span>
                     )}
                     <span className="font-mono bg-gray-100 px-2 py-0.5 rounded font-bold">{formatGourdes(i.prix)} Gdes</span>
-                    <button onClick={()=>{ setIdEdit(i.id); setNomEdit(i.nom); setPrixEdit(String(i.prix)); setSousCategorieEdit(i.sub || 'chirurgie'); }} className="text-gray-400 hover:text-gray-700 p-1"><Pencil size={12}/></button>
+                    {i.nouveauPrix != null && i.nouveauPrix !== "" && <span className="font-mono bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold" title="Nouveau prix à venir">→ {formatGourdes(i.nouveauPrix)} Gdes</span>}
+                    <button onClick={()=>{ setIdEdit(i.id); setNomEdit(i.nom); setPrixEdit(String(i.prix)); setNouveauPrixEdit(i.nouveauPrix != null ? String(i.nouveauPrix) : ""); setSousCategorieEdit(i.sub || 'chirurgie'); }} className="text-gray-400 hover:text-gray-700 p-1"><Pencil size={12}/></button>
                     <button onClick={()=>supprimerElement(i.id)} className="text-gray-300 hover:text-red-600 p-1"><Trash2 size={12}/></button>
                   </div>
                 </>

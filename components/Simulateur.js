@@ -21,6 +21,7 @@ function Simulateur({ medicaments, actes }) {
   const [recherche, setRecherche] = useState("");
   const [quantite, setQuantite] = useState("1");
   const [selection, setSelection] = useState(null);
+  const [tarifChoisi, setTarifChoisi] = useState("actuel"); // "actuel" | "nouveau" — quel prix du catalogue utiliser
   const inputRechercheRef = useRef(null);
 
   const catalogueFiltre = categorie === "med" ? medicaments : actes;
@@ -38,14 +39,15 @@ function Simulateur({ medicaments, actes }) {
   const grandTotal = useMemo(() => Object.values(totalsParService).reduce((a,b) => a+b, 0), [totalsParService]);
 
   const injecterLigne = (item, cat, qte) => {
+    const prixEffectif = (tarifChoisi === "nouveau" && item.nouveauPrix != null && item.nouveauPrix !== "") ? parseFloat(item.nouveauPrix) : item.prix;
     setLignes(prev => {
       const index = prev.findIndex(l => l.itemId === item.id && l.type === cat);
       if (index !== -1) return prev.map((l, idx) => idx === index ? { ...l, qte: l.qte + qte } : l);
-      return [...prev, { id: "l-" + Math.random().toString(36).slice(2, 6), itemId: item.id, type: cat, sub: item.sub || "", nom: item.nom, qte, prix: item.prix }];
+      return [...prev, { id: "l-" + Math.random().toString(36).slice(2, 6), itemId: item.id, type: cat, sub: item.sub || "", nom: item.nom, qte, prix: prixEffectif }];
     });
   };
   const actionAjouterSoin = () => { if (!selection) return; const q = parseFloat(quantite); if (isNaN(q) || q <= 0) return; injecterLigne(selection, categorie, q); setRecherche(""); setSelection(null); setQuantite("1"); if (inputRechercheRef.current) inputRechercheRef.current.focus(); };
-  const vider = () => { setLignes([]); setDateEntree1(""); setDateSortie1(""); setTypeLit1("normal"); setMultiPeriode(false); setDateEntree2(""); setDateSortie2(""); setTypeLit2("normal"); setHasChirSpec(false); setNomChirSpec(""); setPrixChirSpec(""); setRecherche(""); setSelection(null); setQuantite("1"); };
+  const vider = () => { setLignes([]); setDateEntree1(""); setDateSortie1(""); setTypeLit1("normal"); setMultiPeriode(false); setDateEntree2(""); setDateSortie2(""); setTypeLit2("normal"); setHasChirSpec(false); setNomChirSpec(""); setPrixChirSpec(""); setRecherche(""); setSelection(null); setQuantite("1"); setTarifChoisi("actuel"); };
 
   return (
     <div className="space-y-4">
@@ -66,7 +68,14 @@ function Simulateur({ medicaments, actes }) {
           {hasChirSpec && <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-red-50/20 p-2 rounded-lg border"><div><label className="text-[9px] font-bold text-red-800">Libellé</label><input type="text" value={nomChirSpec} onChange={e=>setNomChirSpec(e.target.value)} placeholder="Nom..." className="border rounded-lg p-1 text-xs w-full bg-white outline-none" /></div><div><label className="text-[9px] font-bold text-red-800">Montant (Gdes)</label><input type="number" min="0" value={prixChirSpec} onChange={e=>setPrixChirSpec(e.target.value)} placeholder="0" className="border rounded-lg p-1 text-xs w-full bg-white outline-none" /></div></div>}
         </div>
         <div className="bg-white p-4 rounded-xl border space-y-3 shadow-sm mt-4">
-          <p className="text-[11px] font-bold uppercase text-gray-400">2. Actes, Laboratoire & Ordonnance</p>
+          <div className="flex justify-between items-center">
+            <p className="text-[11px] font-bold uppercase text-gray-400">2. Actes, Laboratoire & Ordonnance</p>
+            <div className="flex text-[10px] font-bold rounded-lg border overflow-hidden">
+              <button onClick={()=>setTarifChoisi("actuel")} className={`px-2 py-1 ${tarifChoisi!=="nouveau" ? "bg-[#1E2A24] text-white" : "bg-gray-50 text-gray-500"}`}>Tarif Actuel</button>
+              <button onClick={()=>setTarifChoisi("nouveau")} className={`px-2 py-1 ${tarifChoisi==="nouveau" ? "bg-indigo-700 text-white" : "bg-gray-50 text-gray-500"}`}>Nouveau prix</button>
+            </div>
+          </div>
+          {tarifChoisi === "nouveau" && <p className="text-[9px] text-indigo-600 font-bold">⚠️ Les articles ajoutés utiliseront le nouveau prix (à venir) quand il existe.</p>}
           <div className="flex gap-2 text-xs font-semibold">
             <button onClick={()=>{ setCategorie("med"); setRecherche(""); setSelection(null); }} className={`flex-1 py-1.5 border rounded-lg ${categorie==="med" ? "bg-[#1E2A24] text-white" : "bg-gray-50"}`}>💊 Pharmacie</button>
             <button onClick={()=>{ setCategorie("acte"); setRecherche(""); setSelection(null); }} className={`flex-1 py-1.5 border rounded-lg ${categorie==="acte" ? "bg-[#1E2A24] text-white" : "bg-gray-50"}`}>🔬 Examens / Actes</button>
