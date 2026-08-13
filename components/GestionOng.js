@@ -37,11 +37,21 @@ function GestionOngPanel({ listeOngDocs, showToast }) {
     } catch (e) { showToast("Erreur lors de la suppression.", "error"); }
   };
 
+  const modifierProchainNumero = async (id, nom, valeur) => {
+    const numero = parseInt(valeur, 10);
+    if (!numero || numero < 1) return;
+    try {
+      await db.collection('ong_partenaires').doc(id).update({ prochainNumero: numero });
+      enregistrerAudit('modification_prochain_numero_lot', { nom, prochainNumero: numero });
+      showToast(`Prochain numéro de ${nom} réglé sur ${numero}`, "success");
+    } catch (e) { showToast("Erreur lors de la mise à jour.", "error"); }
+  };
+
   return (
     <div className="space-y-4 text-xs">
       <div className="bg-white p-4 rounded-xl border shadow-sm space-y-2">
         <h2 className="font-black text-gray-800 mb-1">🤝 Partenaires</h2>
-        <p className="text-gray-500">Ajoute un partenaire pour qu'il apparaisse dans les listes de sélection (nouveau dossier, factures, archives, caisse).</p>
+        <p className="text-gray-500">Ajoute un partenaire pour qu'il apparaisse dans les listes de sélection (nouveau dossier, factures, archives, caisse). Le "Prochain N°" de chaque partenaire (ci-dessous) définit le numéro du prochain lot/facture généré pour lui.</p>
         <div className="flex gap-2">
           <input
             type="text" value={nouveauNom} onChange={e => setNouveauNom(e.target.value)}
@@ -56,7 +66,17 @@ function GestionOngPanel({ listeOngDocs, showToast }) {
         {listeOngDocs.map(o => (
           <div key={o.id} className="p-3 flex justify-between items-center hover:bg-gray-50">
             <span className="font-medium text-gray-700">{o.nom}</span>
-            <button onClick={() => supprimer(o.id, o.nom)} className="text-gray-300 hover:text-red-600 p-1"><Trash2 size={12} /></button>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-1.5 text-[10px] text-gray-500">
+                Prochain N°
+                <input
+                  type="number" min="1" defaultValue={o.prochainNumero || 1} key={o.id + '-' + (o.prochainNumero || 1)}
+                  onBlur={e => { if (parseInt(e.target.value, 10) !== (o.prochainNumero || 1)) modifierProchainNumero(o.id, o.nom, e.target.value); }}
+                  className="w-16 border rounded p-1 text-xs text-center outline-none"
+                />
+              </label>
+              <button onClick={() => supprimer(o.id, o.nom)} className="text-gray-300 hover:text-red-600 p-1"><Trash2 size={12} /></button>
+            </div>
           </div>
         ))}
       </div>

@@ -7,7 +7,7 @@ const { Eye, Pencil, Trash2, Printer, Clock, FolderOpen, X, Download, Check } = 
 const { chf, toEpisodeApi } = require('../api/supabase');
 const { LOGO_CHF_BASE64 } = require('../utils/logoChf');
 
-function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, userRole, showToast, onChangerTypeOng, listeOng, confirmModal, setConfirmModal }) {
+function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, userRole, showToast, onChangerTypeOng, listeOng, listeOngDocs, confirmModal, setConfirmModal, lotInitialFocus, clearLotInitialFocus }) {
   const [focusedVerif, setFocusedVerif] = useState(null);
   const [editTypeArchiveOuvert, setEditTypeArchiveOuvert] = useState(false);
   const [nouveauTypeArchive, setNouveauTypeArchive] = useState("ONG");
@@ -28,7 +28,28 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
   const [dossierAAjouterAuLot, setDossierAAjouterAuLot] = useState("");
 
   useEffect(() => { if (filtreInitialNom) { setRechercheNomPatient(filtreInitialNom); clearFiltreInitialNom(); } }, [filtreInitialNom]);
+  useEffect(() => {
+    if (lotInitialFocus) {
+      setSousOngletArchives("lots");
+      setLotOngSelectionne(lotInitialFocus.ongPartenaire);
+      setLotFocusedNumero(lotInitialFocus.numeroLot);
+      clearLotInitialFocus();
+    }
+  }, [lotInitialFocus]);
   useEffect(() => { setNombreAffiche(100); }, [filtreType, filtreOng, rechercheNomPatient, filtreDateDebut, filtreDateFin, filtreCategorie, filtreStatut]);
+
+  const numeroDepartConfigure = (ongCible) => {
+    const doc = (listeOngDocs || []).find(o => o.nom === ongCible);
+    return doc?.prochainNumero || 1;
+  };
+
+  const ventilationDossier = (v) => {
+    const totaux = {};
+    (v.fiches || []).forEach(f => {
+      Object.entries(f.breakdown || {}).forEach(([cle, montant]) => { totaux[cle] = (totaux[cle] || 0) + (montant || 0); });
+    });
+    return CATEGORIES_LISTE.map(cat => ({ label: cat.label, montant: totaux[cat.key] || 0 })).filter(x => x.montant > 0);
+  };
 
   const lotsDuPartenaire = useMemo(() => {
     if (!lotOngSelectionne) return [];
@@ -40,7 +61,9 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       }
     });
     return Object.keys(parNumero).map(n => Number(n)).sort((a, b) => b - a).map(n => ({
-      numero: n, dossiers: parNumero[n], total: parNumero[n].reduce((s, v) => s + (v.totalGlobal || 0), 0)
+      numero: n,
+      dossiers: [...parNumero[n]].sort((a, b) => (a.dateEntreePourTri || '9999-12-31').localeCompare(b.dateEntreePourTri || '9999-12-31')),
+      total: parNumero[n].reduce((s, v) => s + (v.totalGlobal || 0), 0)
     }));
   }, [verifications, lotOngSelectionne]);
 
@@ -174,10 +197,11 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       r++; // ligne vide
 
       const now = new Date();
-      const moisTexte = now.toLocaleString('fr-FR', { month: 'long' }).toUpperCase();
+      const moisRapport = new Date(now.getFullYear(), now.getMonth() - 1, 1); // le rapport envoyé début de mois porte toujours sur le mois précédent
+      const moisTexte = moisRapport.toLocaleString('fr-FR', { month: 'long' }).toUpperCase();
       appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.gras);
       ws.getCell(r, 1).value = "DATE D'ADMISSION :";
-      ws.getCell(r, 2).value = `${moisTexte} ${now.getFullYear()}`;
+      ws.getCell(r, 2).value = `${moisTexte} ${moisRapport.getFullYear()}`;
       r++;
       appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.gras);
       ws.getCell(r, 1).value = "FACTURE";
@@ -293,7 +317,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     const eligibles = verifications.filter(v => v.ongPartenaire === ongCible && (v.status || 'archived') === 'archived' && v.numeroLot == null && !v.verrouilleFacture);
     if (eligibles.length === 0) { showToast(`Aucun nouveau dossier en attente pour ${ongCible}.`, "error"); return; }
     const numerosExistants = verifications.filter(v => v.ongPartenaire === ongCible && v.numeroLot != null).map(v => v.numeroLot);
-    const prochainNumero = numerosExistants.length > 0 ? Math.max(...numerosExistants) + 1 : 1;
+    const prochainNumero = numerosExistants.length > 0 ? Math.max(...numerosExistants) + 1 : numeroDepartConfigure(ongCible);
     const totalEstime = eligibles.reduce((s, v) => s + (v.totalGlobal || 0), 0);
     setConfirmModal({
       titre: `📦 Générer le Lot ${prochainNumero} pour ${ongCible} ?`,
@@ -311,7 +335,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     const orphelins = verifications.filter(v => v.ongPartenaire === ongCible && (v.status || 'archived') === 'archived' && v.numeroLot == null && v.verrouilleFacture);
     if (orphelins.length === 0) return;
     const numerosExistants = verifications.filter(v => v.ongPartenaire === ongCible && v.numeroLot != null).map(v => v.numeroLot);
-    const numero = numerosExistants.length > 0 ? Math.max(...numerosExistants) + 1 : 1;
+    const numero = numerosExistants.length > 0 ? Math.max(...numerosExistants) + 1 : numeroDepartConfigure(ongCible);
     setConfirmModal({
       titre: `Rattacher ces ${orphelins.length} dossier(s) déjà envoyés au Lot ${numero} ?`,
       message: `Ces dossiers ont déjà été envoyés à ${ongCible} avant la mise en place des lots. Aucun fichier ne sera regénéré ni téléchargé ici — on marque juste qu'ils correspondent au Lot ${numero}, pour que le prochain lot généré démarre à ${numero + 1}.`,
@@ -476,10 +500,18 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
               )}
               <div className="divide-y max-h-80 overflow-y-auto">
                 {lotFocused.dossiers.map(v => (
-                  <div key={v.id} className="flex justify-between items-center py-2 text-xs font-mono">
-                    <span>{v.nomPatient} <span className="text-gray-400">— {formatGourdes(v.totalGlobal||0)} Gdes</span></span>
+                  <div key={v.id} className="flex justify-between items-start py-2 text-xs font-mono gap-2">
+                    <div className="flex-1 min-w-0">
+                      <span className={`inline-block w-16 ${v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? 'text-gray-500' : 'text-red-500'}`}>{v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? v.dateEntreePourTri.split('-').reverse().join('/') : 'sans exeat'}</span>
+                      {v.nomPatient} <span className="text-gray-400">— {formatGourdes(v.totalGlobal||0)} Gdes</span>
+                      <div className="flex flex-wrap gap-1 mt-1 pl-16">
+                        {ventilationDossier(v).map(x => (
+                          <span key={x.label} className="bg-indigo-50 text-indigo-700 border border-indigo-100 rounded px-1.5 py-0.5 text-[10px] whitespace-nowrap">{x.label}: {formatGourdes(x.montant)}</span>
+                        ))}
+                      </div>
+                    </div>
                     <div className="flex gap-1">
-                      {peutModifier && <button onClick={() => { if ((v.status||'archived')==='archived' && !confirm(`Ce dossier est déjà archivé (Lot ${lotFocused.numero}). Le modifier corrigera ce dossier existant — pense à réimprimer le lot ensuite.\n\nContinuer ?`)) return; onChargerPourModif(v); }} className="text-amber-700 p-1 bg-amber-50 rounded" title="Modifier / corriger"><Pencil size={13}/></button>}
+                      {peutModifier && <button onClick={() => { if ((v.status||'archived')==='archived' && !confirm(`Ce dossier est déjà archivé (Lot ${lotFocused.numero}). Le modifier corrigera ce dossier existant — pense à réimprimer le lot ensuite.\n\nContinuer ?`)) return; onChargerPourModif(v, { ongPartenaire: lotOngSelectionne, numeroLot: lotFocused.numero }); }} className="text-amber-700 p-1 bg-amber-50 rounded" title="Modifier / corriger"><Pencil size={13}/></button>}
                       {peutModifier && <button onClick={() => retirerDossierDuLot(v)} className="text-red-600 p-1 bg-red-50 rounded" title="Retirer du lot">➖</button>}
                     </div>
                   </div>

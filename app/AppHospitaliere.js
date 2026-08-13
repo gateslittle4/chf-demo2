@@ -41,6 +41,8 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   const [ongTargets, setOngTargets] = useState({ "MSF-H": 0, "MSF-F": 0, "ALIMA": 0, "AVSI": 0, "GRID MISSION": 0, "WAY TO HEALTH": 0, "TEAM TASSY": 0 });
   const [listeOngDocs, setListeOngDocs] = useState([]); // [{id, nom}] — chargé depuis Firestore (collection ong_partenaires)
   const [dossierActif, setDossierActif] = useState(false);
+  const [origineLotEdition, setOrigineLotEdition] = useState(null); // {ongPartenaire, numeroLot} si on corrige un dossier depuis un lot déjà préparé, pour y revenir après sauvegarde
+  const [lotAFocuserAuRetour, setLotAFocuserAuRetour] = useState(null); // déclenche le repositionnement dans ArchivesPanel une fois la sauvegarde faite
   const [nomPatient, setNomPatient] = useState("");
   const [selectedOng, setSelectedOng] = useState("");
   const [typePatient, setTypePatient] = useState("ONG");
@@ -231,6 +233,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   };
 
   const initialiserNouveauDossier = async (nom, ong, numDossier, type, naissance, tel, serviceChoisi) => {
+    setOrigineLotEdition(null);
     const propreNom = formaterNomPropre(nom);
     if (!propreNom || (!ong && type === "ONG")) { showToast("Veuillez remplir tous les champs.", "error"); return; }
     const episodeData = {
@@ -268,7 +271,8 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
     showToast(`Dossier de ${propreNom} ouvert`, "success");
   };
 
-  const chargerDossierExistant = (patientDoc) => {
+  const chargerDossierExistant = (patientDoc, origineLot) => {
+    setOrigineLotEdition(origineLot || null);
     setDossierId(patientDoc.id);
     setDossierUpdatedAtOuverture(patientDoc.updatedAt || null);
     setNomPatient(patientDoc.nomPatient);
@@ -335,6 +339,9 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
 
   const executerArchivage = async () => {
     const somme = fichesDossier.reduce((s, f) => s + f.totalGlobal, 0);
+    // Corriger un dossier déjà verrouillé (facturé/inclus dans un lot envoyé) ne doit pas le déverrouiller
+    // silencieusement — sinon son 🔒 disparaît et le bouton Supprimer se réactive dans Archives.
+    const verrouilleFactureExistante = verifications.find(v => v.id === dossierId)?.verrouilleFacture || false;
     const datesTrouvees = [];
     fichesDossier.forEach(f => { if (f.rawState?.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 }); if (f.rawState?.multiPeriode && f.rawState?.dateEntree2) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 }); });
     let sejourTexte = "—";
@@ -344,7 +351,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
       dateNaissance, telephone, dateHeure: new Date().toLocaleDateString("fr-FR"),
       periodeSejourString: sejourTexte,
       dateEntreePourTri: datesTrouvees.length > 0 ? datesTrouvees[0].in : "9999-12-31",
-      totalGlobal: somme, totalSaisiePapierDH: 0, contientErreurs: false, verrouilleFacture: false,
+      totalGlobal: somme, totalSaisiePapierDH: 0, contientErreurs: false, verrouilleFacture: verrouilleFactureExistante,
       fiches: [...fichesDossier], status: 'archived', timestamp: Date.now()
     };
     try {
@@ -361,6 +368,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
       setNomPatient(""); setSelectedOng(""); setNumDossierPatient(""); sessionStorage.removeItem('numDossierPatient');
       setFichesDossier([]); setModePreValidation(false); viderLeCalculateurFicheUniquement(); setDossierId(null);
       localStorage.removeItem(LOG_DOSSIER_BROUILLON_KEY);
+      if (origineLotEdition) { setOnglet("verifie"); setLotAFocuserAuRetour(origineLotEdition); setOrigineLotEdition(null); }
       showToast("Dossier archivé !", "success");
     } catch (error) {
       if (!error.isOfflineQueue) { showToast("Erreur archivage: " + error.message, "error"); return; }
@@ -370,6 +378,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
       setNomPatient(""); setSelectedOng(""); setNumDossierPatient(""); sessionStorage.removeItem('numDossierPatient');
       setFichesDossier([]); setModePreValidation(false); viderLeCalculateurFicheUniquement(); setDossierId(null);
       localStorage.removeItem(LOG_DOSSIER_BROUILLON_KEY);
+      if (origineLotEdition) { setOnglet("verifie"); setLotAFocuserAuRetour(origineLotEdition); setOrigineLotEdition(null); }
       showToast("📴 Dossier archivé hors ligne — sera synchronisé au retour d'internet", "info");
     }
   };
@@ -457,6 +466,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
 
     // Nettoyer l'état local
     setDossierActif(false);
+    setOrigineLotEdition(null);
     setNomPatient("");
     setSelectedOng("");
     setNumDossierPatient("");
@@ -547,6 +557,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
 
     // Nettoyer l'état local
     setDossierActif(false);
+    setOrigineLotEdition(null);
     setNomPatient("");
     setSelectedOng("");
     setNumDossierPatient("");
@@ -599,6 +610,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
       showToast("📴 Dossier annulé hors ligne", "info");
     }
     setDossierActif(false);
+    setOrigineLotEdition(null);
     setNomPatient(""); setSelectedOng(""); setNumDossierPatient(""); sessionStorage.removeItem('numDossierPatient');
     setFichesDossier([]); setModePreValidation(false); viderLeCalculateurFicheUniquement(); setDossierId(null);
     localStorage.removeItem(LOG_DOSSIER_BROUILLON_KEY);
@@ -617,7 +629,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
     });
   };
 
-  const réimporterDossierDepuisArchives = (doc) => chargerDossierExistant(doc);
+  const réimporterDossierDepuisArchives = (doc, origineLot) => chargerDossierExistant(doc, origineLot);
   const supprimerDossierArchive = (id) => {
     const dossier = verifications.find(v => v.id === id);
     setConfirmModal({
@@ -961,7 +973,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
               listeOng={listeOngNoms}
             />
         )}
-        {onglet === "verifie" && <HistoriqueVerifPanel verifications={verifications} setVerifications={setVerifications} onChargerPourModif={réimporterDossierDepuisArchives} onSupprimer={supprimerDossierArchive} filtreInitialNom={filtreArchivesInitialNom} clearFiltreInitialNom={() => setFiltreArchivesInitialNom("")} userRole={userRole} showToast={showToast} onChangerTypeOng={changerTypeOngPourDossier} listeOng={listeOngNoms} confirmModal={confirmModal} setConfirmModal={setConfirmModal} />}
+        {onglet === "verifie" && <HistoriqueVerifPanel verifications={verifications} setVerifications={setVerifications} onChargerPourModif={réimporterDossierDepuisArchives} onSupprimer={supprimerDossierArchive} filtreInitialNom={filtreArchivesInitialNom} clearFiltreInitialNom={() => setFiltreArchivesInitialNom("")} userRole={userRole} showToast={showToast} onChangerTypeOng={changerTypeOngPourDossier} listeOng={listeOngNoms} listeOngDocs={listeOngDocs} confirmModal={confirmModal} setConfirmModal={setConfirmModal} lotInitialFocus={lotAFocuserAuRetour} clearLotInitialFocus={() => setLotAFocuserAuRetour(null)} />}
         {onglet === "analyse" && (userRole === "administrateur" || userRole === "direction") && <AnalyticsPanel verifications={verifications} />}
         {onglet === "meds" && (userRole === "administrateur" || userRole === "direction") && <GrilleEditionPanel titre="de la Pharmacie" items={medicaments} setItems={setMedicaments} collectionName="medicaments" showToast={showToast} />}
         {onglet === "actes" && (userRole === "administrateur" || userRole === "direction") && <GrilleEditionPanel titre="des Actes" items={actes} setItems={setActes} collectionName="actes" showToast={showToast} />}

@@ -312,7 +312,67 @@ function CalculateurPanel({
 
   const imprimerFicheA4 = () => {
     if (!paiementEffectue) { showToast("Enregistre d'abord la fiche.", "error"); return; }
-    showToast("Impression A4 (fonction prête)", "success");
+    const numeroFicheReelle = idFicheEnCoursDEdition ? (fichesDossier.find(f => f.id === idFicheEnCoursDEdition)?.numeroFiche || numeroFicheCourante) : numeroFicheCourante;
+    const data = {
+      nomPatient: nomPatient || "Patient non renseigné",
+      selectedOng: selectedOng || "—",
+      numDossier: numDossierPatient || 'N/R',
+      lignes: lignes || [],
+      grandTotal: grandTotal || 0,
+      dateEntree1, dateSortie1, totalE1, totalE2, j1, j2, typeLit1, typeLit2,
+      multiPeriode, dateEntree2, dateSortie2,
+      hasChirSpec, nomChirSpec, totalChirSpec,
+      telephone: telephone || 'N/R',
+      dateNaissance: dateNaissance || 'N/R',
+      typePatient: typePatient || 'ONG',
+      creePar: auth.currentUser?.displayName || 'inconnu'
+    };
+    const ligneHebergement = data.dateEntree1 && data.dateSortie1 ? `<tr><td>Hébergement — ${echapperHTML(CONFIG_LITS[data.typeLit1].nom)}</td><td class="qte">${data.j1} j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit1].prix)}</td><td class="mtotal">${formatGourdes(data.totalE1)}</td></tr>` : '';
+    const ligneHebergement2 = data.multiPeriode && data.dateEntree2 && data.dateSortie2 ? `<tr><td>Hébergement (2e période) — ${echapperHTML(CONFIG_LITS[data.typeLit2].nom)}</td><td class="qte">${data.j2} j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit2].prix)}</td><td class="mtotal">${formatGourdes(data.totalE2)}</td></tr>` : '';
+    const ligneChir = data.hasChirSpec && data.nomChirSpec ? `<tr><td>Chirurgie : ${echapperHTML(data.nomChirSpec)}</td><td class="qte">1</td><td class="prix">${formatGourdes(data.totalChirSpec)}</td><td class="mtotal">${formatGourdes(data.totalChirSpec)}</td></tr>` : '';
+    const lignesArticles = data.lignes.map(l => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="mtotal">${formatGourdes(l.qte * l.prix)}</td></tr>`).join('');
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N°${numeroFicheReelle} - ${echapperHTML(data.nomPatient)}</title><style>
+      @page{size:A4;margin:18mm;}
+      body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;font-size:13px;}
+      .entete{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1E2A24;padding-bottom:14px;margin-bottom:20px;}
+      .entete-gauche h1{font-size:24px;margin:0 0 4px;color:#1E2A24;}
+      .entete-gauche p{margin:1px 0;font-size:11px;color:#555;}
+      .entete-droite{text-align:right;font-size:11px;color:#555;}
+      .titre-doc{text-align:center;font-size:16px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;margin:10px 0 20px;color:#1E2A24;}
+      .infos-patient{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;background:#f7f5f0;border:1px solid #ddd;border-radius:8px;padding:14px 18px;margin-bottom:20px;font-size:12px;}
+      .infos-patient .label{color:#888;font-size:10px;text-transform:uppercase;font-weight:bold;}
+      .infos-patient .valeur{font-weight:bold;color:#1a1a1a;}
+      table{width:100%;border-collapse:collapse;margin-bottom:16px;}
+      th{background:#1E2A24;color:white;text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;}
+      td{padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;}
+      .qte,th.qte{text-align:center;}
+      .prix,.mtotal,th.prix,th.mtotal{text-align:right;}
+      .total-general{display:flex;justify-content:flex-end;margin-top:10px;}
+      .total-general .montant{font-size:22px;font-weight:bold;color:#1E2A24;border-top:3px solid #1E2A24;padding-top:8px;margin-top:4px;text-align:right;}
+      .footer{margin-top:50px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#555;}
+      .signature{border-top:1px solid #999;width:180px;text-align:center;padding-top:4px;}
+      </style></head><body>
+      <div class="entete">
+        <div class="entete-gauche"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p></div>
+        <div class="entete-droite"><p>${new Date().toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p><p>${new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</p><p>Fiche N°${numeroFicheReelle}</p></div>
+      </div>
+      <div class="titre-doc">Fiche de facturation</div>
+      <div class="infos-patient">
+        <div><span class="label">Patient</span><br/><span class="valeur">${echapperHTML(data.nomPatient)}</span></div>
+        <div><span class="label">${data.typePatient === 'ONG' ? 'Partenaire' : 'Type'}</span><br/><span class="valeur">${data.typePatient === 'ONG' ? echapperHTML(data.selectedOng) : 'Privé'}</span></div>
+        <div><span class="label">N° Dossier</span><br/><span class="valeur">${echapperHTML(data.numDossier)}</span></div>
+        <div><span class="label">Téléphone</span><br/><span class="valeur">${echapperHTML(data.telephone)}</span></div>
+        <div><span class="label">Date de naissance</span><br/><span class="valeur">${echapperHTML(data.dateNaissance)}</span></div>
+        <div><span class="label">Enregistré par</span><br/><span class="valeur">${echapperHTML(data.creePar)}</span></div>
+      </div>
+      ${data.dateEntree1 && data.dateSortie1 ? `<p style="font-size:12px;margin-bottom:12px;"><strong>Séjour :</strong> du ${data.dateEntree1.split('-').reverse().join('/')} au ${data.dateSortie1.split('-').reverse().join('/')}</p>` : ''}
+      <table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix unitaire</th><th class="mtotal">Total</th></tr></thead><tbody>${ligneHebergement}${ligneHebergement2}${ligneChir}${lignesArticles}</tbody></table>
+      <div class="total-general"><div class="montant">${formatGourdes(data.grandTotal)} Gdes <span style="font-size:14px;color:#555;">(${formatDH(data.grandTotal)} DH)</span></div></div>
+      <div class="footer"><div class="signature">Signature / Cachet</div><div>CHF Système Hospitalier — Document généré le ${new Date().toLocaleDateString('fr-FR')}</div></div>
+      </body></html>`;
+    const win = window.open('', '_blank', 'width=850,height=1100');
+    if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
+    win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 500);
   };
 
   const executerEncaissement = async () => {
@@ -424,6 +484,14 @@ function CalculateurPanel({
       numeroFiche: idFicheEnCoursDEdition ? fichesDossier.find(f => f.id === idFicheEnCoursDEdition)?.numeroFiche || numeroFicheCourante : numeroFicheCourante,
       breakdown: { ...totalsParService },
       totalGlobal: grandTotal,
+      exeat: dateEntree1 && dateSortie1 ? {
+        dateEntree: dateEntree1, dateSortie: dateSortie1, nbJours: j1, typeLit: typeLit1,
+        prixParJour: CONFIG_LITS[typeLit1].prix, totalHebergement: totalE1,
+        multiPeriode: multiPeriode, dateEntree2: dateEntree2, dateSortie2: dateSortie2,
+        typeLit2: typeLit2, nbJours2: j2, totalHebergement2: totalE2
+      } : null,
+      dateCreation: new Date().toISOString(),
+      creePar: auth.currentUser?.displayName || 'inconnu',
       rawState: { lignesCalcul: [...lignes], dateEntree1, dateSortie1, typeLit1, multiPeriode, dateEntree2, dateSortie2, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
     };
     onEnregistrerFiche(fiche);
