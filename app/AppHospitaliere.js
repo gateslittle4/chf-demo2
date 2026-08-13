@@ -873,7 +873,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
         <button onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })} className="floating-btn p-3 bg-[#1E2A24] text-[#F7F5F0] rounded-full shadow-lg"><ArrowDown size={18} /></button>
       </div>
       <header className="border-b border-[#D8D2C2] bg-[#1E2A24] text-[#F7F5F0] p-4">
-        <div className="max-w-3xl mx-auto flex justify-between items-baseline mb-2">
+        <div className="max-w-6xl mx-auto flex justify-between items-baseline mb-2 px-2">
           <div><p className="text-[10px] uppercase tracking-widest text-[#9FB8A8]">Centre Hospitalier de Fontaine</p><h1 className="text-xl font-bold tracking-tight">CHF — Système Hospitalier</h1></div>
           <div className="flex gap-2 text-[10px] font-mono items-center flex-wrap">
             <span className="bg-blue-600 text-white px-2 py-1 rounded-full">{userDisplayName} ({userRole})</span>
@@ -887,7 +887,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
             <button onClick={onQuitter} className="bg-red-900/80 px-2 py-1 rounded">Quitter</button>
           </div>
         </div>
-        <div className="max-w-3xl mx-auto flex flex-wrap gap-2 text-xs mt-3">
+        <div className="max-w-6xl mx-auto flex flex-wrap gap-2 text-xs mt-3 px-2">
           <button onClick={() => { setOnglet("accueil"); setModePreValidation(false); }} className={`px-4 py-2 font-medium border-b-2 ${onglet === "accueil" ? "border-white text-white" : "text-[#9FB8A8]"}`}>🏛️ Accueil</button>
           <button onClick={() => setOnglet("calcul")} className={`px-4 py-2 font-medium border-b-2 ${onglet === "calcul" ? "border-white text-white" : "text-[#9FB8A8]"}`}>Calcul Facture</button>
           <button onClick={() => { setOnglet("verifie"); setModePreValidation(false); }} className={`px-4 py-2 font-medium border-b-2 ${onglet === "verifie" ? "border-white text-white" : "text-[#9FB8A8]"}`}>📁 Archives</button>
@@ -912,11 +912,11 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
           )}
         </div>
       </header>
-      <main className="flex-1 max-w-3xl w-full mx-auto p-4 pb-24">
+      <main className="flex-1 max-w-6xl w-full mx-auto p-4 pb-24">
         {onglet === "accueil" && (
           <AccueilPanel
             verifications={verifications} paiements={paiements} medicaments={medicaments}
-            userRole={userRole} userDisplayName={userDisplayName}
+            userRole={userRole} userDisplayName={userDisplayName} showToast={showToast}
             onNaviguer={(cible) => { setOnglet(cible); setModePreValidation(false); }}
             onOuvrirAchatExpress={() => setAchatExpressOuvert(true)}
           />

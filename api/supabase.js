@@ -13,6 +13,11 @@ class CHF_API {
     this.isOnline = navigator.onLine;
     window.addEventListener('online', () => { this.isOnline = true; this.syncPending(); });
     window.addEventListener('offline', () => { this.isOnline = false; });
+    // Filet de sécurité : l'événement 'online' du navigateur ne se déclenche QUE lors d'une vraie
+    // coupure réseau détectée. Si c'était plutôt le backend qui était indisponible (connexion
+    // personnelle restée active tout ce temps), cet événement ne se produit jamais — donc on
+    // retente aussi périodiquement, sans attendre un signal du navigateur.
+    setInterval(() => this.syncPending(), 30000);
   }
 
   async request(endpoint, method = 'GET', data = null, meta = {}) {
@@ -47,6 +52,19 @@ class CHF_API {
 
   // Nombre d'opérations en attente de synchronisation (utile pour un badge dans l'UI)
   countPending() { return this.pendingQueue.length; }
+
+  // Détail lisible des opérations en attente (quoi + quand), pour que la personne sache ce qui
+  // n'est pas encore enregistré, plutôt qu'un simple nombre sans explication.
+  getPendingDetails() {
+    const libelle = (op) => {
+      if (op.endpoint.startsWith('/episodes')) return op.method === 'POST' ? 'Nouveau dossier' : 'Modification d\'un dossier';
+      if (op.endpoint.startsWith('/paiements')) return 'Paiement';
+      if (op.endpoint.startsWith('/catalog/medicaments')) return 'Mise à jour de la pharmacie';
+      if (op.endpoint.startsWith('/catalog/actes')) return 'Mise à jour des actes';
+      return op.endpoint;
+    };
+    return this.pendingQueue.map(op => ({ texte: libelle(op), quand: new Date(op.timestamp).toLocaleString('fr-FR') }));
+  }
 
   // Retire de la file une création jamais synchronisée (ex: dossier ouvert hors-ligne puis annulé avant le retour d'internet)
   removePendingByLocalId(localId) {
