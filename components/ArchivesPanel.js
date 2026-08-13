@@ -36,6 +36,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       clearLotInitialFocus();
     }
   }, [lotInitialFocus]);
+  useEffect(() => { setAppliqueRabais10(false); setMontantDonIntrants(""); }, [lotFocusedNumero]);
   useEffect(() => { setNombreAffiche(100); }, [filtreType, filtreOng, rechercheNomPatient, filtreDateDebut, filtreDateFin, filtreCategorie, filtreStatut]);
 
   const numeroDepartConfigure = (ongCible) => {
@@ -491,6 +492,11 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                   <button onClick={() => reimprimerLot(lotOngSelectionne, lotFocused.numero)} className="bg-purple-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1"><Download size={12}/> Réimprimer ce lot</button>
                   <button onClick={() => setLotFocusedNumero(null)}><X size={14}/></button>
                 </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-4 bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs">
+                <span className="font-bold text-amber-800">💡 Oublié à la génération ? Coche/renseigne puis réimprime ce lot pour l'appliquer :</span>
+                <label className="flex items-center gap-1 font-bold text-purple-900 cursor-pointer"><input type="checkbox" checked={appliqueRabais10} onChange={e=>setAppliqueRabais10(e.target.checked)} className="rounded" /> Rabais 10%</label>
+                <div className="flex items-center gap-1"><span className="font-semibold text-gray-500">Dons:</span><input type="number" min="0" value={montantDonIntrants} onChange={e=>setMontantDonIntrants(e.target.value)} placeholder="0" className="border rounded p-1 w-24 font-mono font-bold text-right text-red-700 outline-none" /></div>
               </div>
               {dossiersEnAttenteDeLot.length > 0 && (
                 <div className="flex items-center gap-2 bg-gray-50 border border-dashed rounded-lg p-2">

@@ -120,10 +120,10 @@ function CalculateurPanel({
   const catalogueGrille = useMemo(() => {
     if (categorie === "med") {
       const lettre = lettreActive || lettresDisponibles[0];
-      return medicaments.filter(m => premiereLettre(m.nom) === lettre).sort((a, b) => (b.nbUtilisations || 0) - (a.nbUtilisations || 0) || a.nom.localeCompare(b.nom));
+      return medicaments.filter(m => premiereLettre(m.nom) === lettre).sort((a, b) => a.nom.localeCompare(b.nom));
     }
     const filtres = sousCategorieActeActive ? actes.filter(a => (a.sub || 'chirurgie') === sousCategorieActeActive) : actes;
-    return [...filtres].sort((a, b) => (a.ordre ?? 9999) - (b.ordre ?? 9999) || (b.nbUtilisations || 0) - (a.nbUtilisations || 0) || a.nom.localeCompare(b.nom));
+    return [...filtres].sort((a, b) => (a.ordre ?? 9999) - (b.ordre ?? 9999) || a.nom.localeCompare(b.nom));
   }, [categorie, medicaments, actes, lettreActive, lettresDisponibles, sousCategorieActeActive]);
 
   useEffect(() => {
@@ -649,7 +649,7 @@ function CalculateurPanel({
                     ))}
                   </div>
                 )}
-                <div className={`grid gap-1.5 overflow-y-auto ${estMobile ? 'grid-cols-2 max-h-72' : 'grid-cols-3 max-h-48'}`}>
+                <div className={`grid gap-1.5 overflow-y-auto ${estMobile ? 'grid-cols-2 max-h-72' : 'grid-cols-4 max-h-96'}`}>
                   {catalogueGrille.map(item => (
                     <button key={item.id} onClick={() => ajouterAvecQuantite(item, 1)} disabled={!peutAjouterLignes} className={`border rounded-lg text-left hover:bg-emerald-50 hover:border-emerald-400 active:bg-emerald-100 disabled:opacity-30 disabled:cursor-not-allowed ${estMobile ? 'p-3' : 'p-2'}`}>
                       <div className={`font-semibold text-gray-800 line-clamp-2 ${estMobile ? 'text-sm' : 'text-xs'}`}>{item.nom}</div>
