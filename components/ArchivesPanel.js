@@ -6,9 +6,12 @@ const { formatGourdes, formatDH, echapperHTML, formaterNomPropre } = require('..
 const { Eye, Pencil, Trash2, Printer, Clock, FolderOpen, X, Download, Check } = require('../utils/icons');
 const { chf, toEpisodeApi } = require('../api/supabase');
 const { LOGO_CHF_BASE64 } = require('../utils/logoChf');
+const NOM_COMPLET_ONG = { "MSF-H": "MSF-HOLLANDE", "MSF-F": "MSF-FRANCE" }; // affiché en entier dans les rapports Excel — complète ici si d'autres partenaires sont abrégés
+const nomCompletOng = (nom) => NOM_COMPLET_ONG[nom] || nom;
 
 function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, userRole, showToast, onChangerTypeOng, listeOng, listeOngDocs, confirmModal, setConfirmModal, lotInitialFocus, clearLotInitialFocus }) {
   const [focusedVerif, setFocusedVerif] = useState(null);
+  const [ficheAValider, setFicheAValider] = useState(null); // id du dossier dont on affiche les boutons ✅/✖ pour valider le marquage ⚠️
   const [editTypeArchiveOuvert, setEditTypeArchiveOuvert] = useState(false);
   const [nouveauTypeArchive, setNouveauTypeArchive] = useState("ONG");
   const [nouvelOngArchive, setNouvelOngArchive] = useState("");
@@ -207,7 +210,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.gras);
       ws.getCell(r, 1).value = "FACTURE";
       ws.getCell(r, 2).value = `${ongCible.replace(/\s+/g,'')}-LOT${numeroLot}`;
-      ws.getCell(r, 5).value = ongCible;
+      ws.getCell(r, 5).value = nomCompletOng(ongCible);
       appliquerStyle(ws.getCell(r, 5), EXCEL_STYLES.gras);
       r++;
       r++; // ligne vide
@@ -427,7 +430,21 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
   const peutModifier = userRole === 'direction' || userRole === 'administrateur' || userRole === 'comptable';
   const peutExporter = userRole === 'auditeur' || userRole === 'comptable' || userRole === 'direction' || userRole === 'administrateur';
   const peutRouvrir = userRole === 'comptable' || userRole === 'direction' || userRole === 'administrateur';
-  const rouvrirDossierSuspendu = (dossier) => { if (!confirm(`Rouvrir le dossier de ${dossier.nomPatient} ?`)) return; onChargerPourModif(dossier); showToast(`Dossier de ${dossier.nomPatient} rouvert`, "success"); };
+  const rouvrirDossierSuspendu = (dossier) => { if (!confirm(`Rouvrir le dossier de ${dossier.nomPatient} ?${dossier.noteSuspension ? `\n\n📝 Note laissée à la suspension :\n${dossier.noteSuspension}` : ''}`)) return; onChargerPourModif(dossier); showToast(`Dossier de ${dossier.nomPatient} rouvert`, "success"); };
+
+  const validerFichesProblematiques = async (dossier) => {
+    const fichesConcernees = (dossier.fiches || []).filter(f => f.probleme);
+    if (fichesConcernees.length === 0) return;
+    const fichesNettoyees = (dossier.fiches || []).map(f => f.probleme ? { ...f, probleme: false, noteProbleme: '' } : f);
+    setVerifications(prev => prev.map(v => v.id === dossier.id ? { ...v, fiches: fichesNettoyees } : v));
+    try {
+      await chf.updateEpisode(dossier.id, toEpisodeApi({ fiches: fichesNettoyees }));
+      showToast(`Marquage retiré pour ${dossier.nomPatient}`, "success");
+    } catch (error) {
+      if (error.isOfflineQueue) showToast("📴 Changement enregistré hors ligne", "info");
+      else showToast("Erreur: " + error.message, "error");
+    }
+  };
 
   return (
     <div className="space-y-4 text-xs">
@@ -547,7 +564,26 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                 return (
                   <tr key={v.id} className={isSuspendu ? 'bg-amber-50/60 border-l-4 border-amber-400' : isReporte ? 'bg-indigo-50/60 border-l-4 border-indigo-400' : (v.contientErreurs?'bg-red-50/40 border-l-4 border-red-500':'hover:bg-gray-50/50')}>
                     <td className="p-2 text-gray-500">{v.dateHeure}</td>
-                    <td className="p-2 font-bold font-sans flex items-center gap-1">{v.verrouilleFacture && <span>🔒</span>}{v.nomPatient}</td>
+                    <td className="p-2 font-bold font-sans flex items-center gap-1">
+                      {v.verrouilleFacture && <span>🔒</span>}
+                      {v.noteSuspension && <span title={`📝 Note : ${v.noteSuspension}`} className="cursor-help">📝</span>}
+                      {(() => { const fp = (v.fiches||[]).filter(f=>f.probleme); if (fp.length === 0) return null;
+                        if (ficheAValider === v.id) return (
+                          <span className="flex items-center gap-0.5">
+                            <button onClick={() => { validerFichesProblematiques(v); setFicheAValider(null); }} className="bg-green-700 text-white p-0.5 rounded" title="Problème réglé — retirer le marquage"><Check size={11}/></button>
+                            <button onClick={() => setFicheAValider(null)} className="border p-0.5 rounded" title="Pas encore réglé — garder le marquage"><X size={11}/></button>
+                          </span>
+                        );
+                        return (
+                          <span
+                            title={`⚠️ ${fp.map(f=>`Fiche N°${f.numeroFiche}${f.noteProbleme?' — '+f.noteProbleme:''}`).join(' | ')}${peutModifier ? ' — clique pour valider' : ''}`}
+                            className={peutModifier ? "cursor-pointer" : "cursor-help"}
+                            onClick={peutModifier ? () => setFicheAValider(v.id) : undefined}
+                          >⚠️</span>
+                        );
+                      })()}
+                      {v.nomPatient}
+                    </td>
                     <td className="p-2 text-center">{(v.typePatient||'ONG') === 'ONG' ? '🏥 Partenaire' : '💳 Privé'}</td>
                     <td className="p-2 text-purple-800 font-bold">{v.ongPartenaire}</td>
                     <td className="p-2 text-center text-gray-600">{(v.fiches||[]).length}</td>

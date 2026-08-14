@@ -31,8 +31,8 @@ const AnalyticsPanel = require('../components/AnalyticsPanel');
 const GestionOngPanel = require('../components/GestionOng');
 
 // ========================== COMPOSANT PRINCIPAL ==========================
-function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
-  const [onglet, setOnglet] = useState("accueil");
+function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, roleParDefaut }) {
+  const [onglet, setOnglet] = useState(() => localStorage.getItem('chf-dernier-onglet') || "accueil");
   const [medicaments, setMedicaments] = useState([]);
   const [actes, setActes] = useState([]);
   const [verifications, setVerifications] = useState([]);
@@ -81,6 +81,14 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
     setTimeout(() => { setToasts(prev => prev.filter(t => t.id !== id)); }, 4000);
   };
   const removeToast = (id) => setToasts(prev => prev.filter(t => t.id !== id));
+
+  useEffect(() => {
+    if (roleParDefaut) {
+      showToast("⚠️ Ton rôle habituel n'a pas pu être retrouvé — connecté en Auditeur (lecture seule) par défaut. Si ce n'est pas normal, préviens un administrateur.", "error");
+    }
+  }, [roleParDefaut]);
+
+  useEffect(() => { localStorage.setItem('chf-dernier-onglet', onglet); }, [onglet]);
 
   const lowStockItems = useMemo(() => medicaments.filter(m => (m.quantite || 0) <= (m.seuilAlerte || 5)), [medicaments]);
 
@@ -188,7 +196,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   };
 
   // --- NOUVEAU : Charger une fiche existante pour modification ---
-  const editerFiche = (idFiche) => {
+  const editerFiche = (idFiche, silencieux) => {
     const fiche = fichesDossier.find(f => f.id === idFiche);
     if (!fiche) {
       showToast("Fiche introuvable.", "error");
@@ -209,14 +217,24 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
     setPrixChirSpec(raw.prixChirSpec || "");
     setIdFicheEnCoursDEdition(idFiche);
     setPaiementEffectue(false);
-    showToast(`Édition de la fiche N°${fiche.numeroFiche}`, "info");
+    if (!silencieux) showToast(`Édition de la fiche N°${fiche.numeroFiche}`, "info");
   };
 
   // --- NOUVEAU : Enregistrer une fiche modifiée (remplace l'ancienne) ---
   const enregistrerFicheModifiee = (nouvelleFiche) => {
-    setFichesDossier(prev => prev.map(f => f.id === nouvelleFiche.id ? nouvelleFiche : f));
-    viderLeCalculateurFicheUniquement();
-    showToast("Fiche mise à jour", "success");
+    const fichesMisesAJour = fichesDossier.map(f => f.id === nouvelleFiche.id ? nouvelleFiche : f);
+    setFichesDossier(fichesMisesAJour);
+    // S'il y a une fiche suivante (par numéro) dans ce dossier, basculer directement dessus
+    const triees = [...fichesMisesAJour].sort((a, b) => a.numeroFiche - b.numeroFiche);
+    const idx = triees.findIndex(f => f.id === nouvelleFiche.id);
+    const suivante = idx !== -1 ? triees[idx + 1] : null;
+    if (suivante) {
+      editerFiche(suivante.id, true);
+      showToast(`Fiche mise à jour — Fiche N°${suivante.numeroFiche} chargée`, "success");
+    } else {
+      viderLeCalculateurFicheUniquement();
+      showToast("Fiche mise à jour", "success");
+    }
   };
 
   // --- Modification de l'enregistrement d'une nouvelle fiche : gère l'édition ---
@@ -418,7 +436,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   };
 
   // --- CORRECTION DE LA SUSPENSION : sauvegarde les fiches ---
-  const executerSuspension = async (fichesAUtiliser) => {
+  const executerSuspension = async (fichesAUtiliser, note) => {
     const listeFiches = fichesAUtiliser || fichesDossier;
     const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
     const datesTrouvees = [];
@@ -441,11 +459,12 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
       dateEntreePourTri: datesTrouvees.length > 0 ? datesTrouvees[0].in : "9999-12-31",
       totalGlobal: somme,
       totalSaisiePapierDH: 0,
-      contientErreurs: false,
+      contientErreurs: !!note,
       verrouilleFacture: false,
       fiches: [...listeFiches],  // ⬅️ CONSERVE LES FICHES
       status: 'suspendu',
       dateSuspension: new Date().toISOString(),
+      noteSuspension: note || '',
       timestamp: Date.now()
     };
 
@@ -481,13 +500,16 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   const suspendreDossier = async () => {
     if (!dossierId) { showToast("Aucun dossier actif.", "error"); return; }
     avecFicheEnCoursAjoutee((fichesFinales) => {
-      const demanderConfirmation = () => setConfirmModal({
-        titre: "Suspendre ce dossier ?",
-        message: `Le dossier de ${nomPatient} sera mis en pause. Il pourra être rouvert plus tard depuis les Archives.`,
-        confirmLabel: "⏸️ Suspendre",
-        onConfirm: () => { setConfirmModal(null); executerSuspension(fichesFinales); },
-        onCancel: () => setConfirmModal(null)
-      });
+      const demanderConfirmation = () => {
+        const note = (window.prompt(`Note sur le problème à ne pas oublier pour le dossier de ${nomPatient} (optionnel — ex: quelle fiche, quel souci) :`, "") || "").trim();
+        setConfirmModal({
+          titre: "Suspendre ce dossier ?",
+          message: `Le dossier de ${nomPatient} sera mis en pause. Il pourra être rouvert plus tard depuis les Archives.${note ? `\n\n📝 Note : ${note}` : ''}`,
+          confirmLabel: "⏸️ Suspendre",
+          onConfirm: () => { setConfirmModal(null); executerSuspension(fichesFinales, note); },
+          onCancel: () => setConfirmModal(null)
+        });
+      };
       (async () => {
         if (await verifierConflit()) {
           setConfirmModal({
@@ -723,6 +745,22 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
     return v;
   }, [lignesCalcul, totalGeneralExeat, totalChirSpec]);
 
+  // Coût (achat + main d'œuvre, renseigné dans Gestion du Catalogue) par service — pour donner la
+  // marge en plus du revenu. Hébergement/Chirurgie spéciale n'ont pas de coût catalogue : non suivi
+  // pour l'instant plutôt que d'afficher un faux 0.
+  const coutsParService = useMemo(() => {
+    const v = {}; CATEGORIES_LISTE.forEach(c => v[c.key] = 0);
+    let incomplet = false;
+    lignesCalcul.forEach(l => {
+      const item = (l.type === "med" ? medicaments : actes).find(x => x.id === l.itemId);
+      if (!item || item.cout == null) { incomplet = true; return; }
+      const m = l.qte * item.cout;
+      if (l.type === "med") v.med += m;
+      else if (l.type === "acte") { if (v[l.sub] !== undefined) v[l.sub] += m; else v.chirurgie += m; }
+    });
+    return { valeurs: v, incomplet: incomplet || totalGeneralExeat > 0 || totalChirSpec > 0 };
+  }, [lignesCalcul, medicaments, actes, totalGeneralExeat, totalChirSpec]);
+
   const grandTotalGlobalFiche = useMemo(() => Object.values(totalsParService).reduce((a, b) => a + b, 0), [totalsParService]);
   const totalDossierGourdes = useMemo(() => fichesDossier.reduce((s, f) => s + f.totalGlobal, 0), [fichesDossier]);
   const cumulCategoriesDossierActif = useMemo(() => { const b = {}; CATEGORIES_LISTE.forEach(c => b[c.key] = 0); fichesDossier.forEach(f => { Object.keys(f.breakdown).forEach(k => { if (b[k] !== undefined) b[k] += f.breakdown[k]; }); }); return b; }, [fichesDossier]);
@@ -750,6 +788,20 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
       if (fiche) restituerStock([fiche]);
       showToast("Fiche supprimée — stock remis à jour", "success");
     }
+  };
+
+  const marquerProblemeFiche = (idF) => {
+    const fiche = fichesDossier.find(f => f.id === idF);
+    if (!fiche) return;
+    if (fiche.probleme) {
+      setFichesDossier(prev => prev.map(f => f.id === idF ? { ...f, probleme: false, noteProbleme: '' } : f));
+      showToast("Marquage retiré", "success");
+      return;
+    }
+    const saisie = window.prompt(`Quel est le problème avec la Fiche N°${fiche.numeroFiche} ?`, "");
+    if (saisie === null) return; // annulé — on ne marque rien
+    setFichesDossier(prev => prev.map(f => f.id === idF ? { ...f, probleme: true, noteProbleme: saisie.trim() } : f));
+    showToast("Fiche marquée à vérifier", "success");
   };
 
   const changerTypeOngPourDossier = async (idCible, nouveauType, nouvelOng) => {
@@ -933,7 +985,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
             onOuvrirAchatExpress={() => setAchatExpressOuvert(true)}
           />
         )}
-        {onglet === "dashboard_direction" && (userRole === "direction" || userRole === "administrateur") && <DashboardDirectionPanel verifications={verifications} paiements={paiements} medicaments={medicaments} />}
+        {onglet === "dashboard_direction" && (userRole === "direction" || userRole === "administrateur") && <DashboardDirectionPanel verifications={verifications} paiements={paiements} medicaments={medicaments} actes={actes} />}
         {onglet === "dashboard_caisse" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && <DashboardCaissePanel verifications={verifications} paiements={paiements} userDisplayName={userDisplayName} listeOng={listeOngNoms} showToast={showToast} />}
         {onglet === "calcul" && modePreValidation && (
           <div className="bg-white p-6 rounded-xl border border-emerald-400 shadow-xl space-y-4">
@@ -947,12 +999,12 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
           </div>
         )}
         {onglet === "calcul" && !modePreValidation && (
-          modeSimulation ? <Simulateur medicaments={medicaments} actes={actes} /> :
+          modeSimulation ? <Simulateur medicaments={medicaments} actes={actes} showToast={showToast} /> :
             <CalculateurPanel
               medicaments={medicaments} actes={actes} setActes={setActes} lignes={lignesCalcul} setLignes={setLignesCalcul}
               dossierActif={dossierActif} nomPatient={nomPatient} selectedOng={selectedOng}
               onNouveauDossier={initialiserNouveauDossier} onAnnulerDossier={annulerDossier} onCloturerDossier={declencherPreValidationDossier}
-              fichesDossier={fichesDossier} onSupprimerFicheDossier={supprimerFicheDossier} 
+              fichesDossier={fichesDossier} onSupprimerFicheDossier={supprimerFicheDossier} onMarquerProblemeFiche={marquerProblemeFiche} 
               idFicheEnCoursDEdition={idFicheEnCoursDEdition}  // <-- passé pour affichage
               onEditerFiche={editerFiche}                       // <-- nouvelle prop
               numeroFicheCourante={numeroFicheCourante}
@@ -961,7 +1013,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
               multiPeriode={multiPeriode} setMultiPeriode={setMultiPeriode} dateEntree2={dateEntree2} setDateEntree2={setDateEntree2}
               dateSortie2={dateSortie2} setDateSortie2={setDateSortie2} typeLit2={typeLit2} setTypeLit2={setTypeLit2} j2={j2} totalE2={totalE2}
               hasChirSpec={hasChirSpec} setHasChirSpec={setHasChirSpec} nomChirSpec={nomChirSpec} setNomChirSpec={setNomChirSpec}
-              prixChirSpec={prixChirSpec} setPrixChirSpec={setPrixChirSpec} totalsParService={totalsParService} grandTotal={grandTotalGlobalFiche}
+              prixChirSpec={prixChirSpec} setPrixChirSpec={setPrixChirSpec} totalsParService={totalsParService} coutsParService={coutsParService} grandTotal={grandTotalGlobalFiche}
               totalDossierGourdes={totalDossierGourdes} onEnregistrerFiche={enregistrerNouvelleFiche}
               onViderFicheActive={viderLeCalculateurFicheUniquement} injecterLigne={injecterLigneAuCalculateur} tarifChoisi={tarifChoisi} setTarifChoisi={setTarifChoisi}
               modeSimulation={modeSimulation} userRole={userRole} userDisplayName={userDisplayName}
@@ -992,6 +1044,7 @@ function ApplicationRoot() {
   const [chargementAuth, setChargementAuth] = useState(true);
   const [userRole, setUserRole] = useState(null);
   const [userDisplayName, setUserDisplayName] = useState("");
+  const [roleParDefaut, setRoleParDefaut] = useState(false); // true si le rôle vient d'un repli silencieux (doc introuvable/rôle vide/erreur), pas d'une vraie attribution
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
@@ -1004,6 +1057,7 @@ function ApplicationRoot() {
           if (doc.exists) {
             const data = doc.data();
             setUserRole(data.role || 'auditeur');
+            setRoleParDefaut(!data.role);
             setUserDisplayName(data.displayName || user.email || 'Utilisateur');
           } else {
             await db.collection('users').doc(user.uid).set({
@@ -1012,10 +1066,12 @@ function ApplicationRoot() {
               active: true, createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
             setUserRole('auditeur');
+            setRoleParDefaut(true);
           }
         } catch (error) {
           console.error("Erreur récupération rôle:", error);
           setUserRole('auditeur');
+          setRoleParDefaut(true);
         }
       } else {
         setAuthentifie(false);
@@ -1027,7 +1083,7 @@ function ApplicationRoot() {
 
   if (chargementAuth) return <div className="min-h-screen w-full flex items-center justify-center bg-[#1E2A24]"><div className="text-white text-sm">Chargement...</div></div>;
   if (!authentifie) return <LoginScreen onLogin={() => setAuthentifie(true)} />;
-  return <AppHospitaliere onQuitter={() => auth.signOut()} userRole={userRole} userDisplayName={userDisplayName} userEmail={auth.currentUser?.email} />;
+  return <AppHospitaliere onQuitter={() => auth.signOut()} userRole={userRole} userDisplayName={userDisplayName} userEmail={auth.currentUser?.email} roleParDefaut={roleParDefaut} />;
 }
 
 module.exports = { AppHospitaliere, ApplicationRoot };

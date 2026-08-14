@@ -14,14 +14,14 @@ const HebergementForm = require('./HebergementForm');
 // les dépôts, les impressions, etc. Toutes les conversions vers l'API sont faites.
 function CalculateurPanel({
   medicaments, actes, setActes, lignes, setLignes, dossierActif, nomPatient, selectedOng, onNouveauDossier, onAnnulerDossier, onCloturerDossier,
-  fichesDossier, onSupprimerFicheDossier,
+  fichesDossier, onSupprimerFicheDossier, onMarquerProblemeFiche,
   idFicheEnCoursDEdition,  // ID de la fiche en cours d'édition (passé par le parent)
   onEditerFiche,           // NOUVELLE PROP : fonction pour charger une fiche en édition
   numeroFicheCourante,
   dateEntree1, setDateEntree1, dateSortie1, setDateSortie1,
   typeLit1, setTypeLit1, j1, totalE1, multiPeriode, setMultiPeriode, dateEntree2, setDateEntree2,
   dateSortie2, setDateSortie2, typeLit2, setTypeLit2, j2, totalE2, hasChirSpec, setHasChirSpec,
-  nomChirSpec, setNomChirSpec, prixChirSpec, setPrixChirSpec, totalsParService, grandTotal,
+  nomChirSpec, setNomChirSpec, prixChirSpec, setPrixChirSpec, totalsParService, coutsParService, grandTotal,
   totalDossierGourdes, onEnregistrerFiche, onViderFicheActive, injecterLigne, modeSimulation,
   tarifChoisi, setTarifChoisi,
   userRole, userDisplayName, setMedicaments, medicamentsState, dateNaissance, telephone, numDossierPatient, typePatient,
@@ -516,7 +516,24 @@ function CalculateurPanel({
           searchPatientText={searchPatientText} setSearchPatientText={setSearchPatientText}
           suggestionsPatients={suggestionsPatients} choisirPatientExistant={choisirPatientExistant}
           peutCreerDossier={peutCreerDossier}
-          onSoumettre={e => { e.preventDefault(); if (inputOng) localStorage.setItem('chf-dernier-ong', inputOng); onNouveauDossier(inputNom, inputOng, inputNumDossier, inputTypePatient, inputDateNaissance, inputTelephone, serviceChoisi); }}
+          onSoumettre={e => {
+            e.preventDefault();
+            const nomNormalise = inputNom.trim().toLowerCase();
+            const doublon = patientsExistants.find(p => (p.nomPatient || '').trim().toLowerCase() === nomNormalise);
+            if (doublon) {
+              const infos = [
+                `dossier ${doublon.numDossier || 'sans numéro'}`,
+                `ouvert le ${doublon.dateHeure || '?'}`,
+                `statut : ${doublon.status || 'actif'}`,
+                doublon.dateNaissance ? `né(e) le ${doublon.dateNaissance.split('-').reverse().join('/')}` : null,
+                doublon.telephone ? `tél ${doublon.telephone}` : null
+              ].filter(Boolean).join(', ');
+              const continuer = confirm(`⚠️ Un patient nommé "${doublon.nomPatient}" existe déjà (${infos}).\n\nCréer quand même un NOUVEAU dossier séparé pour ce nom ?\n\n(Annuler pour plutôt chercher/charger le dossier existant en haut)`);
+              if (!continuer) return;
+            }
+            if (inputOng) localStorage.setItem('chf-dernier-ong', inputOng);
+            onNouveauDossier(inputNom, inputOng, inputNumDossier, inputTypePatient, inputDateNaissance, inputTelephone, serviceChoisi);
+          }}
           serviceChoisi={serviceChoisi} setServiceChoisi={setServiceChoisi}
           inputNom={inputNom} setInputNom={setInputNom}
           inputTypePatient={inputTypePatient} setInputTypePatient={setInputTypePatient}
@@ -582,10 +599,20 @@ function CalculateurPanel({
                 {fichesDossier.map(f => {
                   const isEditing = f.id === idFicheEnCoursDEdition;
                   return (
-                    <div key={f.id} className={`flex items-center rounded-lg font-mono text-[11px] font-bold border overflow-hidden shadow-sm ${isEditing ? 'bg-blue-100 border-blue-400' : 'bg-gray-50 border-gray-200'}`}>
+                    <div key={f.id} className={`flex items-center rounded-lg font-mono text-[11px] font-bold border overflow-hidden shadow-sm ${isEditing ? 'bg-blue-100 border-blue-400' : f.probleme ? 'bg-red-100 border-red-400' : 'bg-gray-50 border-gray-200'}`}>
                       <button onClick={() => reimprimerFicheValidee(f)} className="pl-2.5 pr-2 py-1 hover:text-blue-700" title="Réimprimer cette fiche">
-                        🖨️ Fiche N°{f.numeroFiche} ({formatGourdes(f.totalGlobal)} Gdes)
+                        {f.probleme && '⚠️ '}🖨️ Fiche N°{f.numeroFiche} ({formatGourdes(f.totalGlobal)} Gdes)
                       </button>
+                      {/* Bouton MARQUER / DÉMARQUER PROBLÈME */}
+                      {onMarquerProblemeFiche && (
+                        <button
+                          onClick={() => onMarquerProblemeFiche(f.id)}
+                          className={`px-2 py-1 border-l transition-colors font-bold text-[10px] ${f.probleme ? 'bg-red-500/10 hover:bg-red-600 hover:text-white text-red-700' : 'bg-gray-200/30 hover:bg-amber-500 hover:text-white text-gray-400'}`}
+                          title={f.probleme ? (f.noteProbleme ? `⚠️ ${f.noteProbleme}\n\n(clique pour retirer le marquage)` : "Retirer le marquage problème") : "Marquer cette fiche comme ayant un problème"}
+                        >
+                          ⚠️
+                        </button>
+                      )}
                       {/* Bouton MODIFIER */}
                       {onEditerFiche && (
                         <button
@@ -615,7 +642,7 @@ function CalculateurPanel({
             dateEntree2={dateEntree2} setDateEntree2={setDateEntree2} dateSortie2={dateSortie2} setDateSortie2={setDateSortie2} typeLit2={typeLit2} setTypeLit2={setTypeLit2}
             hasChirSpec={hasChirSpec} setHasChirSpec={setHasChirSpec} nomChirSpec={nomChirSpec} setNomChirSpec={setNomChirSpec} prixChirSpec={prixChirSpec} setPrixChirSpec={setPrixChirSpec}
           />
-          <div className={estMobile ? "" : "grid grid-cols-2 gap-4 items-start"}>
+          <div className={estMobile ? "" : "grid grid-cols-[3fr_2fr] gap-4 items-start"}>
           <div className={`bg-white p-4 rounded-xl border space-y-3 shadow-sm ${estMobile ? '' : 'max-h-[75vh] overflow-y-auto'}`} ref={refZone}>
             <div className="flex justify-between items-center">
               <p className="text-[11px] font-bold uppercase text-gray-400">2. Actes, Laboratoire & Ordonnance</p>
@@ -649,7 +676,7 @@ function CalculateurPanel({
                     ))}
                   </div>
                 )}
-                <div className={`grid gap-1.5 overflow-y-auto ${estMobile ? 'grid-cols-2 max-h-72' : 'grid-cols-4 max-h-96'}`}>
+                <div className={`grid gap-1.5 overflow-y-auto ${estMobile ? 'grid-cols-2 max-h-72' : 'grid-cols-5 max-h-96'}`}>
                   {catalogueGrille.map(item => (
                     <button key={item.id} onClick={() => ajouterAvecQuantite(item, 1)} disabled={!peutAjouterLignes} className={`border rounded-lg text-left hover:bg-emerald-50 hover:border-emerald-400 active:bg-emerald-100 disabled:opacity-30 disabled:cursor-not-allowed ${estMobile ? 'p-3' : 'p-2'}`}>
                       <div className={`font-semibold text-gray-800 line-clamp-2 ${estMobile ? 'text-sm' : 'text-xs'}`}>{item.nom}</div>
@@ -672,7 +699,17 @@ function CalculateurPanel({
               </table>
               <div className="p-4 bg-gray-50 border-t border-b text-[11px] text-gray-600 font-mono space-y-1 shadow-inner">
                 <div className="grid grid-cols-3 font-bold text-[#1E2A24] border-b pb-1 mb-2"><span>RÉCAPITULATIF DE LA FICHE</span><span className="text-right">Gdes</span><span className="text-right text-emerald-800">💵 DH</span></div>
-                {require('../utils/constants').CATEGORIES_LISTE.map(srv => { const m = totalsParService[srv.key]; if (m===0) return null; return <div key={srv.key} className="grid grid-cols-3 py-0.5"><span>• {srv.label}</span><span className="text-right">{formatGourdes(m)}</span><span className="text-right font-bold">{formatDH(m)} DH</span></div>; })}
+                {require('../utils/constants').CATEGORIES_LISTE.map(srv => {
+                  const m = totalsParService[srv.key]; if (m===0) return null;
+                  const c = coutsParService?.valeurs?.[srv.key] || 0;
+                  return (
+                    <div key={srv.key}>
+                      <div className="grid grid-cols-3 py-0.5"><span>• {srv.label}</span><span className="text-right">{formatGourdes(m)}</span><span className="text-right font-bold">{formatDH(m)} DH</span></div>
+                      {c > 0 && <div className="grid grid-cols-3 pb-0.5 text-[10px] text-orange-600"><span className="pl-3">↳ Coût</span><span className="text-right">{formatGourdes(c)}</span><span className={`text-right font-bold ${m-c>=0?'text-emerald-700':'text-red-600'}`}>Marge {formatGourdes(m-c)}</span></div>}
+                    </div>
+                  );
+                })}
+                {coutsParService?.incomplet && Object.values(coutsParService.valeurs).some(v=>v>0) && <p className="text-[9px] text-gray-400 italic pt-1">Coût partiel : certains articles de cette fiche (ou l'hébergement/chirurgie spéciale) n'ont pas encore de coût renseigné dans le catalogue.</p>}
               </div>
               <div className="bg-[#1E2A24] text-white p-4 flex justify-between items-center font-bold text-sm font-mono sticky bottom-0">
                 <span>SOUS-TOTAL FICHE {idFicheEnCoursDEdition ? 'EN MODIFICATION' : `N°${numeroFicheCourante}`} :</span>
@@ -686,7 +723,7 @@ function CalculateurPanel({
           {estMobile && dossierActif && (
             <button onClick={() => setDetailOuvert(true)} className="fixed bottom-0 left-0 right-0 z-40 bg-[#1E2A24] text-white px-4 py-3 flex justify-between items-center font-bold text-sm shadow-2xl">
               <span>{lignes.length + (dateEntree1 && dateSortie1 ? 1 : 0) + (multiPeriode && dateEntree2 && dateSortie2 ? 1 : 0) + (hasChirSpec && nomChirSpec ? 1 : 0)} article(s)</span>
-              <span>{formatGourdes(grandTotal)} Gdes ▲</span>
+              <span>{formatDH(grandTotal)} DH ▲</span>
             </button>
           )}
           {estMobile && detailOuvert && (

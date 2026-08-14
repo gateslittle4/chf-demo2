@@ -23,7 +23,7 @@ function NouveauDossierForm({
           <ul className="absolute z-20 left-0 right-0 bg-white border rounded-lg shadow-2xl mt-1 text-xs max-h-48 overflow-y-auto divide-y">
             {suggestionsPatients.map(p => (
               <li key={p.id}><button type="button" onClick={() => choisirPatientExistant(p)} className="w-full text-left px-3 py-2 hover:bg-gray-100 flex justify-between">
-                <span>{p.nomPatient}</span><span className="text-gray-500">{p.numDossier || 'N/R'} - {p.ongPartenaire || 'Privé'}</span>
+                <span>{p.nomPatient}{p.dateNaissance && <span className="text-gray-400"> — né(e) {p.dateNaissance.split('-').reverse().join('/')}</span>}</span><span className="text-gray-500">{p.numDossier || 'N/R'} - {p.ongPartenaire || 'Privé'}</span>
               </button></li>
             ))}
           </ul>
