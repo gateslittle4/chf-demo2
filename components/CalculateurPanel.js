@@ -606,14 +606,6 @@ function CalculateurPanel({
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-1.5 border-l pl-3">
-              <label className="text-[9px] font-bold text-gray-400 uppercase">📅 Date{idFicheEnCoursDEdition ? ' (fiche)' : ' (nouvelle fiche)'}</label>
-              <input type="date" value={dateFiche} onChange={e=>setDateFiche(e.target.value)} className="border rounded p-1 text-xs font-mono" />
-            </div>
-            <div className="flex items-center gap-1.5 border-l pl-3">
-              <label className="text-[9px] font-bold text-gray-400 uppercase">🩺 Prescrit par</label>
-              <input type="text" value={prescritPar} onChange={e=>setPrescritPar(e.target.value)} placeholder="Nom du médecin/infirmière" className="border rounded p-1 text-xs w-36" />
-            </div>
             <div className="flex gap-2 flex-wrap">
               {peutAnnulerDossier && <button onClick={onAnnulerDossier} className="bg-red-50 text-red-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-red-200">Abandonner</button>}
               {peutSuspendre && <button onClick={onSuspendreDossier} className="bg-amber-50 text-amber-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-amber-200 flex items-center gap-1"><Clock size={12}/> Suspendre</button>}
@@ -676,8 +668,18 @@ function CalculateurPanel({
             dateEntree2={dateEntree2} setDateEntree2={setDateEntree2} dateSortie2={dateSortie2} setDateSortie2={setDateSortie2} typeLit2={typeLit2} setTypeLit2={setTypeLit2}
             hasChirSpec={hasChirSpec} setHasChirSpec={setHasChirSpec} nomChirSpec={nomChirSpec} setNomChirSpec={setNomChirSpec} prixChirSpec={prixChirSpec} setPrixChirSpec={setPrixChirSpec}
           />
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              <label className="text-[9px] font-bold text-amber-800 uppercase">📅 Date{idFicheEnCoursDEdition ? ' (fiche)' : ' (nouvelle fiche)'}</label>
+              <input type="date" value={dateFiche} onChange={e=>setDateFiche(e.target.value)} className="border rounded p-1.5 text-xs font-mono bg-white" />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <label className="text-[9px] font-bold text-amber-800 uppercase">🩺 Prescrit par</label>
+              <input type="text" value={prescritPar} onChange={e=>setPrescritPar(e.target.value)} placeholder="Nom du médecin/infirmière" className="border rounded p-1.5 text-xs w-40 bg-white" />
+            </div>
+          </div>
           <div className={estMobile ? "" : "grid grid-cols-[3fr_2fr] gap-4 items-start"}>
-          <div className={`bg-white p-4 rounded-xl border space-y-3 shadow-sm ${estMobile ? '' : 'max-h-[75vh] overflow-y-auto'}`} ref={refZone}>
+          <div className={`bg-white p-4 rounded-xl border space-y-3 shadow-sm ${estMobile ? '' : 'max-h-[80vh] overflow-y-auto'}`} ref={refZone}>
             <div className="flex justify-between items-center">
               <p className="text-[11px] font-bold uppercase text-gray-400">2. Actes, Laboratoire & Ordonnance</p>
               {setTarifChoisi && (
@@ -710,7 +712,7 @@ function CalculateurPanel({
                     ))}
                   </div>
                 )}
-                <div className={`grid gap-1.5 overflow-y-auto ${estMobile ? 'grid-cols-2 max-h-72' : 'grid-cols-5 max-h-96'}`}>
+                <div className={`grid gap-1.5 overflow-y-auto ${estMobile ? 'grid-cols-2 max-h-72' : 'grid-cols-5 max-h-[32rem]'}`}>
                   {catalogueGrille.map(item => (
                     <button key={item.id} onClick={() => ajouterAvecQuantite(item, 1)} disabled={!peutAjouterLignes} className={`border rounded-lg text-left hover:bg-emerald-50 hover:border-emerald-400 active:bg-emerald-100 disabled:opacity-30 disabled:cursor-not-allowed ${estMobile ? 'p-3' : 'p-2'}`}>
                       <div className={`font-semibold text-gray-800 line-clamp-2 ${estMobile ? 'text-sm' : 'text-xs'}`}>{item.nom}</div>
