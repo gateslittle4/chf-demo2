@@ -37,6 +37,30 @@ function GestionOngPanel({ listeOngDocs, showToast }) {
     } catch (e) { showToast("Erreur lors de la suppression.", "error"); }
   };
 
+  const groupesDoublons = Object.values(
+    listeOngDocs.reduce((acc, o) => {
+      const cle = (o.nom || '').trim().toLowerCase();
+      (acc[cle] = acc[cle] || []).push(o);
+      return acc;
+    }, {})
+  ).filter(g => g.length > 1);
+
+  const nettoyerDoublons = async () => {
+    const nbDoublons = groupesDoublons.reduce((s, g) => s + (g.length - 1), 0);
+    if (!confirm(`${groupesDoublons.length} partenaire(s) en double trouvé(s) (${nbDoublons} fiche(s) en trop au total). Garder une seule fiche par partenaire et supprimer le reste ?`)) return;
+    try {
+      const batch = db.batch();
+      groupesDoublons.forEach(groupe => {
+        // Garde celle avec le "Prochain N°" le plus avancé (la plus probable d'avoir déjà servi), sinon la première.
+        const aGarder = groupe.reduce((m, o) => (o.prochainNumero || 1) > (m.prochainNumero || 1) ? o : m, groupe[0]);
+        groupe.forEach(o => { if (o.id !== aGarder.id) batch.delete(db.collection('ong_partenaires').doc(o.id)); });
+      });
+      await batch.commit();
+      enregistrerAudit('nettoyage_doublons_ong_partenaires', { nbSupprimes: nbDoublons });
+      showToast(`${nbDoublons} doublon(s) supprimé(s)`, "success");
+    } catch (e) { showToast("Erreur lors du nettoyage.", "error"); }
+  };
+
   const modifierProchainNumero = async (id, nom, valeur) => {
     const numero = parseInt(valeur, 10);
     if (!numero || numero < 1) return;
@@ -60,6 +84,12 @@ function GestionOngPanel({ listeOngDocs, showToast }) {
           />
           <button onClick={ajouter} className="bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold">Ajouter</button>
         </div>
+        {groupesDoublons.length > 0 && (
+          <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg p-2 mt-1">
+            <span className="text-amber-800 font-semibold">⚠️ {groupesDoublons.length} partenaire(s) en double détecté(s) dans la liste ci-dessous.</span>
+            <button onClick={nettoyerDoublons} className="bg-amber-600 text-white px-3 py-1.5 rounded-lg font-bold whitespace-nowrap">🧹 Nettoyer les doublons</button>
+          </div>
+        )}
       </div>
       <div className="bg-white rounded-xl border overflow-hidden divide-y">
         {listeOngDocs.length === 0 && <p className="text-gray-500 p-3">Aucun partenaire enregistré.</p>}

@@ -18,6 +18,8 @@ function CalculateurPanel({
   idFicheEnCoursDEdition,  // ID de la fiche en cours d'édition (passé par le parent)
   onEditerFiche,           // NOUVELLE PROP : fonction pour charger une fiche en édition
   numeroFicheCourante,
+  dateFiche, setDateFiche,
+  prescritPar, setPrescritPar,
   dateEntree1, setDateEntree1, dateSortie1, setDateSortie1,
   typeLit1, setTypeLit1, j1, totalE1, multiPeriode, setMultiPeriode, dateEntree2, setDateEntree2,
   dateSortie2, setDateSortie2, typeLit2, setTypeLit2, j2, totalE2, hasChirSpec, setHasChirSpec,
@@ -278,10 +280,30 @@ function CalculateurPanel({
     setSearchPatientText(""); setSuggestionsPatients([]);
   };
 
+  // --- Corps réutilisable d'un ticket (une fiche) — utilisé pour la réimpression seule ET l'impression groupée ---
+  const genererCorpsTicket = (fiche, entete) => {
+    const lignesDetaillees = fiche.rawState?.lignesCalcul || [];
+    return `<div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p><p>${entete}</p></div><div style="font-weight:bold;font-size:11px;margin-bottom:6px;">Patient: ${echapperHTML(nomPatient)} — Fiche N°${fiche.numeroFiche}</div><div style="font-size:10px;margin-bottom:6px;">${typePatient === 'ONG' ? `Partenaire : ${echapperHTML(selectedOng || 'N/R')}` : 'Privé'}</div><table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${lignesDetaillees.map(l => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte*l.prix)}</td></tr>`).join('')}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes (${formatDH(fiche.totalGlobal)} DH)</div><p style="font-size:10px;margin-top:4px;">${fiche.prescritPar ? `Prescrit par : ${echapperHTML(fiche.prescritPar)}` : ''}</p><div class="footer">Merci de votre visite !<br/>CHF Système Hospitalier – ${new Date().getFullYear()}</div>`;
+  };
+  const STYLE_TICKET = `@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.page-fiche{page-break-after:always;}`;
+
   // Réimpression d'une fiche (inchangée)
   const reimprimerFicheValidee = (fiche) => {
-    const lignesDetaillees = fiche.rawState?.lignesCalcul || [];
-    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N°${fiche.numeroFiche}</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p><p>RÉIMPRESSION — ${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</p></div><div style="font-weight:bold;font-size:11px;margin-bottom:6px;">Patient: ${echapperHTML(nomPatient)} — Fiche N°${fiche.numeroFiche}</div><div style="font-size:10px;margin-bottom:6px;">Type: ${typePatient === 'ONG' ? 'Partenaire' : 'Privé'}${(typePatient === 'ONG' && selectedOng) ? ` — Partenaire: ${echapperHTML(selectedOng)}` : ''}</div><table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${lignesDetaillees.map(l => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte*l.prix)}</td></tr>`).join('')}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes (${formatDH(fiche.totalGlobal)} DH)</div><p style="font-size:10px;margin-top:4px;">Mode: ${echapperHTML((fiche.modePaiement||'cash').toUpperCase())} | Encaissé par: ${echapperHTML(fiche.creePar||'inconnu')}</p><div class="footer">Merci de votre visite !<br/>CHF Système Hospitalier – ${new Date().getFullYear()}</div></body></html>`;
+    const entete = `RÉIMPRESSION — Fiche du ${(fiche.dateCreation ? new Date(fiche.dateCreation) : new Date()).toLocaleDateString('fr-FR')} (réimprimée le ${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})})`;
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N°${fiche.numeroFiche}</title><style>${STYLE_TICKET}</style></head><body>${genererCorpsTicket(fiche, entete)}</body></html>`;
+    const win = window.open('', '_blank', 'width=500,height=700');
+    if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
+    win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 400);
+  };
+
+  // --- NOUVEAU : Imprimer toutes les fiches du dossier d'affilée, en un seul clic ---
+  const imprimerToutesLesFichesDuDossier = () => {
+    if (fichesDossier.length === 0) { showToast("Aucune fiche à imprimer.", "error"); return; }
+    const corps = fichesDossier.map(f => {
+      const entete = `Fiche du ${(f.dateCreation ? new Date(f.dateCreation) : new Date()).toLocaleDateString('fr-FR')}`;
+      return `<div class="page-fiche">${genererCorpsTicket(f, entete)}</div>`;
+    }).join('');
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${fichesDossier.length} fiches — ${echapperHTML(nomPatient)}</title><style>${STYLE_TICKET}</style></head><body>${corps}</body></html>`;
     const win = window.open('', '_blank', 'width=500,height=700');
     if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
     win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 400);
@@ -302,9 +324,10 @@ function CalculateurPanel({
       telephone: telephone || 'N/R',
       dateNaissance: dateNaissance || 'N/R',
       typePatient: typePatient || 'ONG',
-      creePar: auth.currentUser?.displayName || 'inconnu'
+      creePar: auth.currentUser?.displayName || 'inconnu',
+      prescritPar: prescritPar.trim() || ''
     };
-    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket CHF</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:17px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:27px;margin:4px 0;}.entete p{margin:2px 0;font-size:16px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:16px;margin-bottom:6px;}.info-patient{font-size:15px;margin-bottom:4px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:16px;}th,td{padding:5px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:14px;text-transform:uppercase;}.total{font-weight:bold;font-size:23px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:13px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.exoneration{color:red;font-weight:bold;font-size:19px;}.monnaie{font-size:19px;color:#006600;}.solde{color:#cc0000;font-weight:bold;}.depot-info{font-size:17px;color:#555;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p><p>${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</p></div><div class="info"><span>Patient: ${echapperHTML(data.nomPatient)}</span><span>${data.typePatient === 'ONG' ? `Partenaire: ${echapperHTML(data.selectedOng || 'N/R')}` : 'Privé'}</span></div><div class="info"><span>Dossier: ${echapperHTML(data.numDossier)}</span></div><div class="info info-patient"><span>📞 ${echapperHTML(data.telephone)}</span><span>Type: ${data.typePatient === 'ONG' ? 'Partenaire' : 'Privé'}</span></div><div class="info info-patient"><span>Enregistré par: ${echapperHTML(data.creePar)}</span></div>${data.dateEntree1 && data.dateSortie1 ? `<p style="font-size:10px; margin:4px 0;"><strong>Séjour:</strong> ${data.dateEntree1.split('-').reverse().slice(0,2).join('/')} → ${data.dateSortie1.split('-').reverse().slice(0,2).join('/')}</p>` : ''}<table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${data.dateEntree1 && data.dateSortie1 ? `<tr><td>Hébergement</td><td class="qte">${data.j1}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit1].prix)}</td><td class="sous-total">${formatGourdes(data.totalE1)}</td></tr>` : ''}${data.multiPeriode && data.dateEntree2 && data.dateSortie2 ? `<tr><td>Hébergement P2</td><td class="qte">${data.j2}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit2].prix)}</td><td class="sous-total">${formatGourdes(data.totalE2)}</td></tr>` : ''}${data.hasChirSpec && data.nomChirSpec ? `<tr><td>Chirurgie: ${echapperHTML(data.nomChirSpec)}</td><td class="qte">1</td><td class="prix">${formatGourdes(data.totalChirSpec)}</td><td class="sous-total">${formatGourdes(data.totalChirSpec)}</td></tr>` : ''}${data.lignes.map(l => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte * l.prix)}</td></tr>`).join('')}</tbody></table><div class="total">TOTAL: ${formatGourdes(data.grandTotal)} Gdes<br/>${formatDH(data.grandTotal)} DH</div><div class="footer">Merci de votre visite !<br/>CHF Système Hospitalier – ${new Date().getFullYear()}</div></body></html>`;
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket CHF</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:17px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:27px;margin:4px 0;}.entete p{margin:2px 0;font-size:16px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:16px;margin-bottom:6px;}.info-patient{font-size:15px;margin-bottom:4px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:16px;}th,td{padding:5px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:14px;text-transform:uppercase;}.total{font-weight:bold;font-size:23px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:13px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.exoneration{color:red;font-weight:bold;font-size:19px;}.monnaie{font-size:19px;color:#006600;}.solde{color:#cc0000;font-weight:bold;}.depot-info{font-size:17px;color:#555;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p><p>${dateFiche.split('-').reverse().join('/')} ${new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</p></div><div class="info"><span>Patient: ${echapperHTML(data.nomPatient)}</span><span>${data.typePatient === 'ONG' ? `Partenaire: ${echapperHTML(data.selectedOng || 'N/R')}` : 'Privé'}</span></div><div class="info info-patient"><span>📞 ${echapperHTML(data.telephone)}</span><span>📁 ${echapperHTML(data.numDossier)}</span></div><div class="info info-patient"><span>${data.prescritPar ? `Prescrit par: ${echapperHTML(data.prescritPar)}` : ''}</span></div>${data.dateEntree1 && data.dateSortie1 ? `<p style="font-size:10px; margin:4px 0;"><strong>Séjour:</strong> ${data.dateEntree1.split('-').reverse().slice(0,2).join('/')} → ${data.dateSortie1.split('-').reverse().slice(0,2).join('/')}</p>` : ''}<table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${data.dateEntree1 && data.dateSortie1 ? `<tr><td>Hébergement</td><td class="qte">${data.j1}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit1].prix)}</td><td class="sous-total">${formatGourdes(data.totalE1)}</td></tr>` : ''}${data.multiPeriode && data.dateEntree2 && data.dateSortie2 ? `<tr><td>Hébergement P2</td><td class="qte">${data.j2}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit2].prix)}</td><td class="sous-total">${formatGourdes(data.totalE2)}</td></tr>` : ''}${data.hasChirSpec && data.nomChirSpec ? `<tr><td>Chirurgie: ${echapperHTML(data.nomChirSpec)}</td><td class="qte">1</td><td class="prix">${formatGourdes(data.totalChirSpec)}</td><td class="sous-total">${formatGourdes(data.totalChirSpec)}</td></tr>` : ''}${data.lignes.map(l => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte * l.prix)}</td></tr>`).join('')}</tbody></table><div class="total">TOTAL: ${formatGourdes(data.grandTotal)} Gdes<br/>${formatDH(data.grandTotal)} DH</div><div class="footer">Merci de votre visite !<br/>CHF Système Hospitalier – ${new Date().getFullYear()}</div></body></html>`;
     const win = window.open('', '_blank', 'width=500,height=700');
     if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
     win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 500);
@@ -325,7 +348,8 @@ function CalculateurPanel({
       telephone: telephone || 'N/R',
       dateNaissance: dateNaissance || 'N/R',
       typePatient: typePatient || 'ONG',
-      creePar: auth.currentUser?.displayName || 'inconnu'
+      creePar: auth.currentUser?.displayName || 'inconnu',
+      prescritPar: prescritPar.trim() || ''
     };
     const ligneHebergement = data.dateEntree1 && data.dateSortie1 ? `<tr><td>Hébergement — ${echapperHTML(CONFIG_LITS[data.typeLit1].nom)}</td><td class="qte">${data.j1} j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit1].prix)}</td><td class="mtotal">${formatGourdes(data.totalE1)}</td></tr>` : '';
     const ligneHebergement2 = data.multiPeriode && data.dateEntree2 && data.dateSortie2 ? `<tr><td>Hébergement (2e période) — ${echapperHTML(CONFIG_LITS[data.typeLit2].nom)}</td><td class="qte">${data.j2} j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit2].prix)}</td><td class="mtotal">${formatGourdes(data.totalE2)}</td></tr>` : '';
@@ -354,7 +378,7 @@ function CalculateurPanel({
       </style></head><body>
       <div class="entete">
         <div class="entete-gauche"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p></div>
-        <div class="entete-droite"><p>${new Date().toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p><p>${new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</p><p>Fiche N°${numeroFicheReelle}</p></div>
+        <div class="entete-droite"><p>${new Date(dateFiche + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p><p>Fiche N°${numeroFicheReelle}</p></div>
       </div>
       <div class="titre-doc">Fiche de facturation</div>
       <div class="infos-patient">
@@ -363,7 +387,7 @@ function CalculateurPanel({
         <div><span class="label">N° Dossier</span><br/><span class="valeur">${echapperHTML(data.numDossier)}</span></div>
         <div><span class="label">Téléphone</span><br/><span class="valeur">${echapperHTML(data.telephone)}</span></div>
         <div><span class="label">Date de naissance</span><br/><span class="valeur">${echapperHTML(data.dateNaissance)}</span></div>
-        <div><span class="label">Enregistré par</span><br/><span class="valeur">${echapperHTML(data.creePar)}</span></div>
+        ${data.prescritPar ? `<div><span class="label">Prescrit par</span><br/><span class="valeur">${echapperHTML(data.prescritPar)}</span></div>` : ''}
       </div>
       ${data.dateEntree1 && data.dateSortie1 ? `<p style="font-size:12px;margin-bottom:12px;"><strong>Séjour :</strong> du ${data.dateEntree1.split('-').reverse().join('/')} au ${data.dateSortie1.split('-').reverse().join('/')}</p>` : ''}
       <table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix unitaire</th><th class="mtotal">Total</th></tr></thead><tbody>${ligneHebergement}${ligneHebergement2}${ligneChir}${lignesArticles}</tbody></table>
@@ -490,8 +514,9 @@ function CalculateurPanel({
         multiPeriode: multiPeriode, dateEntree2: dateEntree2, dateSortie2: dateSortie2,
         typeLit2: typeLit2, nbJours2: j2, totalHebergement2: totalE2
       } : null,
-      dateCreation: new Date().toISOString(),
+      dateCreation: new Date(dateFiche + 'T12:00:00').toISOString(),
       creePar: auth.currentUser?.displayName || 'inconnu',
+      prescritPar: prescritPar.trim() || '',
       rawState: { lignesCalcul: [...lignes], dateEntree1, dateSortie1, typeLit1, multiPeriode, dateEntree2, dateSortie2, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
     };
     onEnregistrerFiche(fiche);
@@ -581,6 +606,14 @@ function CalculateurPanel({
                 </div>
               )}
             </div>
+            <div className="flex items-center gap-1.5 border-l pl-3">
+              <label className="text-[9px] font-bold text-gray-400 uppercase">📅 Date{idFicheEnCoursDEdition ? ' (fiche)' : ' (nouvelle fiche)'}</label>
+              <input type="date" value={dateFiche} onChange={e=>setDateFiche(e.target.value)} className="border rounded p-1 text-xs font-mono" />
+            </div>
+            <div className="flex items-center gap-1.5 border-l pl-3">
+              <label className="text-[9px] font-bold text-gray-400 uppercase">🩺 Prescrit par</label>
+              <input type="text" value={prescritPar} onChange={e=>setPrescritPar(e.target.value)} placeholder="Nom du médecin/infirmière" className="border rounded p-1 text-xs w-36" />
+            </div>
             <div className="flex gap-2 flex-wrap">
               {peutAnnulerDossier && <button onClick={onAnnulerDossier} className="bg-red-50 text-red-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-red-200">Abandonner</button>}
               {peutSuspendre && <button onClick={onSuspendreDossier} className="bg-amber-50 text-amber-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-amber-200 flex items-center gap-1"><Clock size={12}/> Suspendre</button>}
@@ -595,22 +628,23 @@ function CalculateurPanel({
               <span className="text-[9px] uppercase font-black text-gray-400">
                 Fiches validées {idFicheEnCoursDEdition ? '(modification en cours)' : ''}
               </span>
+              <button onClick={imprimerToutesLesFichesDuDossier} className="ml-2 bg-[#1E2A24] text-white text-[9px] font-bold px-2 py-1 rounded-lg">🖨️ Imprimer les {fichesDossier.length} fiche{fichesDossier.length > 1 ? 's' : ''} d'affilée</button>
               <div className="flex flex-wrap gap-1.5">
                 {fichesDossier.map(f => {
                   const isEditing = f.id === idFicheEnCoursDEdition;
                   return (
                     <div key={f.id} className={`flex items-center rounded-lg font-mono text-[11px] font-bold border overflow-hidden shadow-sm ${isEditing ? 'bg-blue-100 border-blue-400' : f.probleme ? 'bg-red-100 border-red-400' : 'bg-gray-50 border-gray-200'}`}>
                       <button onClick={() => reimprimerFicheValidee(f)} className="pl-2.5 pr-2 py-1 hover:text-blue-700" title="Réimprimer cette fiche">
-                        {f.probleme && '⚠️ '}🖨️ Fiche N°{f.numeroFiche} ({formatGourdes(f.totalGlobal)} Gdes)
+                        {f.probleme && '❓ '}🖨️ Fiche N°{f.numeroFiche} ({formatGourdes(f.totalGlobal)} Gdes)
                       </button>
                       {/* Bouton MARQUER / DÉMARQUER PROBLÈME */}
                       {onMarquerProblemeFiche && (
                         <button
                           onClick={() => onMarquerProblemeFiche(f.id)}
-                          className={`px-2 py-1 border-l transition-colors font-bold text-[10px] ${f.probleme ? 'bg-red-500/10 hover:bg-red-600 hover:text-white text-red-700' : 'bg-gray-200/30 hover:bg-amber-500 hover:text-white text-gray-400'}`}
-                          title={f.probleme ? (f.noteProbleme ? `⚠️ ${f.noteProbleme}\n\n(clique pour retirer le marquage)` : "Retirer le marquage problème") : "Marquer cette fiche comme ayant un problème"}
+                          className={`px-2 py-1 border-l transition-colors font-bold text-[10px] ${f.probleme ? 'bg-amber-500/10 hover:bg-amber-600 hover:text-white text-amber-700' : 'bg-emerald-500/10 hover:bg-emerald-600 hover:text-white text-emerald-700'}`}
+                          title={f.probleme ? (f.noteProbleme ? `❓ ${f.noteProbleme}\n\n(clique pour retirer le marquage)` : "Retirer le marquage — problème réglé") : "Tout va bien — clique pour signaler un problème"}
                         >
-                          ⚠️
+                          {f.probleme ? '❓' : '✅'}
                         </button>
                       )}
                       {/* Bouton MODIFIER */}

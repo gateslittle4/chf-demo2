@@ -3431,7 +3431,7 @@
             }
             return `<tr><td>${label}</td><td class="qte">1</td><td class="prix">${formatGourdes(val)}</td><td class="sous-total">${formatGourdes(val)}</td></tr>`;
           }).join("") : "";
-          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N\xB0${fiche.numeroFiche}</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:13px;margin-bottom:6px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.info-patient{font-size:12px;margin-bottom:4px;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p><p>${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")} ${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p></div><div class="info"><span>Patient: ${echapperHTML(focusedVerif.nomPatient)}</span><span>${focusedVerif.typePatient === "ONG" ? echapperHTML(focusedVerif.ongPartenaire || "N/R") : "Priv\xE9"}</span></div><div class="info"><span>Fiche N\xB0${fiche.numeroFiche}</span><span>Mode: ${echapperHTML(fiche.modePaiement || "cash").toUpperCase()}</span></div><div class="info info-patient"><span>\u{1F4DE} ${echapperHTML(focusedVerif.telephone || "N/R")}</span><span>\u{1F4C1} ${echapperHTML(focusedVerif.numDossier || "N/R")}</span></div><div class="info info-patient"><span>Type: ${focusedVerif.typePatient === "ONG" ? "Partenaire" : "Priv\xE9"}</span><span>Enregistr\xE9 par: ${echapperHTML(fiche.creePar || "inconnu")}</span></div>${fiche.exeat ? `<p style="font-size:10px; margin:4px 0;"><strong>S\xE9jour:</strong> ${fiche.exeat.dateEntree.split("-").reverse().slice(0, 2).join("/")} \u2192 ${fiche.exeat.dateSortie.split("-").reverse().slice(0, 2).join("/")}</p>` : ""}<table><thead><tr><th>D\xE9signation</th><th class="qte">Qt\xE9</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${hasLignes ? lignesHTML : fallbackHTML}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes<br/>${formatDH(fiche.totalGlobal)} DH</div>${fiche.solde && fiche.solde > 0 ? `<p style="font-size:12px; color:red;"><strong>Solde restant :</strong> ${formatGourdes(fiche.solde)} Gdes</p>` : ""}<div class="footer">Merci de votre visite !<br/>CHF Syst\xE8me Hospitalier \u2013 ${(/* @__PURE__ */ new Date()).getFullYear()}</div></body></html>`;
+          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N\xB0${fiche.numeroFiche}</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:13px;margin-bottom:6px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.info-patient{font-size:12px;margin-bottom:4px;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p><p>Fiche du ${(fiche.dateCreation ? new Date(fiche.dateCreation) : /* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")} (r\xE9imprim\xE9e le ${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")} ${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })})</p></div><div class="info"><span>Patient: ${echapperHTML(focusedVerif.nomPatient)}</span><span>${focusedVerif.typePatient === "ONG" ? `Partenaire : ${echapperHTML(focusedVerif.ongPartenaire || "N/R")}` : "Priv\xE9"}</span></div><div class="info"><span>Fiche N\xB0${fiche.numeroFiche}</span><span>Mode: ${echapperHTML(fiche.modePaiement || "cash").toUpperCase()}</span></div><div class="info info-patient"><span>\u{1F4DE} ${echapperHTML(focusedVerif.telephone || "N/R")}</span><span>\u{1F4C1} ${echapperHTML(focusedVerif.numDossier || "N/R")}</span></div><div class="info info-patient"><span>Enregistr\xE9 par: ${echapperHTML(fiche.creePar || "inconnu")}</span></div>${fiche.exeat ? `<p style="font-size:10px; margin:4px 0;"><strong>S\xE9jour:</strong> ${fiche.exeat.dateEntree.split("-").reverse().slice(0, 2).join("/")} \u2192 ${fiche.exeat.dateSortie.split("-").reverse().slice(0, 2).join("/")}</p>` : ""}<table><thead><tr><th>D\xE9signation</th><th class="qte">Qt\xE9</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${hasLignes ? lignesHTML : fallbackHTML}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes<br/>${formatDH(fiche.totalGlobal)} DH</div>${fiche.solde && fiche.solde > 0 ? `<p style="font-size:12px; color:red;"><strong>Solde restant :</strong> ${formatGourdes(fiche.solde)} Gdes</p>` : ""}<div class="footer">Merci de votre visite !<br/>CHF Syst\xE8me Hospitalier \u2013 ${(/* @__PURE__ */ new Date()).getFullYear()}</div></body></html>`;
           const win = window.open("", "_blank", "width=500,height=700");
           if (!win) {
             showToast("Impression bloqu\xE9e par le navigateur. R\xE9essaie en cliquant sur Imprimer \u2014 si \xE7a ne marche toujours pas, demande \xE0 quelqu'un de v\xE9rifier les r\xE9glages.", "error");
@@ -3520,11 +3520,11 @@ Continuer ?`)) return;
             return /* @__PURE__ */ React.createElement(
               "span",
               {
-                title: `\u26A0\uFE0F ${fp.map((f) => `Fiche N\xB0${f.numeroFiche}${f.noteProbleme ? " \u2014 " + f.noteProbleme : ""}`).join(" | ")}${peutModifier ? " \u2014 clique pour valider" : ""}`,
+                title: `\u2753 ${fp.map((f) => `Fiche N\xB0${f.numeroFiche}${f.noteProbleme ? " \u2014 " + f.noteProbleme : ""}`).join(" | ")}${peutModifier ? " \u2014 clique pour valider" : ""}`,
                 className: peutModifier ? "cursor-pointer" : "cursor-help",
                 onClick: peutModifier ? () => setFicheAValider(v.id) : void 0
               },
-              "\u26A0\uFE0F"
+              "\u2753"
             );
           })(), v.nomPatient), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-center" }, (v.typePatient || "ONG") === "ONG" ? "\u{1F3E5} Partenaire" : "\u{1F4B3} Priv\xE9"), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-purple-800 font-bold" }, v.ongPartenaire), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-center text-gray-600" }, (v.fiches || []).length), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-right font-bold text-emerald-800", title: v.totalGlobal !== totalFiable ? "Recalcul\xE9 \xE0 partir des fiches \u2014 la valeur stock\xE9e \xE9tait absente ou \xE0 z\xE9ro" : "" }, formatDH(totalFiable), " DH", v.totalGlobal !== totalFiable && /* @__PURE__ */ React.createElement("span", { className: "text-amber-500" }, " \u26A0\uFE0F")), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-center" }, statut === "suspendu" ? /* @__PURE__ */ React.createElement("span", { className: "text-amber-600 font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Clock, { size: 12 }), " Suspendu") : statut === "reporte" ? /* @__PURE__ */ React.createElement("span", { className: "text-indigo-600 font-bold flex items-center gap-1", title: v.moisReport ? `Report\xE9 \xE0 ${v.moisReport}` : "" }, "\u{1F4C5} Report\xE9", v.moisReport ? ` (${v.moisReport})` : "") : statut === "actif" ? /* @__PURE__ */ React.createElement("span", { className: "text-blue-600" }, "Actif") : /* @__PURE__ */ React.createElement("span", { className: "text-gray-400" }, "Archiv\xE9")), /* @__PURE__ */ React.createElement("td", { className: "p-2 flex justify-center gap-1 flex-wrap" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setFocusedVerif(v), className: "text-blue-600 p-1 bg-blue-50 rounded", title: "Voir" }, /* @__PURE__ */ React.createElement(Eye, { size: 13 })), peutModifier && /* @__PURE__ */ React.createElement("button", { onClick: () => {
             const statut2 = v.status || "archived";
@@ -3817,6 +3817,10 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
         onEditerFiche,
         // NOUVELLE PROP : fonction pour charger une fiche en édition
         numeroFicheCourante,
+        dateFiche,
+        setDateFiche,
+        prescritPar,
+        setPrescritPar,
         dateEntree1,
         setDateEntree1,
         dateSortie1,
@@ -4154,10 +4158,35 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
           setSearchPatientText("");
           setSuggestionsPatients([]);
         };
-        const reimprimerFicheValidee = (fiche) => {
+        const genererCorpsTicket = (fiche, entete) => {
           var _a;
           const lignesDetaillees = ((_a = fiche.rawState) == null ? void 0 : _a.lignesCalcul) || [];
-          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N\xB0${fiche.numeroFiche}</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p><p>R\xC9IMPRESSION \u2014 ${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")} ${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p></div><div style="font-weight:bold;font-size:11px;margin-bottom:6px;">Patient: ${echapperHTML(nomPatient)} \u2014 Fiche N\xB0${fiche.numeroFiche}</div><div style="font-size:10px;margin-bottom:6px;">Type: ${typePatient === "ONG" ? "Partenaire" : "Priv\xE9"}${typePatient === "ONG" && selectedOng ? ` \u2014 Partenaire: ${echapperHTML(selectedOng)}` : ""}</div><table><thead><tr><th>D\xE9signation</th><th class="qte">Qt\xE9</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${lignesDetaillees.map((l) => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte * l.prix)}</td></tr>`).join("")}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes (${formatDH(fiche.totalGlobal)} DH)</div><p style="font-size:10px;margin-top:4px;">Mode: ${echapperHTML((fiche.modePaiement || "cash").toUpperCase())} | Encaiss\xE9 par: ${echapperHTML(fiche.creePar || "inconnu")}</p><div class="footer">Merci de votre visite !<br/>CHF Syst\xE8me Hospitalier \u2013 ${(/* @__PURE__ */ new Date()).getFullYear()}</div></body></html>`;
+          return `<div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p><p>${entete}</p></div><div style="font-weight:bold;font-size:11px;margin-bottom:6px;">Patient: ${echapperHTML(nomPatient)} \u2014 Fiche N\xB0${fiche.numeroFiche}</div><div style="font-size:10px;margin-bottom:6px;">${typePatient === "ONG" ? `Partenaire : ${echapperHTML(selectedOng || "N/R")}` : "Priv\xE9"}</div><table><thead><tr><th>D\xE9signation</th><th class="qte">Qt\xE9</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${lignesDetaillees.map((l) => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte * l.prix)}</td></tr>`).join("")}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes (${formatDH(fiche.totalGlobal)} DH)</div><p style="font-size:10px;margin-top:4px;">${fiche.prescritPar ? `Prescrit par : ${echapperHTML(fiche.prescritPar)}` : ""}</p><div class="footer">Merci de votre visite !<br/>CHF Syst\xE8me Hospitalier \u2013 ${(/* @__PURE__ */ new Date()).getFullYear()}</div>`;
+        };
+        const STYLE_TICKET = `@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.page-fiche{page-break-after:always;}`;
+        const reimprimerFicheValidee = (fiche) => {
+          const entete = `R\xC9IMPRESSION \u2014 Fiche du ${(fiche.dateCreation ? new Date(fiche.dateCreation) : /* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")} (r\xE9imprim\xE9e le ${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")} ${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })})`;
+          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N\xB0${fiche.numeroFiche}</title><style>${STYLE_TICKET}</style></head><body>${genererCorpsTicket(fiche, entete)}</body></html>`;
+          const win = window.open("", "_blank", "width=500,height=700");
+          if (!win) {
+            showToast("Impression bloqu\xE9e par le navigateur. R\xE9essaie en cliquant sur Imprimer \u2014 si \xE7a ne marche toujours pas, demande \xE0 quelqu'un de v\xE9rifier les r\xE9glages.", "error");
+            return;
+          }
+          win.document.write(contenu);
+          win.document.close();
+          win.focus();
+          setTimeout(() => win.print(), 400);
+        };
+        const imprimerToutesLesFichesDuDossier = () => {
+          if (fichesDossier.length === 0) {
+            showToast("Aucune fiche \xE0 imprimer.", "error");
+            return;
+          }
+          const corps = fichesDossier.map((f) => {
+            const entete = `Fiche du ${(f.dateCreation ? new Date(f.dateCreation) : /* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")}`;
+            return `<div class="page-fiche">${genererCorpsTicket(f, entete)}</div>`;
+          }).join("");
+          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${fichesDossier.length} fiches \u2014 ${echapperHTML(nomPatient)}</title><style>${STYLE_TICKET}</style></head><body>${corps}</body></html>`;
           const win = window.open("", "_blank", "width=500,height=700");
           if (!win) {
             showToast("Impression bloqu\xE9e par le navigateur. R\xE9essaie en cliquant sur Imprimer \u2014 si \xE7a ne marche toujours pas, demande \xE0 quelqu'un de v\xE9rifier les r\xE9glages.", "error");
@@ -4197,9 +4226,10 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             telephone: telephone || "N/R",
             dateNaissance: dateNaissance || "N/R",
             typePatient: typePatient || "ONG",
-            creePar: ((_a = auth.currentUser) == null ? void 0 : _a.displayName) || "inconnu"
+            creePar: ((_a = auth.currentUser) == null ? void 0 : _a.displayName) || "inconnu",
+            prescritPar: prescritPar.trim() || ""
           };
-          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket CHF</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:17px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:27px;margin:4px 0;}.entete p{margin:2px 0;font-size:16px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:16px;margin-bottom:6px;}.info-patient{font-size:15px;margin-bottom:4px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:16px;}th,td{padding:5px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:14px;text-transform:uppercase;}.total{font-weight:bold;font-size:23px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:13px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.exoneration{color:red;font-weight:bold;font-size:19px;}.monnaie{font-size:19px;color:#006600;}.solde{color:#cc0000;font-weight:bold;}.depot-info{font-size:17px;color:#555;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p><p>${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")} ${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p></div><div class="info"><span>Patient: ${echapperHTML(data.nomPatient)}</span><span>${data.typePatient === "ONG" ? `Partenaire: ${echapperHTML(data.selectedOng || "N/R")}` : "Priv\xE9"}</span></div><div class="info"><span>Dossier: ${echapperHTML(data.numDossier)}</span></div><div class="info info-patient"><span>\u{1F4DE} ${echapperHTML(data.telephone)}</span><span>Type: ${data.typePatient === "ONG" ? "Partenaire" : "Priv\xE9"}</span></div><div class="info info-patient"><span>Enregistr\xE9 par: ${echapperHTML(data.creePar)}</span></div>${data.dateEntree1 && data.dateSortie1 ? `<p style="font-size:10px; margin:4px 0;"><strong>S\xE9jour:</strong> ${data.dateEntree1.split("-").reverse().slice(0, 2).join("/")} \u2192 ${data.dateSortie1.split("-").reverse().slice(0, 2).join("/")}</p>` : ""}<table><thead><tr><th>D\xE9signation</th><th class="qte">Qt\xE9</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${data.dateEntree1 && data.dateSortie1 ? `<tr><td>H\xE9bergement</td><td class="qte">${data.j1}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit1].prix)}</td><td class="sous-total">${formatGourdes(data.totalE1)}</td></tr>` : ""}${data.multiPeriode && data.dateEntree2 && data.dateSortie2 ? `<tr><td>H\xE9bergement P2</td><td class="qte">${data.j2}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit2].prix)}</td><td class="sous-total">${formatGourdes(data.totalE2)}</td></tr>` : ""}${data.hasChirSpec && data.nomChirSpec ? `<tr><td>Chirurgie: ${echapperHTML(data.nomChirSpec)}</td><td class="qte">1</td><td class="prix">${formatGourdes(data.totalChirSpec)}</td><td class="sous-total">${formatGourdes(data.totalChirSpec)}</td></tr>` : ""}${data.lignes.map((l) => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte * l.prix)}</td></tr>`).join("")}</tbody></table><div class="total">TOTAL: ${formatGourdes(data.grandTotal)} Gdes<br/>${formatDH(data.grandTotal)} DH</div><div class="footer">Merci de votre visite !<br/>CHF Syst\xE8me Hospitalier \u2013 ${(/* @__PURE__ */ new Date()).getFullYear()}</div></body></html>`;
+          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket CHF</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:17px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:27px;margin:4px 0;}.entete p{margin:2px 0;font-size:16px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:16px;margin-bottom:6px;}.info-patient{font-size:15px;margin-bottom:4px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:16px;}th,td{padding:5px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:14px;text-transform:uppercase;}.total{font-weight:bold;font-size:23px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:13px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.exoneration{color:red;font-weight:bold;font-size:19px;}.monnaie{font-size:19px;color:#006600;}.solde{color:#cc0000;font-weight:bold;}.depot-info{font-size:17px;color:#555;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p><p>${dateFiche.split("-").reverse().join("/")} ${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p></div><div class="info"><span>Patient: ${echapperHTML(data.nomPatient)}</span><span>${data.typePatient === "ONG" ? `Partenaire: ${echapperHTML(data.selectedOng || "N/R")}` : "Priv\xE9"}</span></div><div class="info info-patient"><span>\u{1F4DE} ${echapperHTML(data.telephone)}</span><span>\u{1F4C1} ${echapperHTML(data.numDossier)}</span></div><div class="info info-patient"><span>${data.prescritPar ? `Prescrit par: ${echapperHTML(data.prescritPar)}` : ""}</span></div>${data.dateEntree1 && data.dateSortie1 ? `<p style="font-size:10px; margin:4px 0;"><strong>S\xE9jour:</strong> ${data.dateEntree1.split("-").reverse().slice(0, 2).join("/")} \u2192 ${data.dateSortie1.split("-").reverse().slice(0, 2).join("/")}</p>` : ""}<table><thead><tr><th>D\xE9signation</th><th class="qte">Qt\xE9</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${data.dateEntree1 && data.dateSortie1 ? `<tr><td>H\xE9bergement</td><td class="qte">${data.j1}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit1].prix)}</td><td class="sous-total">${formatGourdes(data.totalE1)}</td></tr>` : ""}${data.multiPeriode && data.dateEntree2 && data.dateSortie2 ? `<tr><td>H\xE9bergement P2</td><td class="qte">${data.j2}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit2].prix)}</td><td class="sous-total">${formatGourdes(data.totalE2)}</td></tr>` : ""}${data.hasChirSpec && data.nomChirSpec ? `<tr><td>Chirurgie: ${echapperHTML(data.nomChirSpec)}</td><td class="qte">1</td><td class="prix">${formatGourdes(data.totalChirSpec)}</td><td class="sous-total">${formatGourdes(data.totalChirSpec)}</td></tr>` : ""}${data.lignes.map((l) => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte * l.prix)}</td></tr>`).join("")}</tbody></table><div class="total">TOTAL: ${formatGourdes(data.grandTotal)} Gdes<br/>${formatDH(data.grandTotal)} DH</div><div class="footer">Merci de votre visite !<br/>CHF Syst\xE8me Hospitalier \u2013 ${(/* @__PURE__ */ new Date()).getFullYear()}</div></body></html>`;
           const win = window.open("", "_blank", "width=500,height=700");
           if (!win) {
             showToast("Impression bloqu\xE9e par le navigateur. R\xE9essaie en cliquant sur Imprimer \u2014 si \xE7a ne marche toujours pas, demande \xE0 quelqu'un de v\xE9rifier les r\xE9glages.", "error");
@@ -4240,7 +4270,8 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             telephone: telephone || "N/R",
             dateNaissance: dateNaissance || "N/R",
             typePatient: typePatient || "ONG",
-            creePar: ((_b = auth.currentUser) == null ? void 0 : _b.displayName) || "inconnu"
+            creePar: ((_b = auth.currentUser) == null ? void 0 : _b.displayName) || "inconnu",
+            prescritPar: prescritPar.trim() || ""
           };
           const ligneHebergement = data.dateEntree1 && data.dateSortie1 ? `<tr><td>H\xE9bergement \u2014 ${echapperHTML(CONFIG_LITS[data.typeLit1].nom)}</td><td class="qte">${data.j1} j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit1].prix)}</td><td class="mtotal">${formatGourdes(data.totalE1)}</td></tr>` : "";
           const ligneHebergement2 = data.multiPeriode && data.dateEntree2 && data.dateSortie2 ? `<tr><td>H\xE9bergement (2e p\xE9riode) \u2014 ${echapperHTML(CONFIG_LITS[data.typeLit2].nom)}</td><td class="qte">${data.j2} j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit2].prix)}</td><td class="mtotal">${formatGourdes(data.totalE2)}</td></tr>` : "";
@@ -4269,7 +4300,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
       </style></head><body>
       <div class="entete">
         <div class="entete-gauche"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p></div>
-        <div class="entete-droite"><p>${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p><p>${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p><p>Fiche N\xB0${numeroFicheReelle}</p></div>
+        <div class="entete-droite"><p>${(/* @__PURE__ */ new Date(dateFiche + "T12:00:00")).toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p><p>Fiche N\xB0${numeroFicheReelle}</p></div>
       </div>
       <div class="titre-doc">Fiche de facturation</div>
       <div class="infos-patient">
@@ -4278,7 +4309,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
         <div><span class="label">N\xB0 Dossier</span><br/><span class="valeur">${echapperHTML(data.numDossier)}</span></div>
         <div><span class="label">T\xE9l\xE9phone</span><br/><span class="valeur">${echapperHTML(data.telephone)}</span></div>
         <div><span class="label">Date de naissance</span><br/><span class="valeur">${echapperHTML(data.dateNaissance)}</span></div>
-        <div><span class="label">Enregistr\xE9 par</span><br/><span class="valeur">${echapperHTML(data.creePar)}</span></div>
+        ${data.prescritPar ? `<div><span class="label">Prescrit par</span><br/><span class="valeur">${echapperHTML(data.prescritPar)}</span></div>` : ""}
       </div>
       ${data.dateEntree1 && data.dateSortie1 ? `<p style="font-size:12px;margin-bottom:12px;"><strong>S\xE9jour :</strong> du ${data.dateEntree1.split("-").reverse().join("/")} au ${data.dateSortie1.split("-").reverse().join("/")}</p>` : ""}
       <table><thead><tr><th>D\xE9signation</th><th class="qte">Qt\xE9</th><th class="prix">Prix unitaire</th><th class="mtotal">Total</th></tr></thead><tbody>${ligneHebergement}${ligneHebergement2}${ligneChir}${lignesArticles}</tbody></table>
@@ -4450,8 +4481,9 @@ Mode de paiement : ${libellesMode[modePaiement] || modePaiement}`,
               nbJours2: j2,
               totalHebergement2: totalE2
             } : null,
-            dateCreation: (/* @__PURE__ */ new Date()).toISOString(),
+            dateCreation: (/* @__PURE__ */ new Date(dateFiche + "T12:00:00")).toISOString(),
             creePar: ((_b = auth.currentUser) == null ? void 0 : _b.displayName) || "inconnu",
+            prescritPar: prescritPar.trim() || "",
             rawState: { lignesCalcul: [...lignes], dateEntree1, dateSortie1, typeLit1, multiPeriode, dateEntree2, dateSortie2, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
           };
           onEnregistrerFiche(fiche);
@@ -4527,18 +4559,18 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
         }, className: "text-[9px] font-bold text-blue-600 underline" }, "\u270F\uFE0F Changer")) : /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5 items-center mt-1 flex-wrap" }, /* @__PURE__ */ React.createElement("select", { value: nouveauTypeEdit, onChange: (e) => setNouveauTypeEdit(e.target.value), className: "border rounded p-1 text-xs bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "ONG" }, "\u{1F3E5} Partenaire"), /* @__PURE__ */ React.createElement("option", { value: "PRIVE" }, "\u{1F4B3} Priv\xE9")), nouveauTypeEdit === "ONG" && /* @__PURE__ */ React.createElement("select", { value: nouvelOngEdit, onChange: (e) => setNouvelOngEdit(e.target.value), className: "border rounded p-1 text-xs bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- Partenaire --"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o))), /* @__PURE__ */ React.createElement("button", { onClick: () => {
           if (onChangerTypeOng) onChangerTypeOng(nouveauTypeEdit, nouveauTypeEdit === "ONG" ? nouvelOngEdit : "");
           setEditTypeOuvert(false);
-        }, className: "bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(Check, { size: 10 })), /* @__PURE__ */ React.createElement("button", { onClick: () => setEditTypeOuvert(false), className: "border text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(X, { size: 10 })))), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 flex-wrap" }, peutAnnulerDossier && /* @__PURE__ */ React.createElement("button", { onClick: onAnnulerDossier, className: "bg-red-50 text-red-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-red-200" }, "Abandonner"), peutSuspendre && /* @__PURE__ */ React.createElement("button", { onClick: onSuspendreDossier, className: "bg-amber-50 text-amber-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-amber-200 flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Clock, { size: 12 }), " Suspendre"), peutSuspendre && onReporterDossier && /* @__PURE__ */ React.createElement("button", { onClick: onReporterDossier, className: "bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-indigo-200 flex items-center gap-1" }, "\u{1F4C5} Reporter au mois suivant"), peutArchiver && /* @__PURE__ */ React.createElement("button", { onClick: onCloturerDossier, className: "bg-emerald-700 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg" }, "\u{1F3C1} Cl\xF4turer"))), fichesDossier.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm space-y-1.5" }, /* @__PURE__ */ React.createElement("span", { className: "text-[9px] uppercase font-black text-gray-400" }, "Fiches valid\xE9es ", idFicheEnCoursDEdition ? "(modification en cours)" : ""), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-1.5" }, fichesDossier.map((f) => {
+        }, className: "bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(Check, { size: 10 })), /* @__PURE__ */ React.createElement("button", { onClick: () => setEditTypeOuvert(false), className: "border text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(X, { size: 10 })))), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 border-l pl-3" }, /* @__PURE__ */ React.createElement("label", { className: "text-[9px] font-bold text-gray-400 uppercase" }, "\u{1F4C5} Date", idFicheEnCoursDEdition ? " (fiche)" : " (nouvelle fiche)"), /* @__PURE__ */ React.createElement("input", { type: "date", value: dateFiche, onChange: (e) => setDateFiche(e.target.value), className: "border rounded p-1 text-xs font-mono" })), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5 border-l pl-3" }, /* @__PURE__ */ React.createElement("label", { className: "text-[9px] font-bold text-gray-400 uppercase" }, "\u{1FA7A} Prescrit par"), /* @__PURE__ */ React.createElement("input", { type: "text", value: prescritPar, onChange: (e) => setPrescritPar(e.target.value), placeholder: "Nom du m\xE9decin/infirmi\xE8re", className: "border rounded p-1 text-xs w-36" })), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 flex-wrap" }, peutAnnulerDossier && /* @__PURE__ */ React.createElement("button", { onClick: onAnnulerDossier, className: "bg-red-50 text-red-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-red-200" }, "Abandonner"), peutSuspendre && /* @__PURE__ */ React.createElement("button", { onClick: onSuspendreDossier, className: "bg-amber-50 text-amber-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-amber-200 flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Clock, { size: 12 }), " Suspendre"), peutSuspendre && onReporterDossier && /* @__PURE__ */ React.createElement("button", { onClick: onReporterDossier, className: "bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-indigo-200 flex items-center gap-1" }, "\u{1F4C5} Reporter au mois suivant"), peutArchiver && /* @__PURE__ */ React.createElement("button", { onClick: onCloturerDossier, className: "bg-emerald-700 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg" }, "\u{1F3C1} Cl\xF4turer"))), fichesDossier.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm space-y-1.5" }, /* @__PURE__ */ React.createElement("span", { className: "text-[9px] uppercase font-black text-gray-400" }, "Fiches valid\xE9es ", idFicheEnCoursDEdition ? "(modification en cours)" : ""), /* @__PURE__ */ React.createElement("button", { onClick: imprimerToutesLesFichesDuDossier, className: "ml-2 bg-[#1E2A24] text-white text-[9px] font-bold px-2 py-1 rounded-lg" }, "\u{1F5A8}\uFE0F Imprimer les ", fichesDossier.length, " fiche", fichesDossier.length > 1 ? "s" : "", " d'affil\xE9e"), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-1.5" }, fichesDossier.map((f) => {
           const isEditing = f.id === idFicheEnCoursDEdition;
-          return /* @__PURE__ */ React.createElement("div", { key: f.id, className: `flex items-center rounded-lg font-mono text-[11px] font-bold border overflow-hidden shadow-sm ${isEditing ? "bg-blue-100 border-blue-400" : f.probleme ? "bg-red-100 border-red-400" : "bg-gray-50 border-gray-200"}` }, /* @__PURE__ */ React.createElement("button", { onClick: () => reimprimerFicheValidee(f), className: "pl-2.5 pr-2 py-1 hover:text-blue-700", title: "R\xE9imprimer cette fiche" }, f.probleme && "\u26A0\uFE0F ", "\u{1F5A8}\uFE0F Fiche N\xB0", f.numeroFiche, " (", formatGourdes(f.totalGlobal), " Gdes)"), onMarquerProblemeFiche && /* @__PURE__ */ React.createElement(
+          return /* @__PURE__ */ React.createElement("div", { key: f.id, className: `flex items-center rounded-lg font-mono text-[11px] font-bold border overflow-hidden shadow-sm ${isEditing ? "bg-blue-100 border-blue-400" : f.probleme ? "bg-red-100 border-red-400" : "bg-gray-50 border-gray-200"}` }, /* @__PURE__ */ React.createElement("button", { onClick: () => reimprimerFicheValidee(f), className: "pl-2.5 pr-2 py-1 hover:text-blue-700", title: "R\xE9imprimer cette fiche" }, f.probleme && "\u2753 ", "\u{1F5A8}\uFE0F Fiche N\xB0", f.numeroFiche, " (", formatGourdes(f.totalGlobal), " Gdes)"), onMarquerProblemeFiche && /* @__PURE__ */ React.createElement(
             "button",
             {
               onClick: () => onMarquerProblemeFiche(f.id),
-              className: `px-2 py-1 border-l transition-colors font-bold text-[10px] ${f.probleme ? "bg-red-500/10 hover:bg-red-600 hover:text-white text-red-700" : "bg-gray-200/30 hover:bg-amber-500 hover:text-white text-gray-400"}`,
-              title: f.probleme ? f.noteProbleme ? `\u26A0\uFE0F ${f.noteProbleme}
+              className: `px-2 py-1 border-l transition-colors font-bold text-[10px] ${f.probleme ? "bg-amber-500/10 hover:bg-amber-600 hover:text-white text-amber-700" : "bg-emerald-500/10 hover:bg-emerald-600 hover:text-white text-emerald-700"}`,
+              title: f.probleme ? f.noteProbleme ? `\u2753 ${f.noteProbleme}
 
-(clique pour retirer le marquage)` : "Retirer le marquage probl\xE8me" : "Marquer cette fiche comme ayant un probl\xE8me"
+(clique pour retirer le marquage)` : "Retirer le marquage \u2014 probl\xE8me r\xE9gl\xE9" : "Tout va bien \u2014 clique pour signaler un probl\xE8me"
             },
-            "\u26A0\uFE0F"
+            f.probleme ? "\u2753" : "\u2705"
           ), onEditerFiche && /* @__PURE__ */ React.createElement(
             "button",
             {
@@ -5195,6 +5227,31 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
             showToast("Erreur lors de la suppression.", "error");
           }
         };
+        const groupesDoublons = Object.values(
+          listeOngDocs.reduce((acc, o) => {
+            const cle = (o.nom || "").trim().toLowerCase();
+            (acc[cle] = acc[cle] || []).push(o);
+            return acc;
+          }, {})
+        ).filter((g) => g.length > 1);
+        const nettoyerDoublons = async () => {
+          const nbDoublons = groupesDoublons.reduce((s, g) => s + (g.length - 1), 0);
+          if (!confirm(`${groupesDoublons.length} partenaire(s) en double trouv\xE9(s) (${nbDoublons} fiche(s) en trop au total). Garder une seule fiche par partenaire et supprimer le reste ?`)) return;
+          try {
+            const batch = db.batch();
+            groupesDoublons.forEach((groupe) => {
+              const aGarder = groupe.reduce((m, o) => (o.prochainNumero || 1) > (m.prochainNumero || 1) ? o : m, groupe[0]);
+              groupe.forEach((o) => {
+                if (o.id !== aGarder.id) batch.delete(db.collection("ong_partenaires").doc(o.id));
+              });
+            });
+            await batch.commit();
+            enregistrerAudit("nettoyage_doublons_ong_partenaires", { nbSupprimes: nbDoublons });
+            showToast(`${nbDoublons} doublon(s) supprim\xE9(s)`, "success");
+          } catch (e) {
+            showToast("Erreur lors du nettoyage.", "error");
+          }
+        };
         const modifierProchainNumero = async (id, nom, valeur) => {
           const numero = parseInt(valeur, 10);
           if (!numero || numero < 1) return;
@@ -5218,7 +5275,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
             placeholder: "Nom du partenaire...",
             className: "border rounded-lg p-2 flex-1 outline-none"
           }
-        ), /* @__PURE__ */ React.createElement("button", { onClick: ajouter, className: "bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold" }, "Ajouter"))), /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl border overflow-hidden divide-y" }, listeOngDocs.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "text-gray-500 p-3" }, "Aucun partenaire enregistr\xE9."), listeOngDocs.map((o) => /* @__PURE__ */ React.createElement("div", { key: o.id, className: "p-3 flex justify-between items-center hover:bg-gray-50" }, /* @__PURE__ */ React.createElement("span", { className: "font-medium text-gray-700" }, o.nom), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-3" }, /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1.5 text-[10px] text-gray-500" }, "Prochain N\xB0", /* @__PURE__ */ React.createElement(
+        ), /* @__PURE__ */ React.createElement("button", { onClick: ajouter, className: "bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold" }, "Ajouter")), groupesDoublons.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg p-2 mt-1" }, /* @__PURE__ */ React.createElement("span", { className: "text-amber-800 font-semibold" }, "\u26A0\uFE0F ", groupesDoublons.length, " partenaire(s) en double d\xE9tect\xE9(s) dans la liste ci-dessous."), /* @__PURE__ */ React.createElement("button", { onClick: nettoyerDoublons, className: "bg-amber-600 text-white px-3 py-1.5 rounded-lg font-bold whitespace-nowrap" }, "\u{1F9F9} Nettoyer les doublons"))), /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl border overflow-hidden divide-y" }, listeOngDocs.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "text-gray-500 p-3" }, "Aucun partenaire enregistr\xE9."), listeOngDocs.map((o) => /* @__PURE__ */ React.createElement("div", { key: o.id, className: "p-3 flex justify-between items-center hover:bg-gray-50" }, /* @__PURE__ */ React.createElement("span", { className: "font-medium text-gray-700" }, o.nom), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-3" }, /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1.5 text-[10px] text-gray-500" }, "Prochain N\xB0", /* @__PURE__ */ React.createElement(
           "input",
           {
             type: "number",
@@ -5289,6 +5346,8 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
         const [idFicheEnCoursDEdition, setIdFicheEnCoursDEdition] = useState(null);
         const [modePreValidation, setModePreValidation] = useState(false);
         const [lignesCalcul, setLignesCalcul] = useState([]);
+        const [dateFiche, setDateFiche] = useState(() => (/* @__PURE__ */ new Date()).toISOString().split("T")[0]);
+        const [prescritPar, setPrescritPar] = useState("");
         const [dateEntree1, setDateEntree1] = useState("");
         const [dateSortie1, setDateSortie1] = useState("");
         const [typeLit1, setTypeLit1] = useState("normal");
@@ -5376,7 +5435,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           const unsubscribe = db.collection("ong_partenaires").orderBy("nom").onSnapshot((snapshot) => {
             if (snapshot.empty) {
               const batch = db.batch();
-              LISTE_ONG.forEach((nom) => batch.set(db.collection("ong_partenaires").doc(), { nom, dateAjout: firebase2.firestore.FieldValue.serverTimestamp() }));
+              LISTE_ONG.forEach((nom) => batch.set(db.collection("ong_partenaires").doc(nom.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")), { nom, dateAjout: firebase2.firestore.FieldValue.serverTimestamp() }));
               batch.commit().catch((e) => console.warn("Amor\xE7age ong_partenaires:", e));
               return;
             }
@@ -5454,6 +5513,8 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
         const viderLeCalculateurFicheUniquement = () => {
           setLignesCalcul([]);
           setIdFicheEnCoursDEdition(null);
+          setDateFiche((/* @__PURE__ */ new Date()).toISOString().split("T")[0]);
+          setPrescritPar("");
           setDateEntree1("");
           setDateSortie1("");
           setTypeLit1("normal");
@@ -5474,6 +5535,8 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
             return;
           }
           const raw = fiche.rawState || {};
+          setDateFiche(fiche.dateCreation ? fiche.dateCreation.split("T")[0] : (/* @__PURE__ */ new Date()).toISOString().split("T")[0]);
+          setPrescritPar(fiche.prescritPar || "");
           setLignesCalcul(raw.lignesCalcul || []);
           setDateEntree1(raw.dateEntree1 || "");
           setDateSortie1(raw.dateSortie1 || "");
@@ -5783,7 +5846,8 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             timestamp: Date.now()
           };
           try {
-            await chf.updateEpisode(dossierId, toEpisodeApi(dossierSuspendu));
+            const { noteSuspension: _omisePourApi, ...dossierSuspenduPourApi } = dossierSuspendu;
+            await chf.updateEpisode(dossierId, toEpisodeApi(dossierSuspenduPourApi));
             const updatedItems = verifications.map((v) => v.id === dossierId ? { ...v, ...dossierSuspendu } : v);
             setVerifications(updatedItems);
             showToast(`Dossier suspendu avec ${listeFiches.length} fiche(s)`, "success");
@@ -6366,6 +6430,10 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             idFicheEnCoursDEdition,
             onEditerFiche: editerFiche,
             numeroFicheCourante,
+            dateFiche,
+            setDateFiche,
+            prescritPar,
+            setPrescritPar,
             dateEntree1,
             setDateEntree1,
             dateSortie1,

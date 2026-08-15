@@ -53,6 +53,8 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
   const [idFicheEnCoursDEdition, setIdFicheEnCoursDEdition] = useState(null); // ID de la fiche en édition
   const [modePreValidation, setModePreValidation] = useState(false);
   const [lignesCalcul, setLignesCalcul] = useState([]);
+  const [dateFiche, setDateFiche] = useState(() => new Date().toISOString().split('T')[0]); // date réelle du service — modifiable si saisie en retard
+  const [prescritPar, setPrescritPar] = useState(""); // nom du médecin/infirmière qui a prescrit — tapé clairement, remplace la signature manuscrite illisible
   const [dateEntree1, setDateEntree1] = useState("");
   const [dateSortie1, setDateSortie1] = useState("");
   const [typeLit1, setTypeLit1] = useState("normal");
@@ -140,8 +142,10 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
     const unsubscribe = db.collection('ong_partenaires').orderBy('nom').onSnapshot(snapshot => {
       if (snapshot.empty) {
         // Première utilisation : amorce la collection avec l'ancienne liste codée en dur, pour ne rien casser.
+        // ID de document = nom normalisé (pas un ID aléatoire) → idempotent, même si ce code se déclenche
+        // plusieurs fois (double onSnapshot au chargement), ça écrase le même doc au lieu d'en créer un second.
         const batch = db.batch();
-        LISTE_ONG.forEach(nom => batch.set(db.collection('ong_partenaires').doc(), { nom, dateAjout: firebase.firestore.FieldValue.serverTimestamp() }));
+        LISTE_ONG.forEach(nom => batch.set(db.collection('ong_partenaires').doc(nom.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')), { nom, dateAjout: firebase.firestore.FieldValue.serverTimestamp() }));
         batch.commit().catch(e => console.warn("Amorçage ong_partenaires:", e));
         return; // le prochain onSnapshot (déclenché par ce commit) mettra à jour l'état
       }
@@ -181,6 +185,8 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
   const viderLeCalculateurFicheUniquement = () => {
     setLignesCalcul([]);
     setIdFicheEnCoursDEdition(null);
+    setDateFiche(new Date().toISOString().split('T')[0]);
+    setPrescritPar("");
     setDateEntree1("");
     setDateSortie1("");
     setTypeLit1("normal");
@@ -204,6 +210,8 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
     }
     // Restaurer l'état du calculateur à partir de rawState
     const raw = fiche.rawState || {};
+    setDateFiche(fiche.dateCreation ? fiche.dateCreation.split('T')[0] : new Date().toISOString().split('T')[0]);
+    setPrescritPar(fiche.prescritPar || "");
     setLignesCalcul(raw.lignesCalcul || []);
     setDateEntree1(raw.dateEntree1 || "");
     setDateSortie1(raw.dateSortie1 || "");
@@ -469,7 +477,11 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
     };
 
     try {
-      await chf.updateEpisode(dossierId, toEpisodeApi(dossierSuspendu));
+      // ⚠️ noteSuspension n'est PAS envoyée à l'API : la colonne 'note_suspension' n'existe pas
+      // encore côté base de données (Supabase) — voir NOTES_POUR_PROCHAIN_CLAUDE.md.
+      // Elle reste gardée en local (dossierSuspendu) pour s'afficher tout de suite dans cette session.
+      const { noteSuspension: _omisePourApi, ...dossierSuspenduPourApi } = dossierSuspendu;
+      await chf.updateEpisode(dossierId, toEpisodeApi(dossierSuspenduPourApi));
       const updatedItems = verifications.map(v => v.id === dossierId ? { ...v, ...dossierSuspendu } : v);
       setVerifications(updatedItems);
       showToast(`Dossier suspendu avec ${listeFiches.length} fiche(s)`, "success");
@@ -1008,6 +1020,8 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
               idFicheEnCoursDEdition={idFicheEnCoursDEdition}  // <-- passé pour affichage
               onEditerFiche={editerFiche}                       // <-- nouvelle prop
               numeroFicheCourante={numeroFicheCourante}
+              dateFiche={dateFiche} setDateFiche={setDateFiche}
+              prescritPar={prescritPar} setPrescritPar={setPrescritPar}
               dateEntree1={dateEntree1} setDateEntree1={setDateEntree1} dateSortie1={dateSortie1} setDateSortie1={setDateSortie1}
               typeLit1={typeLit1} setTypeLit1={setTypeLit1} j1={j1} totalE1={totalE1}
               multiPeriode={multiPeriode} setMultiPeriode={setMultiPeriode} dateEntree2={dateEntree2} setDateEntree2={setDateEntree2}
