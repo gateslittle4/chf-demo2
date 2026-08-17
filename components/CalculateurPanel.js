@@ -687,6 +687,21 @@ function CalculateurPanel({
                 </div>
               )}
             </div>
+            {fichesDossier.length > 1 && (() => {
+              const fichesTriees = [...fichesDossier].sort((a,b) => a.numeroFiche - b.numeroFiche);
+              const indexActuel = idFicheEnCoursDEdition ? fichesTriees.findIndex(f => f.id === idFicheEnCoursDEdition) : fichesTriees.length;
+              const peutPrecedente = indexActuel > 0;
+              const peutSuivante = idFicheEnCoursDEdition && indexActuel < fichesTriees.length - 1;
+              return (
+                <div className="flex items-center justify-center gap-3 bg-gray-50 rounded-lg py-1.5 border">
+                  <button onClick={() => peutPrecedente && onEditerFiche(fichesTriees[indexActuel - 1].id)} disabled={!peutPrecedente} className="px-2 py-0.5 text-gray-600 disabled:opacity-20 disabled:cursor-not-allowed font-bold text-lg">◀</button>
+                  <span className="text-[10px] font-bold text-gray-500 font-mono">
+                    {idFicheEnCoursDEdition ? `Fiche N°${fichesTriees[indexActuel]?.numeroFiche} (${indexActuel + 1}/${fichesTriees.length})` : "Nouvelle fiche"}
+                  </span>
+                  <button onClick={() => peutSuivante && onEditerFiche(fichesTriees[indexActuel + 1].id)} disabled={!peutSuivante} className="px-2 py-0.5 text-gray-600 disabled:opacity-20 disabled:cursor-not-allowed font-bold text-lg">▶</button>
+                </div>
+              );
+            })()}
             {tarifChoisi === "nouveau" && <p className="text-[9px] text-indigo-600 font-bold">⚠️ Les articles ajoutés utiliseront le nouveau prix (à venir) quand il existe.</p>}
             <div className="flex gap-2 text-xs font-semibold">
               <button onClick={()=>{ setCategorie("med"); setSelection(null); }} className={`flex-1 py-1.5 border rounded-lg ${categorie==="med" ? "bg-[#1E2A24] text-white" : "bg-gray-50"}`}>💊 Pharmacie</button>

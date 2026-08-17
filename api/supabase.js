@@ -73,7 +73,12 @@ class CHF_API {
   }
 
   async syncPending() {
-    if (!navigator.onLine || this.pendingQueue.length === 0) return;
+    // On ne se fie plus à navigator.onLine ici : sur certains téléphones/navigateurs, ce
+    // drapeau reste bloqué à "false" même quand la connexion fonctionne réellement. La seule
+    // vraie preuve de connexion, c'est une requête qui aboutit — donc on tente toujours si la
+    // file n'est pas vide, et on laisse chaque requête individuelle échouer/se remettre en
+    // file si la connexion n'est vraiment pas là.
+    if (this.pendingQueue.length === 0) return;
     console.log(`🔄 Sync de ${this.pendingQueue.length} opérations...`);
     const queue = [...this.pendingQueue];
     this.pendingQueue = [];

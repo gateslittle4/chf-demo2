@@ -209,7 +209,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       r++;
       appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.gras);
       ws.getCell(r, 1).value = "FACTURE";
-      ws.getCell(r, 2).value = `${ongCible.replace(/\s+/g,'')}-LOT${numeroLot}`;
+      ws.getCell(r, 2).value = `N°${numeroLot}`;
       ws.getCell(r, 5).value = nomCompletOng(ongCible);
       appliquerStyle(ws.getCell(r, 5), EXCEL_STYLES.gras);
       r++;
@@ -526,10 +526,10 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                   <div key={v.id} className="flex justify-between items-start py-2 text-xs font-mono gap-2">
                     <div className="flex-1 min-w-0">
                       <span className={`inline-block w-16 ${v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? 'text-gray-500' : 'text-red-500'}`}>{v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? v.dateEntreePourTri.split('-').reverse().join('/') : 'sans exeat'}</span>
-                      {v.nomPatient} <span className="text-gray-400">— {formatGourdes(v.totalGlobal||0)} Gdes</span>
+                      {v.nomPatient} <span className="text-gray-400">— {formatGourdes(v.totalGlobal||0)} Gdes <span className="text-indigo-400">({formatDH(v.totalGlobal||0)} DH)</span></span>
                       <div className="flex flex-wrap gap-1 mt-1 pl-16">
                         {ventilationDossier(v).map(x => (
-                          <span key={x.label} className="bg-indigo-50 text-indigo-700 border border-indigo-100 rounded px-1.5 py-0.5 text-[10px] whitespace-nowrap">{x.label}: {formatGourdes(x.montant)}</span>
+                          <span key={x.label} className="bg-indigo-50 text-indigo-700 border border-indigo-100 rounded px-1.5 py-0.5 text-[10px] whitespace-nowrap">{x.label}: {formatDH(x.montant)} DH</span>
                         ))}
                       </div>
                     </div>
