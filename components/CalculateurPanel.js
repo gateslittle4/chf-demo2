@@ -526,12 +526,12 @@ function CalculateurPanel({
   return (
     <div className="space-y-4">
       {confirmModal && <ConfirmModal {...confirmModal} />}
-      {estMobile && dossierActif && (
+      {dossierActif && (
         <button onClick={enregistrerFicheActive} disabled={!peutArchiver}
-          className="fixed right-2 z-50 bg-emerald-700 active:bg-emerald-800 text-white rounded-full shadow-2xl disabled:opacity-40 flex flex-col items-center justify-center gap-0.5 w-16 h-16"
+          className="fixed right-2 z-50 bg-emerald-700 active:bg-emerald-800 hover:bg-emerald-800 text-white rounded-full shadow-2xl disabled:opacity-40 flex flex-col items-center justify-center gap-0.5 w-16 h-16"
           style={{ top: '42%' }}>
           <span className="text-xl leading-none">💾</span>
-          <span className="text-[8px] font-black leading-none">Sauver</span>
+          <span className="text-[8px] font-black leading-none">{idFicheEnCoursDEdition ? 'Màj' : 'Sauver'}</span>
         </button>
       )}
       {!dossierActif ? (

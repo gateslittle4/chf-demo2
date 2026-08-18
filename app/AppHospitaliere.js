@@ -129,7 +129,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
       }
     };
     loadData();
-    const interval = setInterval(() => { if (!document.hidden) loadData(); }, 45000);
+    const interval = setInterval(() => { if (!document.hidden) loadData(); }, 180000); // 3 min — espacé pour économiser data/performance à l'échelle de 200+ dossiers
     return () => clearInterval(interval);
   }, []);
 

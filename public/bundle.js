@@ -4488,16 +4488,16 @@ Mode de paiement : ${libellesMode[modePaiement] || modePaiement}`,
           setPaiementEffectue(true);
           showToast(idFicheEnCoursDEdition ? "Fiche mise \xE0 jour" : "Fiche enregistr\xE9e", "success");
         };
-        return /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, confirmModal && /* @__PURE__ */ React.createElement(ConfirmModal, { ...confirmModal }), estMobile && dossierActif && /* @__PURE__ */ React.createElement(
+        return /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, confirmModal && /* @__PURE__ */ React.createElement(ConfirmModal, { ...confirmModal }), dossierActif && /* @__PURE__ */ React.createElement(
           "button",
           {
             onClick: enregistrerFicheActive,
             disabled: !peutArchiver,
-            className: "fixed right-2 z-50 bg-emerald-700 active:bg-emerald-800 text-white rounded-full shadow-2xl disabled:opacity-40 flex flex-col items-center justify-center gap-0.5 w-16 h-16",
+            className: "fixed right-2 z-50 bg-emerald-700 active:bg-emerald-800 hover:bg-emerald-800 text-white rounded-full shadow-2xl disabled:opacity-40 flex flex-col items-center justify-center gap-0.5 w-16 h-16",
             style: { top: "42%" }
           },
           /* @__PURE__ */ React.createElement("span", { className: "text-xl leading-none" }, "\u{1F4BE}"),
-          /* @__PURE__ */ React.createElement("span", { className: "text-[8px] font-black leading-none" }, "Sauver")
+          /* @__PURE__ */ React.createElement("span", { className: "text-[8px] font-black leading-none" }, idFicheEnCoursDEdition ? "M\xE0j" : "Sauver")
         ), !dossierActif ? /* @__PURE__ */ React.createElement(
           NouveauDossierForm,
           {
@@ -5429,7 +5429,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           loadData();
           const interval = setInterval(() => {
             if (!document.hidden) loadData();
-          }, 45e3);
+          }, 18e4);
           return () => clearInterval(interval);
         }, []);
         useEffect(() => {
