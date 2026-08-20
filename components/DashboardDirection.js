@@ -31,7 +31,7 @@ function DashboardDirectionPanel({ verifications, paiements, medicaments }) {
         const dateFiche = f.dateCreation ? new Date(f.dateCreation) : parseDateDossier(v.dateHeure);
         if (!dateFiche || isNaN(dateFiche)) return;
         const montant = f.totalGlobal || 0;
-        if ((f.modePaiement === 'cash' || f.modePaiement === 'ong') && dateFiche.getMonth() === mois && dateFiche.getFullYear() === annee) caMois += montant;
+        if (dateFiche.getMonth() === mois && dateFiche.getFullYear() === annee) caMois += montant;
         if (estAujourdhui(dateFiche)) {
           if (f.modePaiement === 'cash') caJourCash += montant;
           if (f.modePaiement === 'ong') caJourOng += montant;

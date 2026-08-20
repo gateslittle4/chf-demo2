@@ -13,16 +13,19 @@ const HebergementForm = require('./HebergementForm');
 // Ce composant est long mais intégral. Il gère la création d'épisode, l'ajout de lignes, les paiements,
 // les dépôts, les impressions, etc. Toutes les conversions vers l'API sont faites.
 function CalculateurPanel({
-  medicaments, actes, lignes, setLignes, dossierActif, nomPatient, selectedOng, onNouveauDossier, onAnnulerDossier, onCloturerDossier,
-  fichesDossier, onSupprimerFicheDossier,
+  medicaments, actes, setActes, lignes, setLignes, dossierActif, nomPatient, selectedOng, onNouveauDossier, onAnnulerDossier, onCloturerDossier,
+  fichesDossier, onSupprimerFicheDossier, onMarquerProblemeFiche,
   idFicheEnCoursDEdition,  // ID de la fiche en cours d'édition (passé par le parent)
   onEditerFiche,           // NOUVELLE PROP : fonction pour charger une fiche en édition
   numeroFicheCourante,
+  dateFiche, setDateFiche,
+  prescritPar, setPrescritPar,
   dateEntree1, setDateEntree1, dateSortie1, setDateSortie1,
   typeLit1, setTypeLit1, j1, totalE1, multiPeriode, setMultiPeriode, dateEntree2, setDateEntree2,
   dateSortie2, setDateSortie2, typeLit2, setTypeLit2, j2, totalE2, hasChirSpec, setHasChirSpec,
-  nomChirSpec, setNomChirSpec, prixChirSpec, setPrixChirSpec, totalsParService, grandTotal,
+  nomChirSpec, setNomChirSpec, prixChirSpec, setPrixChirSpec, totalsParService, coutsParService, grandTotal,
   totalDossierGourdes, onEnregistrerFiche, onViderFicheActive, injecterLigne, modeSimulation,
+  tarifChoisi, setTarifChoisi,
   userRole, userDisplayName, setMedicaments, medicamentsState, dateNaissance, telephone, numDossierPatient, typePatient,
   dossierId, setDossierId, patientsExistants, onChargerPatientExistant,
   paiementEffectue, setPaiementEffectue,
@@ -39,8 +42,17 @@ function CalculateurPanel({
   const [inputDateNaissance, setInputDateNaissance] = useState("");
   const [inputTelephone, setInputTelephone] = useState("");
   const [categorie, setCategorie] = useState("med");
+  const [detailOuvert, setDetailOuvert] = useState(false); // mobile : affiche le récapitulatif complet en plein écran au tap
   const [recherche, setRecherche] = useState("");
   const [ouvert, setOuvert] = useState(false);
+  const [lettreActive, setLettreActive] = useState(null); // null = pas encore choisie -> aucune lettre affichée par défaut
+  const [sousCategorieActeActive, setSousCategorieActeActive] = useState(null); // null = toutes
+  const [estMobile, setEstMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+  useEffect(() => {
+    const onResize = () => setEstMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   const [selection, setSelection] = useState(null);
   const [quantite, setQuantite] = useState("1");
 
@@ -65,8 +77,77 @@ function CalculateurPanel({
   const [editNomOuvert, setEditNomOuvert] = useState(false);
   const [nouveauNomEdit, setNouveauNomEdit] = useState("");
 
+  // --- File d'attente de fiches à importer (digitalisation papier) ---
+  const [fileImport, setFileImport] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('chf-file-import') || '[]'); } catch { return []; }
+  });
+  useEffect(() => { localStorage.setItem('chf-file-import', JSON.stringify(fileImport)); }, [fileImport]);
+  const [fileOuverte, setFileOuverte] = useState(false);
+  const [collageJson, setCollageJson] = useState("");
+  const [idEntreeChargee, setIdEntreeChargee] = useState(null); // entrée de la file en cours d'import, retirée après sauvegarde
+
+  const trouverDansCatalogue = (nom, type) => {
+    const source = type === 'med' ? medicaments : actes;
+    const cible = (nom || '').trim().toLowerCase();
+    return source.find(i => i.nom.trim().toLowerCase() === cible);
+  };
+
+  const chargerEntreeFile = (entree) => {
+    const p = entree.patient || {};
+    if (!dossierActif) {
+      setInputNom(p.nom || "");
+      setInputOng(p.ong || "");
+      setInputTypePatient(p.typePatient || "ONG");
+    }
+    const introuvables = [];
+    (entree.lignes || []).forEach(l => {
+      const item = trouverDansCatalogue(l.nom, l.type);
+      if (item) injecterLigne(item, l.type, l.qte || 1);
+      else introuvables.push(l.nom);
+    });
+    if (introuvables.length > 0) showToast(`Introuvable(s) dans le catalogue : ${introuvables.join(', ')}`, "error");
+    setIdEntreeChargee(entree._id);
+    setFileOuverte(false);
+  };
+
+  const ajouterAuCollage = () => {
+    try {
+      const parsed = JSON.parse(collageJson);
+      const entrees = Array.isArray(parsed) ? parsed : [parsed];
+      const avecId = entrees.map(e => ({ ...e, _id: "fi-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6) }));
+      setFileImport(prev => [...prev, ...avecId]);
+      setCollageJson("");
+      showToast(`${avecId.length} fiche(s) ajoutée(s) à la file`, "success");
+    } catch (e) {
+      showToast("JSON invalide : " + e.message, "error");
+    }
+  };
+  const retirerDeLaFile = (id) => setFileImport(prev => prev.filter(e => e._id !== id));
+
   const refZone = useRef(null);
   const inputRechercheRef = useRef(null);
+
+  // --- Répétition automatique des boutons +/- quand on reste appuyé (souris ou tactile) :
+  // 1 clic normal = +1 comme avant ; rester appuyé > ~400ms déclenche une répétition qui
+  // accélère progressivement, pour ne pas avoir à cliquer 60 fois pour une quantité de 60.
+  const holdDelaiRef = useRef(null);
+  const holdIntervalRef = useRef(null);
+  const demarrerRepetition = (fn) => {
+    fn(); // premier appui = +1 immédiat, comme un clic normal
+    holdDelaiRef.current = setTimeout(() => {
+      let vitesse = 180;
+      const tick = () => {
+        fn();
+        vitesse = Math.max(35, vitesse - 15); // accélère jusqu'à un plancher, sans devenir incontrôlable
+        holdIntervalRef.current = setTimeout(tick, vitesse);
+      };
+      tick();
+    }, 400);
+  };
+  const arreterRepetition = () => {
+    clearTimeout(holdDelaiRef.current);
+    clearTimeout(holdIntervalRef.current);
+  };
 
   const catalogueFiltre = categorie === "med" ? medicaments : actes;
   const suggestions = useMemo(() => {
@@ -74,6 +155,25 @@ function CalculateurPanel({
     if (!q) return catalogueFiltre.slice(0, 5);
     return catalogueFiltre.filter(i => i.nom.toLowerCase().includes(q)).slice(0, 5);
   }, [recherche, catalogueFiltre]);
+
+  // --- Grille cliquable pour ordinateur (souris uniquement, sans clavier) ---
+  const premiereLettre = (nom) => (nom || '?').normalize('NFD').replace(/[\u0300-\u036f]/g, '')[0].toUpperCase();
+  const lettresDisponibles = useMemo(() => {
+    return [...new Set(medicaments.map(m => premiereLettre(m.nom)))].sort();
+  }, [medicaments]);
+  const categoriesActesDisponibles = useMemo(() => {
+    const { CATEGORIES_LISTE } = require('../utils/constants');
+    const clesUtilisees = new Set(actes.map(a => a.sub || 'chirurgie'));
+    return CATEGORIES_LISTE.filter(c => c.key !== 'hospit' && clesUtilisees.has(c.key));
+  }, [actes]);
+  const catalogueGrille = useMemo(() => {
+    if (categorie === "med") {
+      const lettre = lettreActive || lettresDisponibles[0];
+      return medicaments.filter(m => premiereLettre(m.nom) === lettre).sort((a, b) => a.nom.localeCompare(b.nom));
+    }
+    const filtres = sousCategorieActeActive ? actes.filter(a => (a.sub || 'chirurgie') === sousCategorieActeActive) : actes;
+    return [...filtres].sort((a, b) => (a.ordre ?? 9999) - (b.ordre ?? 9999) || a.nom.localeCompare(b.nom));
+  }, [categorie, medicaments, actes, lettreActive, lettresDisponibles, sousCategorieActeActive]);
 
   useEffect(() => {
     if (!dossierId) { setDepots([]); return; }
@@ -114,29 +214,36 @@ function CalculateurPanel({
 
   const soldeRestantDepot = totalDossierGourdes + grandTotal - totalDepots - (parseFloat(montantDepot) || 0);
 
-  const actionAjouterSoin = () => {
-    if (!selection) return;
-    const q = parseFloat(quantite);
-    if (isNaN(q) || q <= 0) return;
+  const ajouterAvecQuantite = (item, q) => {
+    if (!item || isNaN(q) || q <= 0) return;
     if (categorie === "med") {
-      const stockActuel = selection.quantite || 0;
-      if (stockActuel < q) { showToast(`Stock insuffisant pour "${selection.nom}". Restant : ${stockActuel}`, "error"); return; }
+      const stockActuel = item.quantite || 0;
+      if (stockActuel < q) { showToast(`Stock insuffisant pour "${item.nom}". Restant : ${stockActuel}`, "error"); return; }
     }
-    injecterLigne(selection, categorie, q);
-    if (categorie === "med" && selection.quantite !== undefined) {
+    injecterLigne(item, categorie, q);
+    if (categorie === "med" && item.quantite !== undefined) {
       const updated = medicaments.map(m => {
-        if (m.id === selection.id) { return { ...m, quantite: Math.max(0, (m.quantite || 0) - q) }; }
+        if (m.id === item.id) { return { ...m, quantite: Math.max(0, (m.quantite || 0) - q), nbUtilisations: (m.nbUtilisations || 0) + 1 }; }
         return m;
       });
       setMedicaments(updated);
       const { LOG_MEDS_KEY } = require('../api/firebase');
       localStorage.setItem(LOG_MEDS_KEY, JSON.stringify(updated));
       chf.updateCatalog('medicaments', updated).catch(e => console.warn(e));
+    } else if (categorie === "acte" && setActes) {
+      // Les actes n'ont pas de stock à décrémenter, mais on suit quand même la fréquence d'usage
+      // pour faire remonter les plus utilisés en haut de leur lettre/catégorie (moins de clics).
+      const updated = actes.map(a => a.id === item.id ? { ...a, nbUtilisations: (a.nbUtilisations || 0) + 1 } : a);
+      setActes(updated);
+      const { LOG_ACTES_KEY } = require('../api/firebase');
+      localStorage.setItem(LOG_ACTES_KEY, JSON.stringify(updated));
+      chf.updateCatalog('actes', updated).catch(e => console.warn(e));
     }
     setRecherche(""); setSelection(null); setQuantite("1");
     if (inputRechercheRef.current) inputRechercheRef.current.focus();
     setPaiementEffectue(false);
   };
+  const actionAjouterSoin = () => { const q = parseFloat(quantite); ajouterAvecQuantite(selection, q); };
 
   const demanderExoneration = async () => {
     if (modePaiement !== "exoneration") { showToast("Sélectionnez le mode Exonération.", "error"); return; }
@@ -220,10 +327,27 @@ function CalculateurPanel({
     setSearchPatientText(""); setSuggestionsPatients([]);
   };
 
-  // Réimpression d'une fiche (inchangée)
-  const reimprimerFicheValidee = (fiche) => {
+  // --- Corps réutilisable d'un ticket (une fiche) — utilisé pour la réimpression seule ET l'impression groupée ---
+  const genererCorpsTicket = (fiche) => {
     const lignesDetaillees = fiche.rawState?.lignesCalcul || [];
-    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N°${fiche.numeroFiche}</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p><p>RÉIMPRESSION — ${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</p></div><div style="font-weight:bold;font-size:11px;margin-bottom:6px;">Patient: ${echapperHTML(nomPatient)} — Fiche N°${fiche.numeroFiche}</div><div style="font-size:10px;margin-bottom:6px;">Type: ${typePatient === 'ONG' ? 'Partenaire' : 'Privé'}${(typePatient === 'ONG' && selectedOng) ? ` — Partenaire: ${echapperHTML(selectedOng)}` : ''}</div><table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${lignesDetaillees.map(l => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte*l.prix)}</td></tr>`).join('')}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes (${formatDH(fiche.totalGlobal)} DH)</div><p style="font-size:10px;margin-top:4px;">Mode: ${echapperHTML((fiche.modePaiement||'cash').toUpperCase())} | Encaissé par: ${echapperHTML(fiche.creePar||'inconnu')}</p><div class="footer">Merci de votre visite !<br/>CHF Système Hospitalier – ${new Date().getFullYear()}</div></body></html>`;
+    const dateAffichee = (fiche.dateCreation ? new Date(fiche.dateCreation) : new Date()).toLocaleDateString('fr-FR');
+    return `<div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p></div><div style="font-weight:bold;font-size:11px;margin-bottom:6px;">Patient: ${echapperHTML(nomPatient)} — Fiche N°${fiche.numeroFiche}</div><div style="font-size:10px;margin-bottom:2px;">${typePatient === 'ONG' ? `Partenaire : ${echapperHTML(selectedOng || 'N/R')}` : 'Privé'}</div><div style="font-size:10px;margin-bottom:2px;">📞 ${echapperHTML(telephone || 'N/R')}</div><div style="font-size:11px;font-weight:bold;margin-bottom:6px;">Date : ${dateAffichee}</div><table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${lignesDetaillees.map(l => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte*l.prix)}</td></tr>`).join('')}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes (${formatDH(fiche.totalGlobal)} DH)</div><p style="font-size:10px;margin-top:4px;">${fiche.prescritPar ? `Prescrit par : ${echapperHTML(fiche.prescritPar)}` : ''}</p><div class="footer">Merci de votre visite ! Bonne guérison !<br/>CHF-${new Date().getFullYear()}</div>`;
+  };
+  const STYLE_TICKET = `@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.page-fiche{page-break-after:always;}`;
+
+  // Réimpression d'une fiche
+  const reimprimerFicheValidee = (fiche) => {
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N°${fiche.numeroFiche}</title><style>${STYLE_TICKET}</style></head><body>${genererCorpsTicket(fiche)}</body></html>`;
+    const win = window.open('', '_blank', 'width=500,height=700');
+    if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
+    win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 400);
+  };
+
+  // --- NOUVEAU : Imprimer toutes les fiches du dossier d'affilée, en un seul clic ---
+  const imprimerToutesLesFichesDuDossier = () => {
+    if (fichesDossier.length === 0) { showToast("Aucune fiche à imprimer.", "error"); return; }
+    const corps = fichesDossier.map(f => `<div class="page-fiche">${genererCorpsTicket(f)}</div>`).join('');
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${fichesDossier.length} fiches — ${echapperHTML(nomPatient)}</title><style>${STYLE_TICKET}</style></head><body>${corps}</body></html>`;
     const win = window.open('', '_blank', 'width=500,height=700');
     if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
     win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 400);
@@ -231,17 +355,13 @@ function CalculateurPanel({
 
   // Impression du ticket (inchangée)
   const imprimerTicket = (forcer = false) => {
-    if (!forcer && !paiementEffectue) { showToast("Veuillez d'abord effectuer le paiement avant d'imprimer.", "error"); return; }
+    if (!forcer && !paiementEffectue) { showToast("Enregistre d'abord la fiche avant d'imprimer.", "error"); return; }
     const data = {
       nomPatient: nomPatient || "Patient non renseigné",
       selectedOng: selectedOng || "—",
       numDossier: numDossierPatient || 'N/R',
-      modePaiement: modePaiement || "cash",
       lignes: lignes || [],
       grandTotal: grandTotal || 0,
-      montantVerse: parseFloat(montantVerse) || 0,
-      monnaieARendre: monnaieARendre || 0,
-      exoneration: autorisationExoneration && modePaiement === "exoneration" ? { pourcentage: pourcentageExoneration, montantExonere: montantExonere } : null,
       dateEntree1, dateSortie1, totalE1, totalE2, j1, j2, typeLit1, typeLit2,
       multiPeriode, dateEntree2, dateSortie2,
       hasChirSpec, nomChirSpec, totalChirSpec,
@@ -249,18 +369,79 @@ function CalculateurPanel({
       dateNaissance: dateNaissance || 'N/R',
       typePatient: typePatient || 'ONG',
       creePar: auth.currentUser?.displayName || 'inconnu',
-      solde: (modePaiement === 'credit') ? montantRestantApresDepots : 0,
-      depots: totalDepots
+      prescritPar: prescritPar.trim() || ''
     };
-    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket CHF</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:17px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:27px;margin:4px 0;}.entete p{margin:2px 0;font-size:16px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:16px;margin-bottom:6px;}.info-patient{font-size:15px;margin-bottom:4px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:16px;}th,td{padding:5px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:14px;text-transform:uppercase;}.total{font-weight:bold;font-size:23px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:13px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.exoneration{color:red;font-weight:bold;font-size:19px;}.monnaie{font-size:19px;color:#006600;}.solde{color:#cc0000;font-weight:bold;}.depot-info{font-size:17px;color:#555;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p><p>${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</p></div><div class="info"><span>Patient: ${echapperHTML(data.nomPatient)}</span><span>${data.typePatient === 'ONG' ? `Partenaire: ${echapperHTML(data.selectedOng || 'N/R')}` : 'Privé'}</span></div><div class="info"><span>Dossier: ${echapperHTML(data.numDossier)}</span><span>Mode: ${echapperHTML(data.modePaiement).toUpperCase()}</span></div><div class="info info-patient"><span>📞 ${echapperHTML(data.telephone)}</span><span>Type: ${data.typePatient === 'ONG' ? 'Partenaire' : 'Privé'}</span></div><div class="info info-patient"><span>Enregistré par: ${echapperHTML(data.creePar)}</span></div>${data.dateEntree1 && data.dateSortie1 ? `<p style="font-size:10px; margin:4px 0;"><strong>Séjour:</strong> ${data.dateEntree1.split('-').reverse().slice(0,2).join('/')} → ${data.dateSortie1.split('-').reverse().slice(0,2).join('/')}</p>` : ''}<table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${data.dateEntree1 && data.dateSortie1 ? `<tr><td>Hébergement</td><td class="qte">${data.j1}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit1].prix)}</td><td class="sous-total">${formatGourdes(data.totalE1)}</td></tr>` : ''}${data.multiPeriode && data.dateEntree2 && data.dateSortie2 ? `<tr><td>Hébergement P2</td><td class="qte">${data.j2}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit2].prix)}</td><td class="sous-total">${formatGourdes(data.totalE2)}</td></tr>` : ''}${data.hasChirSpec && data.nomChirSpec ? `<tr><td>Chirurgie: ${echapperHTML(data.nomChirSpec)}</td><td class="qte">1</td><td class="prix">${formatGourdes(data.totalChirSpec)}</td><td class="sous-total">${formatGourdes(data.totalChirSpec)}</td></tr>` : ''}${data.lignes.map(l => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte * l.prix)}</td></tr>`).join('')}</tbody></table>${data.exoneration ? `<div class="exoneration">Exonération: ${data.exoneration.pourcentage}% (${formatGourdes(data.exoneration.montantExonere)} Gdes)</div>` : ''}${data.depots > 0 ? `<div class="depot-info">Dépôts déjà effectués: ${formatGourdes(data.depots)} Gdes</div>` : ''}<div class="total">TOTAL À PAYER (après déduction des dépôts): ${formatGourdes(montantRestantApresDepots)} Gdes<br/>${formatDH(montantRestantApresDepots)} DH</div>${data.solde > 0 ? `<p class="solde">Solde restant : ${formatGourdes(data.solde)} Gdes</p>` : ''}<div style="margin-top:6px; border-top:2px dashed #000; padding-top:6px;">${data.modePaiement === 'cash' ? `<div style="display:flex; justify-content:space-between; font-size:12px;"><span>Montant versé:</span><span>${formatGourdes(data.montantVerse)} Gdes</span></div><div style="display:flex; justify-content:space-between; font-size:16px; font-weight:bold; color:#006600;"><span>Monnaie à rendre:</span><span>${formatGourdes(data.monnaieARendre)} Gdes</span></div>` : ''}</div><div class="footer">Merci de votre visite !<br/>CHF Système Hospitalier – ${new Date().getFullYear()}</div></body></html>`;
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket CHF</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:17px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:27px;margin:4px 0;}.entete p{margin:2px 0;font-size:16px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:16px;margin-bottom:6px;}.info-patient{font-size:15px;margin-bottom:4px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:16px;}th,td{padding:5px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:14px;text-transform:uppercase;}.total{font-weight:bold;font-size:23px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:13px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.exoneration{color:red;font-weight:bold;font-size:19px;}.monnaie{font-size:19px;color:#006600;}.solde{color:#cc0000;font-weight:bold;}.depot-info{font-size:17px;color:#555;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p></div><div class="info"><span>Patient: ${echapperHTML(data.nomPatient)}</span><span>${data.typePatient === 'ONG' ? `Partenaire: ${echapperHTML(data.selectedOng || 'N/R')}` : 'Privé'}</span></div><div class="info info-patient"><span>📞 ${echapperHTML(data.telephone)}</span><span>📁 ${echapperHTML(data.numDossier)}</span></div><div class="info info-patient" style="font-weight:bold;">Date : ${dateFiche.split('-').reverse().join('/')}</div><div class="info info-patient"><span>${data.prescritPar ? `Prescrit par: ${echapperHTML(data.prescritPar)}` : ''}</span></div>${data.dateEntree1 && data.dateSortie1 ? `<p style="font-size:10px; margin:4px 0;"><strong>Séjour:</strong> ${data.dateEntree1.split('-').reverse().slice(0,2).join('/')} → ${data.dateSortie1.split('-').reverse().slice(0,2).join('/')}</p>` : ''}<table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${data.dateEntree1 && data.dateSortie1 ? `<tr><td>Hébergement</td><td class="qte">${data.j1}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit1].prix)}</td><td class="sous-total">${formatGourdes(data.totalE1)}</td></tr>` : ''}${data.multiPeriode && data.dateEntree2 && data.dateSortie2 ? `<tr><td>Hébergement P2</td><td class="qte">${data.j2}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit2].prix)}</td><td class="sous-total">${formatGourdes(data.totalE2)}</td></tr>` : ''}${data.hasChirSpec && data.nomChirSpec ? `<tr><td>Chirurgie: ${echapperHTML(data.nomChirSpec)}</td><td class="qte">1</td><td class="prix">${formatGourdes(data.totalChirSpec)}</td><td class="sous-total">${formatGourdes(data.totalChirSpec)}</td></tr>` : ''}${data.lignes.map(l => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte * l.prix)}</td></tr>`).join('')}</tbody></table><div class="total">TOTAL: ${formatGourdes(data.grandTotal)} Gdes<br/>${formatDH(data.grandTotal)} DH</div><div class="footer">Merci de votre visite ! Bonne guérison !<br/>CHF-${new Date().getFullYear()}</div></body></html>`;
     const win = window.open('', '_blank', 'width=500,height=700');
     if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
     win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 500);
   };
 
   const imprimerFicheA4 = () => {
-    if (!paiementEffectue) { showToast("Veuillez d'abord effectuer le paiement.", "error"); return; }
-    showToast("Impression A4 (fonction prête)", "success");
+    if (!paiementEffectue) { showToast("Enregistre d'abord la fiche.", "error"); return; }
+    const numeroFicheReelle = idFicheEnCoursDEdition ? (fichesDossier.find(f => f.id === idFicheEnCoursDEdition)?.numeroFiche || numeroFicheCourante) : numeroFicheCourante;
+    const data = {
+      nomPatient: nomPatient || "Patient non renseigné",
+      selectedOng: selectedOng || "—",
+      numDossier: numDossierPatient || 'N/R',
+      lignes: lignes || [],
+      grandTotal: grandTotal || 0,
+      dateEntree1, dateSortie1, totalE1, totalE2, j1, j2, typeLit1, typeLit2,
+      multiPeriode, dateEntree2, dateSortie2,
+      hasChirSpec, nomChirSpec, totalChirSpec,
+      telephone: telephone || 'N/R',
+      dateNaissance: dateNaissance || 'N/R',
+      typePatient: typePatient || 'ONG',
+      creePar: auth.currentUser?.displayName || 'inconnu',
+      prescritPar: prescritPar.trim() || ''
+    };
+    const ligneHebergement = data.dateEntree1 && data.dateSortie1 ? `<tr><td>Hébergement — ${echapperHTML(CONFIG_LITS[data.typeLit1].nom)}</td><td class="qte">${data.j1} j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit1].prix)}</td><td class="mtotal">${formatGourdes(data.totalE1)}</td></tr>` : '';
+    const ligneHebergement2 = data.multiPeriode && data.dateEntree2 && data.dateSortie2 ? `<tr><td>Hébergement (2e période) — ${echapperHTML(CONFIG_LITS[data.typeLit2].nom)}</td><td class="qte">${data.j2} j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit2].prix)}</td><td class="mtotal">${formatGourdes(data.totalE2)}</td></tr>` : '';
+    const ligneChir = data.hasChirSpec && data.nomChirSpec ? `<tr><td>Chirurgie : ${echapperHTML(data.nomChirSpec)}</td><td class="qte">1</td><td class="prix">${formatGourdes(data.totalChirSpec)}</td><td class="mtotal">${formatGourdes(data.totalChirSpec)}</td></tr>` : '';
+    const lignesArticles = data.lignes.map(l => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="mtotal">${formatGourdes(l.qte * l.prix)}</td></tr>`).join('');
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N°${numeroFicheReelle} - ${echapperHTML(data.nomPatient)}</title><style>
+      @page{size:A4;margin:18mm;}
+      body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;font-size:13px;}
+      .entete{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1E2A24;padding-bottom:14px;margin-bottom:20px;}
+      .entete-gauche h1{font-size:24px;margin:0 0 4px;color:#1E2A24;}
+      .entete-gauche p{margin:1px 0;font-size:11px;color:#555;}
+      .entete-droite{text-align:right;font-size:11px;color:#555;}
+      .titre-doc{text-align:center;font-size:16px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;margin:10px 0 20px;color:#1E2A24;}
+      .infos-patient{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;background:#f7f5f0;border:1px solid #ddd;border-radius:8px;padding:14px 18px;margin-bottom:20px;font-size:12px;}
+      .infos-patient .label{color:#888;font-size:10px;text-transform:uppercase;font-weight:bold;}
+      .infos-patient .valeur{font-weight:bold;color:#1a1a1a;}
+      table{width:100%;border-collapse:collapse;margin-bottom:16px;}
+      th{background:#1E2A24;color:white;text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;}
+      td{padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;}
+      .qte,th.qte{text-align:center;}
+      .prix,.mtotal,th.prix,th.mtotal{text-align:right;}
+      .total-general{display:flex;justify-content:flex-end;margin-top:10px;}
+      .total-general .montant{font-size:22px;font-weight:bold;color:#1E2A24;border-top:3px solid #1E2A24;padding-top:8px;margin-top:4px;text-align:right;}
+      .footer{margin-top:50px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#555;}
+      .signature{border-top:1px solid #999;width:180px;text-align:center;padding-top:4px;}
+      </style></head><body>
+      <div class="entete">
+        <div class="entete-gauche"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p></div>
+        <div class="entete-droite"><p>Fiche N°${numeroFicheReelle}</p></div>
+      </div>
+      <div class="titre-doc">Fiche de facturation</div>
+      <div class="infos-patient">
+        <div><span class="label">Patient</span><br/><span class="valeur">${echapperHTML(data.nomPatient)}</span></div>
+        <div><span class="label">${data.typePatient === 'ONG' ? 'Partenaire' : 'Type'}</span><br/><span class="valeur">${data.typePatient === 'ONG' ? echapperHTML(data.selectedOng) : 'Privé'}</span></div>
+        <div><span class="label">N° Dossier</span><br/><span class="valeur">${echapperHTML(data.numDossier)}</span></div>
+        <div><span class="label">Téléphone</span><br/><span class="valeur">${echapperHTML(data.telephone)}</span></div>
+        <div><span class="label">Date</span><br/><span class="valeur">${dateFiche.split('-').reverse().join('/')}</span></div>
+        <div><span class="label">Date de naissance</span><br/><span class="valeur">${echapperHTML(data.dateNaissance)}</span></div>
+        ${data.prescritPar ? `<div><span class="label">Prescrit par</span><br/><span class="valeur">${echapperHTML(data.prescritPar)}</span></div>` : ''}
+      </div>
+      ${data.dateEntree1 && data.dateSortie1 ? `<p style="font-size:12px;margin-bottom:12px;"><strong>Séjour :</strong> du ${data.dateEntree1.split('-').reverse().join('/')} au ${data.dateSortie1.split('-').reverse().join('/')}</p>` : ''}
+      <table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix unitaire</th><th class="mtotal">Total</th></tr></thead><tbody>${ligneHebergement}${ligneHebergement2}${ligneChir}${lignesArticles}</tbody></table>
+      <div class="total-general"><div class="montant">${formatGourdes(data.grandTotal)} Gdes <span style="font-size:14px;color:#555;">(${formatDH(data.grandTotal)} DH)</span></div></div>
+      <div class="footer"><div class="signature">Signature / Cachet</div><div>CHF — Document généré le ${new Date().toLocaleDateString('fr-FR')}</div></div>
+      </body></html>`;
+    const win = window.open('', '_blank', 'width=850,height=1100');
+    if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
+    win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 500);
   };
 
   const executerEncaissement = async () => {
@@ -364,15 +545,93 @@ function CalculateurPanel({
 
   if (modeSimulation) return <div className="bg-blue-50 p-4">🧮 Mode simulation</div>;
 
+  const enregistrerFicheActive = () => {
+    if (lignes.length === 0 && j1 === 0 && !hasChirSpec && !dateEntree1) { showToast("Fiche vide", "error"); return; }
+    // On crée l'objet fiche (si idFicheEnCoursDEdition, on l'utilise pour remplacer)
+    const fiche = {
+      id: idFicheEnCoursDEdition || "fiche-" + Date.now(),
+      numeroFiche: idFicheEnCoursDEdition ? fichesDossier.find(f => f.id === idFicheEnCoursDEdition)?.numeroFiche || numeroFicheCourante : numeroFicheCourante,
+      breakdown: { ...totalsParService },
+      totalGlobal: grandTotal,
+      exeat: dateEntree1 && dateSortie1 ? {
+        dateEntree: dateEntree1, dateSortie: dateSortie1, nbJours: j1, typeLit: typeLit1,
+        prixParJour: CONFIG_LITS[typeLit1].prix, totalHebergement: totalE1,
+        multiPeriode: multiPeriode, dateEntree2: dateEntree2, dateSortie2: dateSortie2,
+        typeLit2: typeLit2, nbJours2: j2, totalHebergement2: totalE2
+      } : null,
+      dateCreation: new Date(dateFiche + 'T12:00:00').toISOString(),
+      creePar: auth.currentUser?.displayName || 'inconnu',
+      prescritPar: prescritPar.trim() || '',
+      rawState: { lignesCalcul: [...lignes], dateEntree1, dateSortie1, typeLit1, multiPeriode, dateEntree2, dateSortie2, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
+    };
+    onEnregistrerFiche(fiche);
+    // Le parent (AppHospitaliere) gère la mise à jour ou l'ajout et vide le calculateur
+    if (idEntreeChargee) { retirerDeLaFile(idEntreeChargee); setIdEntreeChargee(null); }
+    setPaiementEffectue(true);
+    showToast(idFicheEnCoursDEdition ? "Fiche mise à jour" : "Fiche enregistrée", "success");
+  };
+
   return (
     <div className="space-y-4">
       {confirmModal && <ConfirmModal {...confirmModal} />}
+
+      {/* File d'attente de fiches à importer (digitalisation papier) */}
+      <div className="bg-white rounded-xl border shadow-sm p-3 text-xs">
+        <button onClick={() => setFileOuverte(o => !o)} className="w-full flex justify-between items-center font-bold text-gray-700">
+          <span>📥 File d'import {fileImport.length > 0 && <span className="ml-1 bg-orange-600 text-white rounded-full px-2 py-0.5 text-[10px]">{fileImport.length} en attente</span>}</span>
+          <span>{fileOuverte ? '▲' : '▼'}</span>
+        </button>
+        {fileOuverte && (
+          <div className="mt-3 space-y-2">
+            <div className="space-y-1">
+              {fileImport.map(e => (
+                <div key={e._id} className="flex justify-between items-center bg-gray-50 border rounded-lg p-2">
+                  <button onClick={() => chargerEntreeFile(e)} className="text-left flex-1 font-medium text-gray-800">
+                    {e.patient?.nom || '(sans nom)'} {e.patient?.ong ? `— ${e.patient.ong}` : ''}
+                  </button>
+                  <button onClick={() => retirerDeLaFile(e._id)} className="text-gray-300 hover:text-red-600 ml-2"><X size={12}/></button>
+                </div>
+              ))}
+              {fileImport.length === 0 && <p className="text-gray-400 italic">File vide.</p>}
+            </div>
+            <textarea value={collageJson} onChange={e => setCollageJson(e.target.value)} rows={3} placeholder='Coller un JSON (une fiche ou un tableau de fiches)'
+              className="w-full border rounded-lg p-2 font-mono text-[11px]" />
+            <button onClick={ajouterAuCollage} disabled={!collageJson.trim()} className="w-full bg-[#1E2A24] text-white rounded-lg py-1.5 disabled:opacity-40">Ajouter à la file</button>
+          </div>
+        )}
+      </div>
+
+      {dossierActif && (
+        <button onClick={enregistrerFicheActive} disabled={!peutArchiver}
+          className="fixed right-2 z-50 bg-emerald-700 active:bg-emerald-800 hover:bg-emerald-800 text-white rounded-full shadow-2xl disabled:opacity-40 flex flex-col items-center justify-center gap-0.5 w-16 h-16"
+          style={{ top: '42%' }}>
+          <span className="text-xl leading-none">💾</span>
+          <span className="text-[8px] font-black leading-none">{idFicheEnCoursDEdition ? 'Màj' : 'Sauver'}</span>
+        </button>
+      )}
       {!dossierActif ? (
         <NouveauDossierForm
           searchPatientText={searchPatientText} setSearchPatientText={setSearchPatientText}
           suggestionsPatients={suggestionsPatients} choisirPatientExistant={choisirPatientExistant}
           peutCreerDossier={peutCreerDossier}
-          onSoumettre={e => { e.preventDefault(); if (inputOng) localStorage.setItem('chf-dernier-ong', inputOng); onNouveauDossier(inputNom, inputOng, inputNumDossier, inputTypePatient, inputDateNaissance, inputTelephone, serviceChoisi); }}
+          onSoumettre={e => {
+            e.preventDefault();
+            const nomNormalise = inputNom.trim().toLowerCase();
+            const doublon = patientsExistants.find(p => (p.nomPatient || '').trim().toLowerCase() === nomNormalise);
+            if (doublon) {
+              const infos = [
+                `dossier ${doublon.numDossier || 'sans numéro'}`,
+                `ouvert le ${doublon.dateHeure || '?'}`,
+                `statut : ${doublon.status || 'actif'}`,
+                doublon.dateNaissance ? `né(e) le ${doublon.dateNaissance.split('-').reverse().join('/')}` : null,
+                doublon.telephone ? `tél ${doublon.telephone}` : null
+              ].filter(Boolean).join(', ');
+              const continuer = confirm(`⚠️ Un patient nommé "${doublon.nomPatient}" existe déjà (${infos}).\n\nCréer quand même un NOUVEAU dossier séparé pour ce nom ?\n\n(Annuler pour plutôt chercher/charger le dossier existant en haut)`);
+              if (!continuer) return;
+            }
+            if (inputOng) localStorage.setItem('chf-dernier-ong', inputOng);
+            onNouveauDossier(inputNom, inputOng, inputNumDossier, inputTypePatient, inputDateNaissance, inputTelephone, serviceChoisi);
+          }}
           serviceChoisi={serviceChoisi} setServiceChoisi={setServiceChoisi}
           inputNom={inputNom} setInputNom={setInputNom}
           inputTypePatient={inputTypePatient} setInputTypePatient={setInputTypePatient}
@@ -434,14 +693,25 @@ function CalculateurPanel({
               <span className="text-[9px] uppercase font-black text-gray-400">
                 Fiches validées {idFicheEnCoursDEdition ? '(modification en cours)' : ''}
               </span>
+              <button onClick={imprimerToutesLesFichesDuDossier} className="ml-2 bg-[#1E2A24] text-white text-[9px] font-bold px-2 py-1 rounded-lg">🖨️ Imprimer les {fichesDossier.length} fiche{fichesDossier.length > 1 ? 's' : ''} d'affilée</button>
               <div className="flex flex-wrap gap-1.5">
                 {fichesDossier.map(f => {
                   const isEditing = f.id === idFicheEnCoursDEdition;
                   return (
-                    <div key={f.id} className={`flex items-center rounded-lg font-mono text-[11px] font-bold border overflow-hidden shadow-sm ${isEditing ? 'bg-blue-100 border-blue-400' : 'bg-gray-50 border-gray-200'}`}>
+                    <div key={f.id} className={`flex items-center rounded-lg font-mono text-[11px] font-bold border overflow-hidden shadow-sm ${isEditing ? 'bg-blue-100 border-blue-400' : f.probleme ? 'bg-red-100 border-red-400' : 'bg-gray-50 border-gray-200'}`}>
                       <button onClick={() => reimprimerFicheValidee(f)} className="pl-2.5 pr-2 py-1 hover:text-blue-700" title="Réimprimer cette fiche">
-                        🖨️ Fiche N°{f.numeroFiche} ({formatGourdes(f.totalGlobal)} Gdes)
+                        {f.probleme && '❓ '}🖨️ Fiche N°{f.numeroFiche} ({formatGourdes(f.totalGlobal)} Gdes)
                       </button>
+                      {/* Bouton MARQUER / DÉMARQUER PROBLÈME */}
+                      {onMarquerProblemeFiche && (
+                        <button
+                          onClick={() => onMarquerProblemeFiche(f.id)}
+                          className={`px-2 py-1 border-l transition-colors font-bold text-[10px] ${f.probleme ? 'bg-amber-500/10 hover:bg-amber-600 hover:text-white text-amber-700' : 'bg-emerald-500/10 hover:bg-emerald-600 hover:text-white text-emerald-700'}`}
+                          title={f.probleme ? (f.noteProbleme ? `❓ ${f.noteProbleme}\n\n(clique pour retirer le marquage)` : "Retirer le marquage — problème réglé") : "Tout va bien — clique pour signaler un problème"}
+                        >
+                          {f.probleme ? '❓' : '✅'}
+                        </button>
+                      )}
                       {/* Bouton MODIFIER */}
                       {onEditerFiche && (
                         <button
@@ -471,106 +741,149 @@ function CalculateurPanel({
             dateEntree2={dateEntree2} setDateEntree2={setDateEntree2} dateSortie2={dateSortie2} setDateSortie2={setDateSortie2} typeLit2={typeLit2} setTypeLit2={setTypeLit2}
             hasChirSpec={hasChirSpec} setHasChirSpec={setHasChirSpec} nomChirSpec={nomChirSpec} setNomChirSpec={setNomChirSpec} prixChirSpec={prixChirSpec} setPrixChirSpec={setPrixChirSpec}
           />
-          <div className="bg-white p-4 rounded-xl border space-y-3 shadow-sm" ref={refZone}>
-            <p className="text-[11px] font-bold uppercase text-gray-400">2. Actes, Laboratoire & Ordonnance</p>
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              <label className="text-[9px] font-bold text-amber-800 uppercase">📅 Date{idFicheEnCoursDEdition ? ' (fiche)' : ' (nouvelle fiche)'}</label>
+              <input type="date" value={dateFiche} onChange={e=>setDateFiche(e.target.value)} className="border rounded p-1.5 text-xs font-mono bg-white" />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <label className="text-[9px] font-bold text-amber-800 uppercase">🩺 Prescrit par</label>
+              <input type="text" value={prescritPar} onChange={e=>setPrescritPar(e.target.value)} placeholder="Nom du médecin/infirmière" className="border rounded p-1.5 text-xs w-40 bg-white" />
+            </div>
+          </div>
+          <div className={estMobile ? "" : "grid grid-cols-[3fr_2fr] gap-4 items-start"}>
+          <div className={`bg-white p-4 rounded-xl border space-y-3 shadow-sm ${estMobile ? '' : 'max-h-[80vh] overflow-y-auto'}`} ref={refZone}>
+            <div className="flex justify-between items-center">
+              <p className="text-[11px] font-bold uppercase text-gray-400">2. Actes, Laboratoire & Ordonnance</p>
+              {setTarifChoisi && (
+                <div className="flex text-[10px] font-bold rounded-lg border overflow-hidden">
+                  <button onClick={()=>setTarifChoisi("actuel")} className={`px-2 py-1 ${tarifChoisi!=="nouveau" ? "bg-[#1E2A24] text-white" : "bg-gray-50 text-gray-500"}`}>Tarif Actuel</button>
+                  <button onClick={()=>setTarifChoisi("nouveau")} className={`px-2 py-1 ${tarifChoisi==="nouveau" ? "bg-indigo-700 text-white" : "bg-gray-50 text-gray-500"}`}>Nouveau prix</button>
+                </div>
+              )}
+            </div>
+            {fichesDossier.length > 1 && (() => {
+              const fichesTriees = [...fichesDossier].sort((a,b) => a.numeroFiche - b.numeroFiche);
+              const indexActuel = idFicheEnCoursDEdition ? fichesTriees.findIndex(f => f.id === idFicheEnCoursDEdition) : fichesTriees.length;
+              const peutPrecedente = indexActuel > 0;
+              const peutSuivante = idFicheEnCoursDEdition && indexActuel < fichesTriees.length - 1;
+              return (
+                <div className="flex items-center justify-center gap-3 bg-gray-50 rounded-lg py-1.5 border">
+                  <button onClick={() => peutPrecedente && onEditerFiche(fichesTriees[indexActuel - 1].id)} disabled={!peutPrecedente} className="px-2 py-0.5 text-gray-600 disabled:opacity-20 disabled:cursor-not-allowed font-bold text-lg">◀</button>
+                  <span className="text-[10px] font-bold text-gray-500 font-mono">
+                    {idFicheEnCoursDEdition ? `Fiche N°${fichesTriees[indexActuel]?.numeroFiche} (${indexActuel + 1}/${fichesTriees.length})` : "Nouvelle fiche"}
+                  </span>
+                  <button onClick={() => peutSuivante && onEditerFiche(fichesTriees[indexActuel + 1].id)} disabled={!peutSuivante} className="px-2 py-0.5 text-gray-600 disabled:opacity-20 disabled:cursor-not-allowed font-bold text-lg">▶</button>
+                </div>
+              );
+            })()}
+            {tarifChoisi === "nouveau" && <p className="text-[9px] text-indigo-600 font-bold">⚠️ Les articles ajoutés utiliseront le nouveau prix (à venir) quand il existe.</p>}
             <div className="flex gap-2 text-xs font-semibold">
-              <button onClick={()=>{ setCategorie("med"); setRecherche(""); setSelection(null); }} className={`flex-1 py-1.5 border rounded-lg ${categorie==="med" ? "bg-[#1E2A24] text-white" : "bg-gray-50"}`}>💊 Pharmacie</button>
-              <button onClick={()=>{ setCategorie("acte"); setRecherche(""); setSelection(null); }} className={`flex-1 py-1.5 border rounded-lg ${categorie==="acte" ? "bg-[#1E2A24] text-white" : "bg-gray-50"}`}>🔬 Examens / Actes</button>
+              <button onClick={()=>{ setCategorie("med"); setSelection(null); }} className={`flex-1 py-1.5 border rounded-lg ${categorie==="med" ? "bg-[#1E2A24] text-white" : "bg-gray-50"}`}>💊 Pharmacie</button>
+              <button onClick={()=>{ setCategorie("acte"); setSelection(null); }} className={`flex-1 py-1.5 border rounded-lg ${categorie==="acte" ? "bg-[#1E2A24] text-white" : "bg-gray-50"}`}>🔬 Examens / Actes</button>
             </div>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <input ref={inputRechercheRef} type="text" value={recherche} onChange={e=>{ setRecherche(e.target.value); setOuvert(true); setSelection(null); }} onFocus={()=>setOuvert(true)} onKeyDown={e=>{ if(e.key==='Enter' && suggestions.length>0){ setSelection(suggestions[0]); setRecherche(suggestions[0].nom); setOuvert(false); } }} placeholder="Rechercher un soin ou un médicament..." className="w-full border rounded-lg p-2 text-xs pl-8 outline-none" disabled={!peutAjouterLignes} />
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"><Search size={14}/></span>
-                {ouvert && suggestions.length > 0 && <ul className="absolute z-20 left-0 right-0 bg-white border rounded-lg shadow-2xl mt-1 text-xs max-h-48 overflow-y-auto divide-y">{suggestions.map(i => <li key={i.id}><button type="button" onClick={()=>{ setSelection(i); setRecherche(i.nom); setOuvert(false); }} onDoubleClick={()=>{ setSelection(i); setQuantite("1"); setTimeout(actionAjouterSoin,40); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 flex justify-between"><span>{i.nom}</span><span className="text-gray-500 font-mono">{formatGourdes(i.prix)} Gdes</span></button></li>)}</ul>}
-              </div>
-              <input type="number" min="1" value={quantite} onChange={e=>setQuantite(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') actionAjouterSoin(); }} className="w-16 border rounded-lg p-2 text-xs text-center font-mono font-bold bg-gray-50" disabled={!peutAjouterLignes} />
-              <button onClick={actionAjouterSoin} disabled={!selection || !peutAjouterLignes} className="bg-[#1E2A24] text-white px-4 py-2 rounded-lg text-xs font-bold disabled:opacity-30 flex items-center gap-1"><Plus/> Ajouter</button>
-            </div>
-            <p className="text-[9px] text-gray-400">💡 Astuce : double-clique un résultat dans la liste pour l'ajouter tout de suite, sans passer par le bouton Ajouter.</p>
-          </div>
-          <div className="bg-white rounded-xl border overflow-hidden shadow-sm">
-            <table className="w-full text-xs text-left">
-              <thead><tr className="bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono"><th className="p-3">Désignation</th><th className="p-3 w-16 text-center">Qté</th><th className="p-3 text-right w-24">Prix</th><th className="p-3 text-right w-24">Total</th><th className="w-8"></th></tr></thead>
-              <tbody className="divide-y divide-gray-100">
-                {dateEntree1 && dateSortie1 && <tr className="bg-amber-50/20"><td className="p-3 text-amber-900">Séjour : {CONFIG_LITS[typeLit1].nom}</td><td className="p-3 text-center font-bold">{j1} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(CONFIG_LITS[typeLit1].prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE1)}</td><td></td></tr>}
-                {multiPeriode && dateEntree2 && dateSortie2 && <tr className="bg-amber-50/40"><td className="p-3 text-amber-900">Séjour P2 : {CONFIG_LITS[typeLit2].nom}</td><td className="p-3 text-center font-bold">{j2} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(CONFIG_LITS[typeLit2].prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE2)}</td><td></td></tr>}
-                {hasChirSpec && nomChirSpec && <tr className="bg-red-50/20"><td className="p-3 text-red-900">Chirurgie : {nomChirSpec}</td><td className="p-3 text-center">1</td><td className="p-3 text-right text-gray-400">{formatGourdes(totalChirSpec)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalChirSpec)}</td><td></td></tr>}
-                {lignes.map(l => <tr key={l.id} className="zebra-row"><td className="p-3 text-gray-800"><span className={`text-[8px] font-bold uppercase px-1 rounded mr-1 ${l.type==='med'?'bg-emerald-50 text-emerald-700':'bg-blue-50 text-blue-700'}`}>{l.type==='med'?'Pharma':'Acte'}</span>{l.nom}</td><td className="p-3 text-center font-mono font-bold">{l.qte}</td><td className="p-3 text-right text-gray-400">{formatGourdes(l.prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(l.qte * l.prix)}</td><td className="text-center">{peutSupprimerFiche && <button onClick={()=>setLignes(p=>p.filter(x=>x.id!==l.id))} className="text-gray-300 hover:text-red-600"><X size={12}/></button>}</td></tr>)}
-              </tbody>
-            </table>
-            <div className="p-4 bg-gray-50 border-t border-b text-[11px] text-gray-600 font-mono space-y-1 shadow-inner">
-              <div className="grid grid-cols-3 font-bold text-[#1E2A24] border-b pb-1 mb-2"><span>RÉCAPITULATIF DE LA FICHE</span><span className="text-right">Gdes</span><span className="text-right text-emerald-800">💵 DH</span></div>
-              {require('../utils/constants').CATEGORIES_LISTE.map(srv => { const m = totalsParService[srv.key]; if (m===0) return null; return <div key={srv.key} className="grid grid-cols-3 py-0.5"><span>• {srv.label}</span><span className="text-right">{formatGourdes(m)}</span><span className="text-right font-bold">{formatDH(m)} DH</span></div>; })}
-            </div>
-            <div className="bg-[#1E2A24] text-white p-4 flex justify-between items-center font-bold text-sm font-mono">
-              <span>SOUS-TOTAL FICHE {idFicheEnCoursDEdition ? 'EN MODIFICATION' : `N°${numeroFicheCourante}`} :</span>
-              <span>{formatGourdes(grandTotal)} Gdes ({formatDH(grandTotal)} DH)</span>
-            </div>
-            <div className="bg-white p-4 border-t border-gray-300 space-y-3">
-              <h4 className="font-bold text-gray-700 text-xs uppercase tracking-wider">💵 Encaissement</h4>
-              {totalDepots > 0 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex justify-between items-center text-xs">
-                  <span className="font-bold text-blue-800">💰 Dépôts déjà versés : {formatGourdes(totalDepots)} Gdes</span>
-                  <span className="font-bold text-emerald-700">Solde restant à payer : {formatGourdes(montantRestantApresDepots)} Gdes</span>
+            <p className="text-[9px] text-gray-400">💡 Clique une lettre puis un résultat pour l'ajouter (quantité 1) — aucune saisie, ajuste la quantité juste en dessous.</p>
+
+            <div className={estMobile ? "space-y-2" : "border-t pt-2 space-y-2"}>
+                <p className="text-[10px] font-bold text-gray-400 uppercase">{categorie === "med" ? "Choisir une lettre" : "Choisir une catégorie"}</p>
+                {categorie === "med" ? (
+                  <div className="flex gap-1 flex-wrap">
+                    {lettresDisponibles.map(l => (
+                      <button key={l} onClick={() => setLettreActive(l)} className={`rounded font-bold ${estMobile ? 'w-10 h-10 text-sm' : 'w-7 h-7 text-xs'} ${(lettreActive || lettresDisponibles[0]) === l ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-600"}`}>{l}</button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex gap-1 flex-wrap">
+                    <button onClick={() => setSousCategorieActeActive(null)} className={`rounded font-bold ${estMobile ? 'px-4 py-2 text-sm' : 'px-3 py-1 text-xs'} ${sousCategorieActeActive === null ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-600"}`}>Toutes</button>
+                    {categoriesActesDisponibles.map(c => (
+                      <button key={c.key} onClick={() => setSousCategorieActeActive(c.key)} className={`rounded font-bold ${estMobile ? 'px-4 py-2 text-sm' : 'px-3 py-1 text-xs'} ${sousCategorieActeActive === c.key ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-600"}`}>{c.label}</button>
+                    ))}
+                  </div>
+                )}
+                <div className={`grid gap-1.5 overflow-y-auto ${estMobile ? 'grid-cols-2 max-h-72' : 'grid-cols-5 max-h-[32rem]'}`}>
+                  {catalogueGrille.map(item => (
+                    <button key={item.id} onClick={() => ajouterAvecQuantite(item, 1)} disabled={!peutAjouterLignes} className={`border rounded-lg text-left hover:bg-emerald-50 hover:border-emerald-400 active:bg-emerald-100 disabled:opacity-30 disabled:cursor-not-allowed ${estMobile ? 'p-3' : 'p-2'}`}>
+                      <div className={`font-semibold text-gray-800 line-clamp-2 ${estMobile ? 'text-sm' : 'text-xs'}`}>{item.nom}</div>
+                    </button>
+                  ))}
+                  {catalogueGrille.length === 0 && <p className="col-span-2 text-center text-gray-400 text-xs py-3">Rien dans cette section.</p>}
                 </div>
-              )}
-              <div className="flex flex-wrap gap-2">
-                <button onClick={()=>{ setModePaiement("cash"); setModeDepot(false); }} className={`px-4 py-1.5 rounded-lg text-xs font-bold ${modePaiement==="cash"?"bg-emerald-700 text-white":"bg-gray-100"}`}>💵 Cash</button>
-                <button onClick={()=>{ setModePaiement("credit"); setModeDepot(false); }} className={`px-4 py-1.5 rounded-lg text-xs font-bold ${modePaiement==="credit"?"bg-orange-600 text-white":"bg-gray-100"}`}>📝 Crédit</button>
-                <button onClick={()=>{ setModePaiement("ong"); setModeDepot(false); }} className={`px-4 py-1.5 rounded-lg text-xs font-bold ${modePaiement==="ong"?"bg-purple-700 text-white":"bg-gray-100"}`} disabled={typePatient!=="ONG"}>🏥 Partenaire</button>
-                <button onClick={()=>{ setModePaiement("exoneration"); setModeDepot(false); }} className={`px-4 py-1.5 rounded-lg text-xs font-bold ${modePaiement==="exoneration"?"bg-red-600 text-white":"bg-gray-100"}`} disabled={userRole!=="direction" && userRole!=="administrateur" && userRole!=="comptable"}>🎯 Exonération</button>
-                <button onClick={()=>{ setModeDepot(!modeDepot); if(!modeDepot) setModePaiement("depot"); else setModePaiement("cash"); }} className={`px-4 py-1.5 rounded-lg text-xs font-bold ${modeDepot?"bg-blue-700 text-white":"bg-gray-100"}`}>💰 Dépôt/Acompte</button>
-              </div>
-              {modeDepot && (
-                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 space-y-2">
-                  <div className="flex items-center gap-2"><label className="text-xs font-bold text-blue-800">Montant du dépôt :</label><input type="number" min="0" step="100" value={montantDepot} onChange={e=>setMontantDepot(e.target.value)} placeholder="0" className="border rounded p-1.5 w-32 font-mono" /><span className="text-xs text-gray-600">Solde restant après dépôt : {formatGourdes(soldeRestantDepot)} Gdes</span></div>
-                  <button onClick={enregistrerDepot} disabled={!dossierId} className="bg-blue-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold">💾 Enregistrer le dépôt</button>
-                  <p className="text-[10px] text-gray-500">Dépôts déjà effectués : {formatGourdes(totalDepots)} Gdes</p>
-                </div>
-              )}
-              {modePaiement === "ong" && !modeDepot && <div className="mt-2"><label className="text-[10px] font-bold text-purple-800">Partenaire</label><select value={ongPartenaireFiche} onChange={e=>setOngPartenaireFiche(e.target.value)} className="border rounded-lg p-1.5 text-xs w-full bg-white"><option value="">Sélectionner</option>{listeOng.map(o=><option key={o} value={o}>{o}</option>)}</select></div>}
-              {modePaiement === "exoneration" && !modeDepot && <div className="mt-2 space-y-2 bg-red-50 p-2 rounded-lg"><div className="flex gap-2"><input type="number" min="0" max="100" value={pourcentageExoneration} onChange={e=>setPourcentageExoneration(e.target.value)} placeholder="%" className="w-20 border rounded-lg p-1.5 text-xs" /><input type="text" value={motifExoneration} onChange={e=>setMotifExoneration(e.target.value)} placeholder="Motif..." className="flex-1 border rounded-lg p-1.5 text-xs" /></div>{(userRole==="direction" || userRole==="administrateur") ? <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={autorisationExoneration} onChange={e=>{
-                if (!e.target.checked) { setAutorisationExoneration(false); return; }
-                setConfirmModal({
-                  titre: "Autoriser l'exonération ?",
-                  message: `Patient : ${nomPatient}\nMotif : ${motifExoneration || '(non précisé)'}\nPourcentage : ${pourcentageExoneration}%`,
-                  detail: `Montant exonéré : ${formatGourdes((grandTotal * (parseFloat(pourcentageExoneration)||0)) / 100)} Gdes`,
-                  confirmLabel: "Autoriser",
-                  danger: true,
-                  onConfirm: () => {
-                    enregistrerAudit('autorisation_exoneration', {
-                      nomPatient,
-                      pourcentage: parseFloat(pourcentageExoneration) || 0,
-                      montantExonere: (grandTotal * (parseFloat(pourcentageExoneration)||0)) / 100,
-                      motif: motifExoneration
-                    });
-                    setAutorisationExoneration(true); setConfirmModal(null);
-                  },
-                  onCancel: () => setConfirmModal(null)
-                });
-              }} /> Autoriser</label> : <button onClick={demanderExoneration} disabled={!pourcentageExoneration||pourcentageExoneration==0} className="bg-amber-500 text-white px-3 py-1 rounded text-xs disabled:opacity-30">📨 Demander</button>}</div>}
-              {(modePaiement === "cash" && !modeDepot) && <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><label className="text-[10px] font-bold text-gray-500">Montant versé</label><input type="number" min="0" value={montantVerse} onChange={e=>setMontantVerse(e.target.value)} placeholder="0" className="border rounded-lg p-2 w-full text-sm font-mono" disabled={!peutEncaisser} /></div><div><label className="text-[10px] font-bold text-gray-500">Monnaie</label><div className="bg-gray-100 p-2 rounded-lg text-right font-mono font-bold text-lg text-emerald-700">{formatGourdes(monnaieARendre)} Gdes</div></div></div>}
-              {!modeDepot && <button onClick={demanderConfirmationEncaissement} disabled={!peutEncaisser || (modePaiement === "exoneration" && !(userRole === 'direction' || userRole === 'administrateur'))} className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-2.5 rounded-lg text-sm font-bold shadow-md disabled:opacity-50">💳 Encaisser cette fiche</button>}
             </div>
           </div>
+          {!estMobile && (
+            <div className="bg-white rounded-xl border overflow-hidden shadow-sm max-h-[75vh] overflow-y-auto">
+              <table className="w-full text-xs text-left table-fixed">
+                <thead className="sticky top-0"><tr className="bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono"><th className="p-3 w-[46%]">Désignation</th><th className="p-3 w-[14%] text-center">Qté</th><th className="p-3 text-right w-[17%]">Prix</th><th className="p-3 text-right w-[17%]">Total</th><th className="w-[6%]"></th></tr></thead>
+                <tbody className="divide-y divide-gray-100">
+                  {dateEntree1 && dateSortie1 && <tr className="bg-amber-50/20"><td className="p-3 text-amber-900">Séjour : {CONFIG_LITS[typeLit1].nom}</td><td className="p-3 text-center font-bold">{j1} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(CONFIG_LITS[typeLit1].prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE1)}</td><td></td></tr>}
+                  {multiPeriode && dateEntree2 && dateSortie2 && <tr className="bg-amber-50/40"><td className="p-3 text-amber-900">Séjour P2 : {CONFIG_LITS[typeLit2].nom}</td><td className="p-3 text-center font-bold">{j2} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(CONFIG_LITS[typeLit2].prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE2)}</td><td></td></tr>}
+                  {hasChirSpec && nomChirSpec && <tr className="bg-red-50/20"><td className="p-3 text-red-900">Chirurgie : {nomChirSpec}</td><td className="p-3 text-center">1</td><td className="p-3 text-right text-gray-400">{formatGourdes(totalChirSpec)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalChirSpec)}</td><td></td></tr>}
+                  {lignes.map(l => { const decrementer = () => setLignes(p=>p.map(x=>x.id===l.id?{...x,qte:Math.max(1,x.qte-1)}:x)); const incrementer = () => setLignes(p=>p.map(x=>x.id===l.id?{...x,qte:x.qte+1}:x)); return <tr key={l.id} className="zebra-row"><td className="p-3 text-gray-800"><span className={`text-[8px] font-bold uppercase px-1 rounded mr-1 ${l.type==='med'?'bg-emerald-50 text-emerald-700':'bg-blue-50 text-blue-700'}`}>{l.type==='med'?'Pharma':'Acte'}</span>{l.nom}</td><td className="p-3 text-center"><div className="flex items-center justify-center gap-1"><button onMouseDown={()=>demarrerRepetition(decrementer)} onMouseUp={arreterRepetition} onMouseLeave={arreterRepetition} onTouchStart={(e)=>{e.preventDefault(); demarrerRepetition(decrementer);}} onTouchEnd={(e)=>{e.preventDefault(); arreterRepetition();}} onTouchCancel={arreterRepetition} className="w-7 h-7 bg-gray-100 active:bg-gray-300 rounded-lg font-bold text-gray-700 select-none">−</button><span className="font-mono font-bold w-6 text-center">{l.qte}</span><button onMouseDown={()=>demarrerRepetition(incrementer)} onMouseUp={arreterRepetition} onMouseLeave={arreterRepetition} onTouchStart={(e)=>{e.preventDefault(); demarrerRepetition(incrementer);}} onTouchEnd={(e)=>{e.preventDefault(); arreterRepetition();}} onTouchCancel={arreterRepetition} className="w-7 h-7 bg-gray-100 active:bg-gray-300 rounded-lg font-bold text-gray-700 select-none">+</button></div></td><td className="p-3 text-right text-gray-400">{formatGourdes(l.prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(l.qte * l.prix)}</td><td className="text-center">{peutSupprimerFiche && <button onClick={()=>setLignes(p=>p.filter(x=>x.id!==l.id))} className="text-gray-300 hover:text-red-600"><X size={12}/></button>}</td></tr>; })}
+                </tbody>
+              </table>
+              <div className="p-4 bg-gray-50 border-t border-b text-[11px] text-gray-600 font-mono space-y-1 shadow-inner">
+                <div className="grid grid-cols-3 font-bold text-[#1E2A24] border-b pb-1 mb-2"><span>RÉCAPITULATIF DE LA FICHE</span><span className="text-right">Gdes</span><span className="text-right text-emerald-800">💵 DH</span></div>
+                {require('../utils/constants').CATEGORIES_LISTE.map(srv => {
+                  const m = totalsParService[srv.key]; if (m===0) return null;
+                  const c = coutsParService?.valeurs?.[srv.key] || 0;
+                  return (
+                    <div key={srv.key}>
+                      <div className="grid grid-cols-3 py-0.5"><span>• {srv.label}</span><span className="text-right">{formatGourdes(m)}</span><span className="text-right font-bold">{formatDH(m)} DH</span></div>
+                      {c > 0 && <div className="grid grid-cols-3 pb-0.5 text-[10px] text-orange-600"><span className="pl-3">↳ Coût</span><span className="text-right">{formatGourdes(c)}</span><span className={`text-right font-bold ${m-c>=0?'text-emerald-700':'text-red-600'}`}>Marge {formatGourdes(m-c)}</span></div>}
+                    </div>
+                  );
+                })}
+                {coutsParService?.incomplet && Object.values(coutsParService.valeurs).some(v=>v>0) && <p className="text-[9px] text-gray-400 italic pt-1">Coût partiel : certains articles de cette fiche (ou l'hébergement/chirurgie spéciale) n'ont pas encore de coût renseigné dans le catalogue.</p>}
+              </div>
+              <div className="bg-[#1E2A24] text-white p-4 flex justify-between items-center font-bold text-sm font-mono sticky bottom-0">
+                <span>SOUS-TOTAL FICHE {idFicheEnCoursDEdition ? 'EN MODIFICATION' : `N°${numeroFicheCourante}`} :</span>
+                <span>{formatGourdes(grandTotal)} Gdes ({formatDH(grandTotal)} DH)</span>
+              </div>
+            </div>
+          )}
+          </div>
+
+          {/* --- Mobile : barre fixe en bas (toujours visible), tap = récapitulatif complet plein écran --- */}
+          {estMobile && dossierActif && (
+            <button onClick={() => setDetailOuvert(true)} className="fixed bottom-0 left-0 right-0 z-40 bg-[#1E2A24] text-white px-4 py-3 flex justify-between items-center font-bold text-sm shadow-2xl">
+              <span>{lignes.length + (dateEntree1 && dateSortie1 ? 1 : 0) + (multiPeriode && dateEntree2 && dateSortie2 ? 1 : 0) + (hasChirSpec && nomChirSpec ? 1 : 0)} article(s)</span>
+              <span>{formatDH(grandTotal)} DH ▲</span>
+            </button>
+          )}
+          {estMobile && detailOuvert && (
+            <div className="fixed inset-0 z-50 bg-black/40 flex items-end" onClick={() => setDetailOuvert(false)}>
+              <div className="bg-white w-full rounded-t-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                <div className="sticky top-0 bg-white p-3 border-b flex justify-between items-center z-10">
+                  <span className="font-bold text-sm text-gray-800">Récapitulatif de la fiche</span>
+                  <button onClick={() => setDetailOuvert(false)} className="p-2 text-gray-500"><X size={18}/></button>
+                </div>
+                <table className="w-full text-xs text-left table-fixed">
+                  <thead><tr className="bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono"><th className="p-3 w-[40%]">Désignation</th><th className="p-3 w-[22%] text-center">Qté</th><th className="p-3 text-right w-[19%]">Prix</th><th className="p-3 text-right w-[19%]">Total</th><th className="w-8"></th></tr></thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {dateEntree1 && dateSortie1 && <tr className="bg-amber-50/20"><td className="p-3 text-amber-900">Séjour : {CONFIG_LITS[typeLit1].nom}</td><td className="p-3 text-center font-bold">{j1} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(CONFIG_LITS[typeLit1].prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE1)}</td><td></td></tr>}
+                    {multiPeriode && dateEntree2 && dateSortie2 && <tr className="bg-amber-50/40"><td className="p-3 text-amber-900">Séjour P2 : {CONFIG_LITS[typeLit2].nom}</td><td className="p-3 text-center font-bold">{j2} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(CONFIG_LITS[typeLit2].prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE2)}</td><td></td></tr>}
+                    {hasChirSpec && nomChirSpec && <tr className="bg-red-50/20"><td className="p-3 text-red-900">Chirurgie : {nomChirSpec}</td><td className="p-3 text-center">1</td><td className="p-3 text-right text-gray-400">{formatGourdes(totalChirSpec)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalChirSpec)}</td><td></td></tr>}
+                    {lignes.map(l => { const decrementer = () => setLignes(p=>p.map(x=>x.id===l.id?{...x,qte:Math.max(1,x.qte-1)}:x)); const incrementer = () => setLignes(p=>p.map(x=>x.id===l.id?{...x,qte:x.qte+1}:x)); return <tr key={l.id} className="zebra-row"><td className="p-3 text-gray-800"><span className={`text-[8px] font-bold uppercase px-1 rounded mr-1 ${l.type==='med'?'bg-emerald-50 text-emerald-700':'bg-blue-50 text-blue-700'}`}>{l.type==='med'?'Pharma':'Acte'}</span>{l.nom}</td><td className="p-3 text-center"><div className="flex items-center justify-center gap-1"><button onMouseDown={()=>demarrerRepetition(decrementer)} onMouseUp={arreterRepetition} onMouseLeave={arreterRepetition} onTouchStart={(e)=>{e.preventDefault(); demarrerRepetition(decrementer);}} onTouchEnd={(e)=>{e.preventDefault(); arreterRepetition();}} onTouchCancel={arreterRepetition} className="w-8 h-8 bg-gray-100 active:bg-gray-300 rounded-lg font-bold text-gray-700 select-none">−</button><span className="font-mono font-bold w-6 text-center">{l.qte}</span><button onMouseDown={()=>demarrerRepetition(incrementer)} onMouseUp={arreterRepetition} onMouseLeave={arreterRepetition} onTouchStart={(e)=>{e.preventDefault(); demarrerRepetition(incrementer);}} onTouchEnd={(e)=>{e.preventDefault(); arreterRepetition();}} onTouchCancel={arreterRepetition} className="w-8 h-8 bg-gray-100 active:bg-gray-300 rounded-lg font-bold text-gray-700 select-none">+</button></div></td><td className="p-3 text-right text-gray-400">{formatGourdes(l.prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(l.qte * l.prix)}</td><td className="text-center">{peutSupprimerFiche && <button onClick={()=>setLignes(p=>p.filter(x=>x.id!==l.id))} className="text-gray-300 hover:text-red-600"><X size={12}/></button>}</td></tr>; })}
+                    {lignes.length === 0 && !dateEntree1 && !hasChirSpec && <tr><td colSpan={5} className="p-6 text-center text-gray-400">Fiche vide pour l'instant.</td></tr>}
+                  </tbody>
+                </table>
+                <div className="p-4 bg-gray-50 border-t border-b text-[11px] text-gray-600 font-mono space-y-1">
+                  <div className="grid grid-cols-3 font-bold text-[#1E2A24] border-b pb-1 mb-2"><span>RÉCAPITULATIF DE LA FICHE</span><span className="text-right">Gdes</span><span className="text-right text-emerald-800">💵 DH</span></div>
+                  {require('../utils/constants').CATEGORIES_LISTE.map(srv => { const m = totalsParService[srv.key]; if (m===0) return null; return <div key={srv.key} className="grid grid-cols-3 py-0.5"><span>• {srv.label}</span><span className="text-right">{formatGourdes(m)}</span><span className="text-right font-bold">{formatDH(m)} DH</span></div>; })}
+                </div>
+                <div className="bg-[#1E2A24] text-white p-4 flex justify-between items-center font-bold text-sm font-mono">
+                  <span>SOUS-TOTAL FICHE {idFicheEnCoursDEdition ? 'EN MODIFICATION' : `N°${numeroFicheCourante}`} :</span>
+                  <span>{formatGourdes(grandTotal)} Gdes ({formatDH(grandTotal)} DH)</span>
+                </div>
+                <button onClick={() => setDetailOuvert(false)} className="w-full py-3 text-center text-gray-500 text-xs font-bold border-t">Fermer</button>
+              </div>
+            </div>
+          )}
           <div className="flex gap-2 flex-wrap">
             <button onClick={onViderFicheActive} className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl py-3 text-xs font-bold">🧹 Vider l'écran</button>
             <button onClick={imprimerFicheA4} disabled={!paiementEffectue} className={`flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>🖨️ A4</button>
             <button onClick={imprimerTicket} disabled={!paiementEffectue} className={`flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>🧾 Ticket</button>
-            <button onClick={() => {
-              if (lignes.length === 0 && j1 === 0 && !hasChirSpec && !dateEntree1) { showToast("Fiche vide", "error"); return; }
-              // On crée l'objet fiche (si idFicheEnCoursDEdition, on l'utilise pour remplacer)
-              const fiche = {
-                id: idFicheEnCoursDEdition || "fiche-" + Date.now(),
-                numeroFiche: idFicheEnCoursDEdition ? fichesDossier.find(f => f.id === idFicheEnCoursDEdition)?.numeroFiche || numeroFicheCourante : numeroFicheCourante,
-                breakdown: { ...totalsParService },
-                totalGlobal: grandTotal,
-                rawState: { lignesCalcul: [...lignes], dateEntree1, dateSortie1, typeLit1, multiPeriode, dateEntree2, dateSortie2, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
-              };
-              onEnregistrerFiche(fiche);
-              // Le parent (AppHospitaliere) gère la mise à jour ou l'ajout et vide le calculateur
-              showToast(idFicheEnCoursDEdition ? "Fiche mise à jour" : "Fiche enregistrée (sans paiement)", "success");
-            }} disabled={!peutArchiver} className="flex-[2] bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl py-3 text-xs font-black shadow-md disabled:opacity-50">
+            <button onClick={enregistrerFicheActive} disabled={!peutArchiver} className="flex-[2] bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl py-3 text-xs font-black shadow-md disabled:opacity-50">
               {idFicheEnCoursDEdition ? '💾 Mettre à jour la Fiche' : `💾 Enregistrer la Fiche N°${numeroFicheCourante} au Dossier`}
             </button>
           </div>

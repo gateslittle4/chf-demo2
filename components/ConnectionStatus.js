@@ -6,6 +6,7 @@ const { chf } = require('../api/supabase');
 function ConnectionStatus() {
   const [online, setOnline] = useState(navigator.onLine);
   const [enAttente, setEnAttente] = useState(0);
+  const [enCours, setEnCours] = useState(false);
 
   useEffect(() => {
     const goOnline = () => setOnline(true);
@@ -23,6 +24,14 @@ function ConnectionStatus() {
     return () => clearInterval(interval);
   }, []);
 
+  const relancerSynchronisation = async () => {
+    if (enCours) return;
+    setEnCours(true);
+    await chf.syncPending();
+    setEnAttente(chf.countPending());
+    setEnCours(false);
+  };
+
   return (
     <div
       className="fixed bottom-4 left-4 z-50 flex items-center gap-1.5 bg-white/95 backdrop-blur px-2.5 py-1.5 rounded-full shadow border text-[10px] font-bold"
@@ -31,9 +40,12 @@ function ConnectionStatus() {
       <span className={`w-2.5 h-2.5 rounded-full ${online ? 'bg-emerald-500' : 'bg-red-500 animate-pulse'}`}></span>
       <span className={online ? 'text-emerald-700' : 'text-red-700'}>{online ? 'En ligne' : 'Hors ligne'}</span>
       {enAttente > 0 && (
-        <span className="bg-amber-500 text-white rounded-full px-1.5 py-0.5 text-[9px]" title={`${enAttente} opération(s) en attente de synchronisation`}>
-          ⏳ {enAttente}
-        </span>
+        <button
+          onClick={relancerSynchronisation} disabled={enCours}
+          className="bg-amber-500 text-white rounded-full px-1.5 py-0.5 text-[9px] disabled:opacity-60"
+          title="Cliquer pour relancer la synchronisation maintenant">
+          {enCours ? '🔄 ...' : `⏳ ${enAttente} — relancer`}
+        </button>
       )}
     </div>
   );

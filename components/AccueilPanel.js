@@ -4,7 +4,7 @@ const { useState, useEffect, useMemo } = React;
 const { chf } = require('../api/supabase');
 const { formatGourdes } = require('../utils/helpers');
 
-function AccueilPanel({ verifications, paiements, medicaments, userRole, userDisplayName, onNaviguer, onOuvrirAchatExpress }) {
+function AccueilPanel({ verifications, paiements, medicaments, userRole, userDisplayName, onNaviguer, onOuvrirAchatExpress, showToast }) {
   const [enAttente, setEnAttente] = useState(0);
   useEffect(() => {
     const interval = setInterval(() => setEnAttente(chf.countPending()), 2000);
@@ -69,8 +69,19 @@ function AccueilPanel({ verifications, paiements, medicaments, userRole, userDis
               </div>
             )}
             {enAttente > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs">
-                <span className="font-bold text-amber-700">⏳ {enAttente} opération(s) en attente de synchronisation</span>
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-amber-700">⏳ {enAttente} opération(s) en attente de synchronisation</span>
+                  <button onClick={() => { chf.syncPending(); showToast?.("Nouvelle tentative en cours...", "info"); }} className="text-amber-800 font-bold underline whitespace-nowrap">🔄 Réessayer maintenant</button>
+                </div>
+                <div className="divide-y divide-amber-200/60">
+                  {chf.getPendingDetails().map((d, i) => (
+                    <div key={i} className="flex justify-between py-1 text-amber-800">
+                      <span>{d.texte}</span><span className="text-amber-600">{d.quand}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-amber-600">Ces changements sont déjà enregistrés sur cet appareil — ils partiront vers le serveur dès qu'une connexion fonctionne. Réessaie manuellement si ça persiste après plusieurs minutes.</p>
               </div>
             )}
           </div>
