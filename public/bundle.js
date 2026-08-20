@@ -70,6 +70,7 @@
           window.addEventListener("offline", () => {
             this.isOnline = false;
           });
+          setInterval(() => this.syncPending(), 3e4);
         }
         async request(endpoint, method = "GET", data = null, meta = {}) {
           const options = { method, headers: { "Content-Type": "application/json" } };
@@ -107,13 +108,25 @@
         countPending() {
           return this.pendingQueue.length;
         }
+        // Détail lisible des opérations en attente (quoi + quand), pour que la personne sache ce qui
+        // n'est pas encore enregistré, plutôt qu'un simple nombre sans explication.
+        getPendingDetails() {
+          const libelle = (op) => {
+            if (op.endpoint.startsWith("/episodes")) return op.method === "POST" ? "Nouveau dossier" : "Modification d'un dossier";
+            if (op.endpoint.startsWith("/paiements")) return "Paiement";
+            if (op.endpoint.startsWith("/catalog/medicaments")) return "Mise \xE0 jour de la pharmacie";
+            if (op.endpoint.startsWith("/catalog/actes")) return "Mise \xE0 jour des actes";
+            return op.endpoint;
+          };
+          return this.pendingQueue.map((op) => ({ texte: libelle(op), quand: new Date(op.timestamp).toLocaleString("fr-FR") }));
+        }
         // Retire de la file une création jamais synchronisée (ex: dossier ouvert hors-ligne puis annulé avant le retour d'internet)
         removePendingByLocalId(localId) {
           this.pendingQueue = this.pendingQueue.filter((op) => op.localId !== localId);
           localStorage.setItem("pending_ops", JSON.stringify(this.pendingQueue));
         }
         async syncPending() {
-          if (!navigator.onLine || this.pendingQueue.length === 0) return;
+          if (this.pendingQueue.length === 0) return;
           console.log(`\u{1F504} Sync de ${this.pendingQueue.length} op\xE9rations...`);
           const queue = [...this.pendingQueue];
           this.pendingQueue = [];
@@ -172,8 +185,11 @@
           contientErreurs: "contient_erreurs",
           verrouilleFacture: "verrouille_facture",
           dateSuspension: "date_suspension",
+          noteSuspension: "note_suspension",
           updatedAt: "updated_at",
-          serviceChoisi: "service_choisi"
+          serviceChoisi: "service_choisi",
+          numeroLot: "numero_lot",
+          moisReport: "mois_report"
         };
         const result = {};
         for (const [k, v] of Object.entries(data)) result[map[k] || k] = v;
@@ -195,8 +211,11 @@
           contient_erreurs: "contientErreurs",
           verrouille_facture: "verrouilleFacture",
           date_suspension: "dateSuspension",
+          note_suspension: "noteSuspension",
           updated_at: "updatedAt",
-          service_choisi: "serviceChoisi"
+          service_choisi: "serviceChoisi",
+          numero_lot: "numeroLot",
+          mois_report: "moisReport"
         };
         const result = {};
         for (const [k, v] of Object.entries(data)) result[map[k] || k] = v;
@@ -1724,7 +1743,7 @@
         },
         {
           "id": "a71",
-          "nom": "Sedimentation",
+          "nom": "Vitesse de s\xE9dimentation (VS)",
           "prix": 250,
           "sub": "labo"
         },
@@ -1948,12 +1967,6 @@
           "id": "a69",
           "nom": "Temps de Saignement (TS)",
           "prix": 300,
-          "sub": "labo"
-        },
-        {
-          "id": "a71b",
-          "nom": "Vitesse de s\xE9dimentation (VS)",
-          "prix": 250,
           "sub": "labo"
         },
         {
@@ -2290,6 +2303,7 @@
       function ConnectionStatus() {
         const [online, setOnline] = useState(navigator.onLine);
         const [enAttente, setEnAttente] = useState(0);
+        const [enCours, setEnCours] = useState(false);
         useEffect(() => {
           const goOnline = () => setOnline(true);
           const goOffline = () => setOnline(false);
@@ -2304,6 +2318,13 @@
           const interval = setInterval(() => setEnAttente(chf.countPending()), 2e3);
           return () => clearInterval(interval);
         }, []);
+        const relancerSynchronisation = async () => {
+          if (enCours) return;
+          setEnCours(true);
+          await chf.syncPending();
+          setEnAttente(chf.countPending());
+          setEnCours(false);
+        };
         return /* @__PURE__ */ React.createElement(
           "div",
           {
@@ -2312,7 +2333,16 @@
           },
           /* @__PURE__ */ React.createElement("span", { className: `w-2.5 h-2.5 rounded-full ${online ? "bg-emerald-500" : "bg-red-500 animate-pulse"}` }),
           /* @__PURE__ */ React.createElement("span", { className: online ? "text-emerald-700" : "text-red-700" }, online ? "En ligne" : "Hors ligne"),
-          enAttente > 0 && /* @__PURE__ */ React.createElement("span", { className: "bg-amber-500 text-white rounded-full px-1.5 py-0.5 text-[9px]", title: `${enAttente} op\xE9ration(s) en attente de synchronisation` }, "\u23F3 ", enAttente)
+          enAttente > 0 && /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              onClick: relancerSynchronisation,
+              disabled: enCours,
+              className: "bg-amber-500 text-white rounded-full px-1.5 py-0.5 text-[9px] disabled:opacity-60",
+              title: "Cliquer pour relancer la synchronisation maintenant"
+            },
+            enCours ? "\u{1F504} ..." : `\u23F3 ${enAttente} \u2014 relancer`
+          )
         );
       }
       module.exports = ConnectionStatus;
@@ -2387,36 +2417,142 @@
   var require_GrilleEdition = __commonJS({
     "components/GrilleEdition.js"(exports, module) {
       var React = window.React;
-      var { useState } = React;
+      var { useState, useEffect } = React;
       var { chf } = require_supabase();
+      var { db } = require_firebase();
       var { LOG_MEDS_KEY, LOG_ACTES_KEY } = require_firebase();
       var { CATEGORIES_LISTE } = require_constants();
       var { formatGourdes } = require_helpers();
       var { Check, X, Pencil, Trash2 } = require_icons();
       function GrilleEditionPanel({ titre, items, setItems, collectionName, showToast }) {
+        const exporterJSON = () => {
+          const texte = JSON.stringify(items, null, 2);
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(texte).then(() => showToast(`${items.length} article(s) copi\xE9(s) dans le presse-papier`, "success")).catch(() => showToast("Copie impossible \u2014 utilise le t\xE9l\xE9chargement \xE0 la place", "error"));
+          }
+        };
+        const telechargerJSON = () => {
+          const blob = new Blob([JSON.stringify(items, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `catalogue-${collectionName}-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+        };
         const [filtre, setFiltre] = useState("");
         const [idEdit, setIdEdit] = useState(null);
         const [prixEdit, setPrixEdit] = useState("");
+        const [coutEdit, setCoutEdit] = useState("");
+        const [nouveauPrixEdit, setNouveauPrixEdit] = useState("");
         const [nomEdit, setNomEdit] = useState("");
         const [sousCategorieEdit, setSousCategorieEdit] = useState("");
         const [nouveauNom, setNouveauNom] = useState("");
         const [nouveauPrix, setNouveauPrix] = useState("");
+        const [nouveauCout, setNouveauCout] = useState("");
         const [nouvelleSousCategorie, setNouvelleSousCategorie] = useState("chirurgie");
         const [quantiteStock, setQuantiteStock] = useState("");
         const [seuilAlerte, setSeuilAlerte] = useState("");
+        const [salaires, setSalaires] = useState({});
+        const [salairesChargement, setSalairesChargement] = useState(true);
+        const [salairesModifies, setSalairesModifies] = useState(false);
+        useEffect(() => {
+          if (collectionName === "medicaments") return;
+          db.collection("config").doc("salairesServices").get().then((doc) => {
+            setSalaires(doc.exists ? doc.data() || {} : {});
+            setSalairesChargement(false);
+          }).catch(() => setSalairesChargement(false));
+        }, [collectionName]);
+        const enregistrerSalaires = async () => {
+          try {
+            const propre = {};
+            Object.entries(salaires).forEach(([k, v]) => {
+              const n = parseFloat(v);
+              if (!isNaN(n) && n >= 0) propre[k] = n;
+            });
+            await db.collection("config").doc("salairesServices").set(propre);
+            setSalaires(propre);
+            setSalairesModifies(false);
+            showToast("Salaires enregistr\xE9s", "success");
+          } catch (e) {
+            showToast("Erreur lors de l'enregistrement des salaires.", "error");
+          }
+        };
         const categoriesActes = CATEGORIES_LISTE.filter((c) => c.key !== "hospit");
+        const normaliser = (s) => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+        const ORDRE_LABO_PAPIER = [
+          "H\xE9mogramme",
+          "Taux de plaquettes",
+          "Groupe Sanguin",
+          "Malaria",
+          "Widal",
+          "Test de Grossesse",
+          "BHCG Plasmatiques",
+          "Vitesse de s\xE9dimentation (VS)",
+          "Glyc\xE9mie",
+          "Cholest\xE9rol",
+          "Acide Urique",
+          "V.C.T",
+          "C.R.P",
+          "A.S.O",
+          "Urines",
+          "Frottis vaginal",
+          "Frottis Ur\xE9tral",
+          "Test Chlamydia",
+          "S\xE9rologie H-Pylori",
+          "H-Pylori (Selles)",
+          "Selles",
+          "Sang Occulte",
+          "Hepatite A",
+          "Hepatite B",
+          "Hepatite C",
+          "Sickling test",
+          "Electrophorese",
+          "Culture + Antibiogramme",
+          "H\xE9moculture",
+          "Bacilloscopie",
+          "Ionogramme",
+          "Bilan Lipidique",
+          "Chimie Sanguin",
+          "Bilan h\xE9patique",
+          "Bilan R\xE9nal",
+          "PSA"
+        ];
+        const ORDRE_LABO_MAP = {};
+        ORDRE_LABO_PAPIER.forEach((nom, idx) => {
+          ORDRE_LABO_MAP[normaliser(nom)] = idx + 1;
+        });
         const sauvegarderCatalogue = async (nouvelleListe) => {
           setItems(nouvelleListe);
           const key = collectionName === "medicaments" ? LOG_MEDS_KEY : LOG_ACTES_KEY;
           localStorage.setItem(key, JSON.stringify(nouvelleListe));
           try {
             await chf.updateCatalog(collectionName, nouvelleListe);
+            return true;
           } catch (e) {
             console.warn("Erreur mise \xE0 jour catalogue:", e);
+            return false;
           }
         };
-        const correspondances = items.filter((i) => i.nom.toLowerCase().includes(filtre.toLowerCase()));
-        const ajouterElement = () => {
+        const appliquerOrdreLabo = async () => {
+          const cibles = items.filter((i) => i.sub === "labo");
+          const matches = cibles.filter((i) => ORDRE_LABO_MAP[normaliser(i.nom)] != null);
+          if (matches.length === 0) {
+            showToast("Aucune correspondance trouv\xE9e avec le bon de laboratoire.", "error");
+            return;
+          }
+          if (!confirm(`Appliquer l'ordre du bon de laboratoire \xE0 ${matches.length} test(s) sur ${cibles.length} dans "Laboratoire" ?`)) return;
+          const updated = items.map((i) => i.sub === "labo" && ORDRE_LABO_MAP[normaliser(i.nom)] != null ? { ...i, ordre: ORDRE_LABO_MAP[normaliser(i.nom)] } : i);
+          const succes = await sauvegarderCatalogue(updated);
+          if (succes) showToast(`\u2705 Ordre appliqu\xE9 \xE0 ${matches.length} test(s) et enregistr\xE9`, "success");
+          else showToast(`\u26A0\uFE0F Ordre appliqu\xE9 \xE0 l'\xE9cran, mais PAS enregistr\xE9 sur le serveur (connexion/backend indisponible) \u2014 il sera perdu au prochain chargement. R\xE9essaie.`, "error");
+        };
+        const correspondances = items.filter((i) => i.nom.toLowerCase().includes(filtre.toLowerCase())).sort((a, b) => {
+          var _a, _b;
+          return ((_a = a.ordre) != null ? _a : 9999) - ((_b = b.ordre) != null ? _b : 9999) || a.nom.localeCompare(b.nom);
+        });
+        const nombreEnAttente = items.filter((i) => i.nouveauPrix != null && i.nouveauPrix !== "").length;
+        const ajouterElement = async () => {
           if (!nouveauNom.trim() || !nouveauPrix) {
             showToast("Veuillez remplir le nom et le prix.", "error");
             return;
@@ -2430,38 +2566,60 @@
             id: Date.now() + Math.random(),
             nom: nouveauNom.trim(),
             prix,
+            nouveauPrix: null,
+            cout: nouveauCout.trim() === "" ? null : parseFloat(nouveauCout) || 0,
             quantite: parseFloat(quantiteStock) || 0,
             seuilAlerte: parseFloat(seuilAlerte) || 5,
             categorie: collectionName === "medicaments" ? "pharmacie" : "",
             sub: collectionName === "medicaments" ? void 0 : nouvelleSousCategorie
           };
-          sauvegarderCatalogue([...items, newItem]);
+          const succes = await sauvegarderCatalogue([...items, newItem]);
           setNouveauNom("");
           setNouveauPrix("");
+          setNouveauCout("");
           setQuantiteStock("");
           setSeuilAlerte("");
-          showToast("Ajout\xE9 avec succ\xE8s", "success");
+          showToast(succes ? "Ajout\xE9 et enregistr\xE9" : "\u26A0\uFE0F Ajout\xE9 \xE0 l'\xE9cran seulement \u2014 pas enregistr\xE9 sur le serveur, r\xE9essaie", succes ? "success" : "error");
         };
-        const supprimerElement = (id) => {
-          if (confirm("Supprimer d\xE9finitivement ?")) {
-            sauvegarderCatalogue(items.filter((i) => i.id !== id));
-            showToast("Supprim\xE9", "success");
+        const supprimerElement = async (id) => {
+          if (!confirm("Supprimer d\xE9finitivement ?")) return;
+          const succes = await sauvegarderCatalogue(items.filter((i) => i.id !== id));
+          showToast(succes ? "Supprim\xE9 et enregistr\xE9" : "\u26A0\uFE0F Retir\xE9 de l'\xE9cran seulement \u2014 pas enregistr\xE9 sur le serveur, r\xE9essaie", succes ? "success" : "error");
+        };
+        const appliquerNouveauxPrix = async () => {
+          if (nombreEnAttente === 0) {
+            showToast("Aucun nouveau prix en attente.", "error");
+            return;
           }
+          if (!confirm(`Appliquer le nouveau prix sur ${nombreEnAttente} article(s) ? Ce sera le prix utilis\xE9 pour toutes les nouvelles fiches \xE0 partir de maintenant.`)) return;
+          const updated = items.map((i) => i.nouveauPrix != null && i.nouveauPrix !== "" ? { ...i, prix: parseFloat(i.nouveauPrix), nouveauPrix: null } : i);
+          const succes = await sauvegarderCatalogue(updated);
+          showToast(succes ? `\u2705 ${nombreEnAttente} prix mis \xE0 jour et enregistr\xE9s` : `\u26A0\uFE0F Prix chang\xE9s \xE0 l'\xE9cran seulement \u2014 pas enregistr\xE9s sur le serveur, r\xE9essaie`, succes ? "success" : "error");
         };
-        return /* @__PURE__ */ React.createElement("div", { className: "space-y-3 text-xs" }, /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm space-y-2" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-gray-800" }, "\u2795 Ajouter un ", titre), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-2" }, /* @__PURE__ */ React.createElement("input", { type: "text", value: nouveauNom, onChange: (e) => setNouveauNom(e.target.value), placeholder: "Nom...", className: "border rounded-lg p-1.5 flex-1 min-w-[120px] outline-none" }), /* @__PURE__ */ React.createElement("input", { type: "number", step: "0.01", value: nouveauPrix, onChange: (e) => setNouveauPrix(e.target.value), placeholder: "Prix (Gourdes)", className: "border rounded-lg p-1.5 w-24 font-mono outline-none" }), collectionName === "medicaments" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("input", { type: "number", step: "1", value: quantiteStock, onChange: (e) => setQuantiteStock(e.target.value), placeholder: "Stock", className: "border rounded-lg p-1.5 w-16 font-mono outline-none" }), /* @__PURE__ */ React.createElement("input", { type: "number", step: "1", value: seuilAlerte, onChange: (e) => setSeuilAlerte(e.target.value), placeholder: "Seuil", className: "border rounded-lg p-1.5 w-16 font-mono outline-none" })), collectionName !== "medicaments" && /* @__PURE__ */ React.createElement("select", { value: nouvelleSousCategorie, onChange: (e) => setNouvelleSousCategorie(e.target.value), className: "border rounded-lg p-1.5 bg-white outline-none" }, categoriesActes.map((c) => /* @__PURE__ */ React.createElement("option", { key: c.key, value: c.key }, c.label))), /* @__PURE__ */ React.createElement("button", { onClick: ajouterElement, className: "bg-emerald-700 text-white px-3 py-1.5 rounded font-bold" }, "Ajouter"))), /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ React.createElement("input", { type: "text", value: filtre, onChange: (e) => setFiltre(e.target.value), placeholder: "Filtrer...", className: "w-full border rounded-lg p-2" }), /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl border overflow-hidden max-h-96 overflow-y-auto divide-y" }, correspondances.map((i) => {
+        return /* @__PURE__ */ React.createElement("div", { className: "space-y-3 text-xs" }, collectionName !== "medicaments" && !salairesChargement && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border border-orange-200 shadow-sm space-y-2" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-gray-800" }, "\u{1F4B0} Salaire mensuel total par service"), /* @__PURE__ */ React.createElement("p", { className: "text-gray-500 text-[10px]" }, "Total des salaires des membres travaillant dans ce service, pour le mois. Sert \xE0 \xE9valuer le co\xFBt r\xE9el en plus du co\xFBt d'achat des articles."), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-3 gap-2" }, categoriesActes.map((c) => {
           var _a;
-          return /* @__PURE__ */ React.createElement("div", { key: i.id, className: "p-3 flex justify-between items-center hover:bg-gray-50" }, idEdit === i.id ? /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 w-full justify-between items-center flex-wrap" }, /* @__PURE__ */ React.createElement("input", { type: "text", value: nomEdit, onChange: (e) => setNomEdit(e.target.value), className: "border rounded p-1 flex-1" }), collectionName !== "medicaments" && /* @__PURE__ */ React.createElement("select", { value: sousCategorieEdit, onChange: (e) => setSousCategorieEdit(e.target.value), className: "border rounded p-1 bg-white text-xs" }, categoriesActes.map((c) => /* @__PURE__ */ React.createElement("option", { key: c.key, value: c.key }, c.label))), /* @__PURE__ */ React.createElement("input", { type: "number", value: prixEdit, onChange: (e) => setPrixEdit(e.target.value), className: "w-20 border rounded p-1 text-right font-mono" }), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+          return /* @__PURE__ */ React.createElement("div", { key: c.key, className: "flex flex-col gap-0.5" }, /* @__PURE__ */ React.createElement("label", { className: "text-[9px] font-bold text-gray-500 uppercase" }, c.label), /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", value: (_a = salaires[c.key]) != null ? _a : "", onChange: (e) => {
+            setSalaires((prev) => ({ ...prev, [c.key]: e.target.value }));
+            setSalairesModifies(true);
+          }, placeholder: "0", className: "border border-orange-200 rounded-lg p-1.5 font-mono text-right outline-none" }));
+        })), salairesModifies && /* @__PURE__ */ React.createElement("button", { onClick: enregistrerSalaires, className: "bg-orange-700 text-white font-bold px-3 py-1.5 rounded" }, "\u{1F4BE} Enregistrer les salaires")), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm space-y-2" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-gray-800" }, "\u2795 Ajouter un ", titre), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-2" }, /* @__PURE__ */ React.createElement("input", { type: "text", value: nouveauNom, onChange: (e) => setNouveauNom(e.target.value), placeholder: "Nom...", className: "border rounded-lg p-1.5 flex-1 min-w-[120px] outline-none" }), /* @__PURE__ */ React.createElement("input", { type: "number", step: "0.01", value: nouveauPrix, onChange: (e) => setNouveauPrix(e.target.value), placeholder: "Prix (Gourdes)", className: "border rounded-lg p-1.5 w-24 font-mono outline-none" }), /* @__PURE__ */ React.createElement("input", { type: "number", step: "0.01", value: nouveauCout, onChange: (e) => setNouveauCout(e.target.value), placeholder: "Co\xFBt (achat+m.o.)", className: "border border-orange-300 rounded-lg p-1.5 w-28 font-mono outline-none" }), collectionName === "medicaments" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("input", { type: "number", step: "1", value: quantiteStock, onChange: (e) => setQuantiteStock(e.target.value), placeholder: "Stock", className: "border rounded-lg p-1.5 w-16 font-mono outline-none" }), /* @__PURE__ */ React.createElement("input", { type: "number", step: "1", value: seuilAlerte, onChange: (e) => setSeuilAlerte(e.target.value), placeholder: "Seuil", className: "border rounded-lg p-1.5 w-16 font-mono outline-none" })), collectionName !== "medicaments" && /* @__PURE__ */ React.createElement("select", { value: nouvelleSousCategorie, onChange: (e) => setNouvelleSousCategorie(e.target.value), className: "border rounded-lg p-1.5 bg-white outline-none" }, categoriesActes.map((c) => /* @__PURE__ */ React.createElement("option", { key: c.key, value: c.key }, c.label))), /* @__PURE__ */ React.createElement("button", { onClick: ajouterElement, className: "bg-emerald-700 text-white px-3 py-1.5 rounded font-bold" }, "Ajouter"))), nombreEnAttente > 0 && /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between gap-2 bg-indigo-50 border border-indigo-300 rounded-xl p-3" }, /* @__PURE__ */ React.createElement("span", { className: "text-indigo-800 font-bold" }, "\u{1F553} ", nombreEnAttente, " nouveau(x) prix en attente (visibles seulement dans le Simulateur pour l'instant)"), /* @__PURE__ */ React.createElement("button", { onClick: appliquerNouveauxPrix, className: "bg-indigo-700 text-white font-bold px-3 py-1.5 rounded whitespace-nowrap" }, "\u{1F504} Appliquer tous les nouveaux prix")), collectionName !== "medicaments" && /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between gap-2 bg-blue-50 border border-blue-300 rounded-xl p-3" }, /* @__PURE__ */ React.createElement("span", { className: "text-blue-800 font-bold" }, '\u{1F4CB} Trier "Laboratoire" comme sur le bon papier'), /* @__PURE__ */ React.createElement("button", { onClick: appliquerOrdreLabo, className: "bg-blue-700 text-white font-bold px-3 py-1.5 rounded whitespace-nowrap" }, "Appliquer l'ordre")), /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between gap-2 bg-gray-50 border rounded-xl p-3" }, /* @__PURE__ */ React.createElement("span", { className: "text-gray-700 font-bold" }, "\u{1F4E4} Exporter ce catalogue (", items.length, " articles)"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: exporterJSON, className: "bg-gray-700 text-white font-bold px-3 py-1.5 rounded whitespace-nowrap" }, "\u{1F4CB} Copier"), /* @__PURE__ */ React.createElement("button", { onClick: telechargerJSON, className: "border border-gray-400 text-gray-700 font-bold px-3 py-1.5 rounded whitespace-nowrap" }, "\u2B07\uFE0F T\xE9l\xE9charger"))), /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ React.createElement("input", { type: "text", value: filtre, onChange: (e) => setFiltre(e.target.value), placeholder: "Filtrer...", className: "w-full border rounded-lg p-2" }), /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl border overflow-hidden max-h-96 overflow-y-auto divide-y" }, correspondances.map((i) => {
+          var _a;
+          return /* @__PURE__ */ React.createElement("div", { key: i.id, className: "p-3 flex justify-between items-center hover:bg-gray-50" }, idEdit === i.id ? /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 w-full justify-between items-center flex-wrap" }, /* @__PURE__ */ React.createElement("input", { type: "text", value: nomEdit, onChange: (e) => setNomEdit(e.target.value), className: "border rounded p-1 flex-1" }), collectionName !== "medicaments" && /* @__PURE__ */ React.createElement("select", { value: sousCategorieEdit, onChange: (e) => setSousCategorieEdit(e.target.value), className: "border rounded p-1 bg-white text-xs" }, categoriesActes.map((c) => /* @__PURE__ */ React.createElement("option", { key: c.key, value: c.key }, c.label))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-0.5" }, /* @__PURE__ */ React.createElement("label", { className: "text-[8px] text-gray-400 uppercase font-bold" }, "Prix actuel"), /* @__PURE__ */ React.createElement("input", { type: "number", value: prixEdit, onChange: (e) => setPrixEdit(e.target.value), className: "w-20 border rounded p-1 text-right font-mono" })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-0.5" }, /* @__PURE__ */ React.createElement("label", { className: "text-[8px] text-orange-500 uppercase font-bold" }, "Co\xFBt (achat+m.o.)"), /* @__PURE__ */ React.createElement("input", { type: "number", value: coutEdit, onChange: (e) => setCoutEdit(e.target.value), placeholder: "\u2014", className: "w-24 border border-orange-300 rounded p-1 text-right font-mono" })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-0.5" }, /* @__PURE__ */ React.createElement("label", { className: "text-[8px] text-indigo-500 uppercase font-bold" }, "Nv. prix (\xE0 venir)"), /* @__PURE__ */ React.createElement("input", { type: "number", value: nouveauPrixEdit, onChange: (e) => setNouveauPrixEdit(e.target.value), placeholder: "\u2014", className: "w-20 border border-indigo-300 rounded p-1 text-right font-mono" })), /* @__PURE__ */ React.createElement("button", { onClick: async () => {
             const p = parseFloat(prixEdit);
             if (!isNaN(p) && nomEdit.trim()) {
-              const updated = items.map((x) => x.id === i.id ? { ...x, nom: nomEdit.trim(), prix: p, ...collectionName !== "medicaments" ? { sub: sousCategorieEdit } : {} } : x);
-              sauvegarderCatalogue(updated);
+              const np = nouveauPrixEdit.trim() === "" ? null : parseFloat(nouveauPrixEdit);
+              const c = coutEdit.trim() === "" ? null : parseFloat(coutEdit);
+              const updated = items.map((x) => x.id === i.id ? { ...x, nom: nomEdit.trim(), prix: p, cout: c != null && !isNaN(c) ? c : null, nouveauPrix: np != null && !isNaN(np) ? np : null, ...collectionName !== "medicaments" ? { sub: sousCategorieEdit } : {} } : x);
+              const succes = await sauvegarderCatalogue(updated);
               setIdEdit(null);
-              showToast("Modifi\xE9", "success");
+              showToast(succes ? "Modifi\xE9 et enregistr\xE9" : "\u26A0\uFE0F Modifi\xE9 \xE0 l'\xE9cran seulement \u2014 pas enregistr\xE9 sur le serveur, r\xE9essaie", succes ? "success" : "error");
             }
-          }, className: "bg-green-700 text-white p-1 rounded" }, /* @__PURE__ */ React.createElement(Check, { size: 12 })), /* @__PURE__ */ React.createElement("button", { onClick: () => setIdEdit(null), className: "border p-1 rounded" }, /* @__PURE__ */ React.createElement(X, { size: 12 }))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { className: "font-medium text-gray-700" }, i.nom), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 items-center flex-wrap" }, collectionName === "medicaments" && /* @__PURE__ */ React.createElement("span", { className: "text-gray-500" }, "\u{1F4E6} ", i.quantite || 0), collectionName !== "medicaments" && /* @__PURE__ */ React.createElement("span", { className: "text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700" }, ((_a = categoriesActes.find((c) => c.key === i.sub)) == null ? void 0 : _a.label) || "\u26A0\uFE0F Non class\xE9 (\u2192 Chirurgie)"), /* @__PURE__ */ React.createElement("span", { className: "font-mono bg-gray-100 px-2 py-0.5 rounded font-bold" }, formatGourdes(i.prix), " Gdes"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+          }, className: "bg-green-700 text-white p-1 rounded" }, /* @__PURE__ */ React.createElement(Check, { size: 12 })), /* @__PURE__ */ React.createElement("button", { onClick: () => setIdEdit(null), className: "border p-1 rounded" }, /* @__PURE__ */ React.createElement(X, { size: 12 }))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { className: "font-medium text-gray-700" }, i.nom), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 items-center flex-wrap" }, collectionName === "medicaments" && /* @__PURE__ */ React.createElement("span", { className: "text-gray-500" }, "\u{1F4E6} ", i.quantite || 0), collectionName !== "medicaments" && /* @__PURE__ */ React.createElement("span", { className: "text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700" }, ((_a = categoriesActes.find((c) => c.key === i.sub)) == null ? void 0 : _a.label) || "\u26A0\uFE0F Non class\xE9 (\u2192 Chirurgie)"), /* @__PURE__ */ React.createElement("span", { className: "font-mono bg-gray-100 px-2 py-0.5 rounded font-bold" }, formatGourdes(i.prix), " Gdes"), i.cout != null ? /* @__PURE__ */ React.createElement("span", { className: "font-mono bg-orange-50 text-orange-700 px-2 py-0.5 rounded font-bold", title: "Co\xFBt (achat + main d'\u0153uvre)" }, "Co\xFBt: ", formatGourdes(i.cout), " ", /* @__PURE__ */ React.createElement("span", { className: i.prix - i.cout >= 0 ? "text-emerald-700" : "text-red-600" }, "(marge ", formatGourdes(i.prix - i.cout), ")")) : /* @__PURE__ */ React.createElement("span", { className: "font-mono bg-gray-50 text-gray-400 px-2 py-0.5 rounded", title: "Co\xFBt non renseign\xE9" }, "Co\xFBt: \u2014"), i.nouveauPrix != null && i.nouveauPrix !== "" && /* @__PURE__ */ React.createElement("span", { className: "font-mono bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold", title: "Nouveau prix \xE0 venir" }, "\u2192 ", formatGourdes(i.nouveauPrix), " Gdes"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
             setIdEdit(i.id);
             setNomEdit(i.nom);
             setPrixEdit(String(i.prix));
+            setCoutEdit(i.cout != null ? String(i.cout) : "");
+            setNouveauPrixEdit(i.nouveauPrix != null ? String(i.nouveauPrix) : "");
             setSousCategorieEdit(i.sub || "chirurgie");
           }, className: "text-gray-400 hover:text-gray-700 p-1" }, /* @__PURE__ */ React.createElement(Pencil, { size: 12 })), /* @__PURE__ */ React.createElement("button", { onClick: () => supprimerElement(i.id), className: "text-gray-300 hover:text-red-600 p-1" }, /* @__PURE__ */ React.createElement(Trash2, { size: 12 })))));
         }))));
@@ -2667,7 +2825,7 @@
               const dateFiche = f.dateCreation ? new Date(f.dateCreation) : parseDateDossier(v.dateHeure);
               if (!dateFiche || isNaN(dateFiche)) return;
               const montant = f.totalGlobal || 0;
-              if ((f.modePaiement === "cash" || f.modePaiement === "ong") && dateFiche.getMonth() === mois && dateFiche.getFullYear() === annee) caMois += montant;
+              if (dateFiche.getMonth() === mois && dateFiche.getFullYear() === annee) caMois += montant;
               if (estAujourdhui(dateFiche)) {
                 if (f.modePaiement === "cash") caJourCash += montant;
                 if (f.modePaiement === "ong") caJourOng += montant;
@@ -2838,9 +2996,12 @@
       var { Eye, Pencil, Trash2, Printer, Clock, FolderOpen, X, Download, Check } = require_icons();
       var { chf, toEpisodeApi } = require_supabase();
       var { LOGO_CHF_BASE64 } = require_logoChf();
-      function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, userRole, showToast, onChangerTypeOng, listeOng }) {
+      var NOM_COMPLET_ONG = { "MSF-H": "MSF-HOLLANDE", "MSF-F": "MSF-FRANCE" };
+      var nomCompletOng = (nom) => NOM_COMPLET_ONG[nom] || nom;
+      function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, userRole, showToast, onChangerTypeOng, listeOng, listeOngDocs, confirmModal, setConfirmModal, lotInitialFocus, clearLotInitialFocus }) {
         var _a;
         const [focusedVerif, setFocusedVerif] = useState(null);
+        const [ficheAValider, setFicheAValider] = useState(null);
         const [editTypeArchiveOuvert, setEditTypeArchiveOuvert] = useState(false);
         const [nouveauTypeArchive, setNouveauTypeArchive] = useState("ONG");
         const [nouvelOngArchive, setNouvelOngArchive] = useState("");
@@ -2865,8 +3026,33 @@
           }
         }, [filtreInitialNom]);
         useEffect(() => {
+          if (lotInitialFocus) {
+            setSousOngletArchives("lots");
+            setLotOngSelectionne(lotInitialFocus.ongPartenaire);
+            setLotFocusedNumero(lotInitialFocus.numeroLot);
+            clearLotInitialFocus();
+          }
+        }, [lotInitialFocus]);
+        useEffect(() => {
+          setAppliqueRabais10(false);
+          setMontantDonIntrants("");
+        }, [lotFocusedNumero]);
+        useEffect(() => {
           setNombreAffiche(100);
         }, [filtreType, filtreOng, rechercheNomPatient, filtreDateDebut, filtreDateFin, filtreCategorie, filtreStatut]);
+        const numeroDepartConfigure = (ongCible) => {
+          const doc = (listeOngDocs || []).find((o) => o.nom === ongCible);
+          return (doc == null ? void 0 : doc.prochainNumero) || 1;
+        };
+        const ventilationDossier = (v) => {
+          const totaux = {};
+          (v.fiches || []).forEach((f) => {
+            Object.entries(f.breakdown || {}).forEach(([cle, montant]) => {
+              totaux[cle] = (totaux[cle] || 0) + (montant || 0);
+            });
+          });
+          return CATEGORIES_LISTE.map((cat) => ({ label: cat.label, montant: totaux[cat.key] || 0 })).filter((x) => x.montant > 0);
+        };
         const lotsDuPartenaire = useMemo(() => {
           if (!lotOngSelectionne) return [];
           const parNumero = {};
@@ -2878,13 +3064,17 @@
           });
           return Object.keys(parNumero).map((n) => Number(n)).sort((a, b) => b - a).map((n) => ({
             numero: n,
-            dossiers: parNumero[n],
+            dossiers: [...parNumero[n]].sort((a, b) => (a.dateEntreePourTri || "9999-12-31").localeCompare(b.dateEntreePourTri || "9999-12-31")),
             total: parNumero[n].reduce((s, v) => s + (v.totalGlobal || 0), 0)
           }));
         }, [verifications, lotOngSelectionne]);
         const dossiersEnAttenteDeLot = useMemo(() => {
           if (!lotOngSelectionne) return [];
           return verifications.filter((v) => v.ongPartenaire === lotOngSelectionne && (v.status || "archived") === "archived" && v.numeroLot == null && !v.verrouilleFacture);
+        }, [verifications, lotOngSelectionne]);
+        const dossiersOrphelinsVerrouilles = useMemo(() => {
+          if (!lotOngSelectionne) return [];
+          return verifications.filter((v) => v.ongPartenaire === lotOngSelectionne && (v.status || "archived") === "archived" && v.numeroLot == null && v.verrouilleFacture);
         }, [verifications, lotOngSelectionne]);
         const lotFocused = lotFocusedNumero != null ? lotsDuPartenaire.find((l) => l.numero === lotFocusedNumero) || null : null;
         const dossiersFiltres = useMemo(() => {
@@ -3018,15 +3208,16 @@
             ligneCentree("centrehfontaine@gmail.com", EXCEL_STYLES.sousTitre);
             r++;
             const now = /* @__PURE__ */ new Date();
-            const moisTexte = now.toLocaleString("fr-FR", { month: "long" }).toUpperCase();
+            const moisRapport = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const moisTexte = moisRapport.toLocaleString("fr-FR", { month: "long" }).toUpperCase();
             appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.gras);
             ws.getCell(r, 1).value = "DATE D'ADMISSION :";
-            ws.getCell(r, 2).value = `${moisTexte} ${now.getFullYear()}`;
+            ws.getCell(r, 2).value = `${moisTexte} ${moisRapport.getFullYear()}`;
             r++;
             appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.gras);
             ws.getCell(r, 1).value = "FACTURE";
-            ws.getCell(r, 2).value = `${ongCible.replace(/\s+/g, "")}-LOT${numeroLot}`;
-            ws.getCell(r, 5).value = ongCible;
+            ws.getCell(r, 2).value = `N\xB0${numeroLot}`;
+            ws.getCell(r, 5).value = nomCompletOng(ongCible);
             appliquerStyle(ws.getCell(r, 5), EXCEL_STYLES.gras);
             r++;
             r++;
@@ -3165,7 +3356,7 @@
             return;
           }
           const numerosExistants = verifications.filter((v) => v.ongPartenaire === ongCible && v.numeroLot != null).map((v) => v.numeroLot);
-          const prochainNumero = numerosExistants.length > 0 ? Math.max(...numerosExistants) + 1 : 1;
+          const prochainNumero = numerosExistants.length > 0 ? Math.max(...numerosExistants) + 1 : numeroDepartConfigure(ongCible);
           const totalEstime = eligibles.reduce((s, v) => s + (v.totalGlobal || 0), 0);
           setConfirmModal({
             titre: `\u{1F4E6} G\xE9n\xE9rer le Lot ${prochainNumero} pour ${ongCible} ?`,
@@ -3174,6 +3365,31 @@
             onConfirm: () => {
               setConfirmModal(null);
               genererFichierExcelPourLot(ongCible, eligibles.map((v) => v.id), prochainNumero);
+            },
+            onCancel: () => setConfirmModal(null)
+          });
+        };
+        const rattacherOrphelinsAUnLot = (ongCible) => {
+          const orphelins = verifications.filter((v) => v.ongPartenaire === ongCible && (v.status || "archived") === "archived" && v.numeroLot == null && v.verrouilleFacture);
+          if (orphelins.length === 0) return;
+          const numerosExistants = verifications.filter((v) => v.ongPartenaire === ongCible && v.numeroLot != null).map((v) => v.numeroLot);
+          const numero = numerosExistants.length > 0 ? Math.max(...numerosExistants) + 1 : numeroDepartConfigure(ongCible);
+          setConfirmModal({
+            titre: `Rattacher ces ${orphelins.length} dossier(s) d\xE9j\xE0 envoy\xE9s au Lot ${numero} ?`,
+            message: `Ces dossiers ont d\xE9j\xE0 \xE9t\xE9 envoy\xE9s \xE0 ${ongCible} avant la mise en place des lots. Aucun fichier ne sera reg\xE9n\xE9r\xE9 ni t\xE9l\xE9charg\xE9 ici \u2014 on marque juste qu'ils correspondent au Lot ${numero}, pour que le prochain lot g\xE9n\xE9r\xE9 d\xE9marre \xE0 ${numero + 1}.`,
+            confirmLabel: `Rattacher au Lot ${numero}`,
+            onConfirm: async () => {
+              setConfirmModal(null);
+              setVerifications((prev) => prev.map((v) => orphelins.some((o) => o.id === v.id) ? { ...v, numeroLot: numero } : v));
+              let echecs = 0;
+              await Promise.all(orphelins.map(async (v) => {
+                try {
+                  await chf.updateEpisode(v.id, toEpisodeApi({ numeroLot: numero }));
+                } catch (e) {
+                  if (!e.isOfflineQueue) echecs++;
+                }
+              }));
+              showToast(`Lot ${numero} cr\xE9\xE9 r\xE9troactivement avec ${orphelins.length} dossier(s)${echecs > 0 ? ` \u2014 \u26A0\uFE0F ${echecs} non enregistr\xE9(s), r\xE9essaie` : ""}`, "success");
             },
             onCancel: () => setConfirmModal(null)
           });
@@ -3230,7 +3446,7 @@
             }
             return `<tr><td>${label}</td><td class="qte">1</td><td class="prix">${formatGourdes(val)}</td><td class="sous-total">${formatGourdes(val)}</td></tr>`;
           }).join("") : "";
-          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N\xB0${fiche.numeroFiche}</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:13px;margin-bottom:6px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.info-patient{font-size:12px;margin-bottom:4px;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p><p>${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")} ${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p></div><div class="info"><span>Patient: ${echapperHTML(focusedVerif.nomPatient)}</span><span>${focusedVerif.typePatient === "ONG" ? echapperHTML(focusedVerif.ongPartenaire || "N/R") : "Priv\xE9"}</span></div><div class="info"><span>Fiche N\xB0${fiche.numeroFiche}</span><span>Mode: ${echapperHTML(fiche.modePaiement || "cash").toUpperCase()}</span></div><div class="info info-patient"><span>\u{1F4DE} ${echapperHTML(focusedVerif.telephone || "N/R")}</span><span>\u{1F4C1} ${echapperHTML(focusedVerif.numDossier || "N/R")}</span></div><div class="info info-patient"><span>Type: ${focusedVerif.typePatient === "ONG" ? "Partenaire" : "Priv\xE9"}</span><span>Enregistr\xE9 par: ${echapperHTML(fiche.creePar || "inconnu")}</span></div>${fiche.exeat ? `<p style="font-size:10px; margin:4px 0;"><strong>S\xE9jour:</strong> ${fiche.exeat.dateEntree.split("-").reverse().slice(0, 2).join("/")} \u2192 ${fiche.exeat.dateSortie.split("-").reverse().slice(0, 2).join("/")}</p>` : ""}<table><thead><tr><th>D\xE9signation</th><th class="qte">Qt\xE9</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${hasLignes ? lignesHTML : fallbackHTML}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes<br/>${formatDH(fiche.totalGlobal)} DH</div>${fiche.solde && fiche.solde > 0 ? `<p style="font-size:12px; color:red;"><strong>Solde restant :</strong> ${formatGourdes(fiche.solde)} Gdes</p>` : ""}<div class="footer">Merci de votre visite !<br/>CHF Syst\xE8me Hospitalier \u2013 ${(/* @__PURE__ */ new Date()).getFullYear()}</div></body></html>`;
+          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N\xB0${fiche.numeroFiche}</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:13px;margin-bottom:6px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.info-patient{font-size:12px;margin-bottom:4px;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p><p>Fiche du ${(fiche.dateCreation ? new Date(fiche.dateCreation) : /* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")} (r\xE9imprim\xE9e le ${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")} ${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })})</p></div><div class="info"><span>Patient: ${echapperHTML(focusedVerif.nomPatient)}</span><span>${focusedVerif.typePatient === "ONG" ? `Partenaire : ${echapperHTML(focusedVerif.ongPartenaire || "N/R")}` : "Priv\xE9"}</span></div><div class="info"><span>Fiche N\xB0${fiche.numeroFiche}</span><span>Mode: ${echapperHTML(fiche.modePaiement || "cash").toUpperCase()}</span></div><div class="info info-patient"><span>\u{1F4DE} ${echapperHTML(focusedVerif.telephone || "N/R")}</span><span>\u{1F4C1} ${echapperHTML(focusedVerif.numDossier || "N/R")}</span></div><div class="info info-patient"><span>Enregistr\xE9 par: ${echapperHTML(fiche.creePar || "inconnu")}</span></div>${fiche.exeat ? `<p style="font-size:10px; margin:4px 0;"><strong>S\xE9jour:</strong> ${fiche.exeat.dateEntree.split("-").reverse().slice(0, 2).join("/")} \u2192 ${fiche.exeat.dateSortie.split("-").reverse().slice(0, 2).join("/")}</p>` : ""}<table><thead><tr><th>D\xE9signation</th><th class="qte">Qt\xE9</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${hasLignes ? lignesHTML : fallbackHTML}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes<br/>${formatDH(fiche.totalGlobal)} DH</div>${fiche.solde && fiche.solde > 0 ? `<p style="font-size:12px; color:red;"><strong>Solde restant :</strong> ${formatGourdes(fiche.solde)} Gdes</p>` : ""}<div class="footer">Merci de votre visite !<br/>CHF Syst\xE8me Hospitalier \u2013 ${(/* @__PURE__ */ new Date()).getFullYear()}</div></body></html>`;
           const win = window.open("", "_blank", "width=500,height=700");
           if (!win) {
             showToast("Impression bloqu\xE9e par le navigateur. R\xE9essaie en cliquant sur Imprimer \u2014 si \xE7a ne marche toujours pas, demande \xE0 quelqu'un de v\xE9rifier les r\xE9glages.", "error");
@@ -3263,9 +3479,25 @@
         const peutExporter = userRole === "auditeur" || userRole === "comptable" || userRole === "direction" || userRole === "administrateur";
         const peutRouvrir = userRole === "comptable" || userRole === "direction" || userRole === "administrateur";
         const rouvrirDossierSuspendu = (dossier) => {
-          if (!confirm(`Rouvrir le dossier de ${dossier.nomPatient} ?`)) return;
+          if (!confirm(`Rouvrir le dossier de ${dossier.nomPatient} ?${dossier.noteSuspension ? `
+
+\u{1F4DD} Note laiss\xE9e \xE0 la suspension :
+${dossier.noteSuspension}` : ""}`)) return;
           onChargerPourModif(dossier);
           showToast(`Dossier de ${dossier.nomPatient} rouvert`, "success");
+        };
+        const validerFichesProblematiques = async (dossier) => {
+          const fichesConcernees = (dossier.fiches || []).filter((f) => f.probleme);
+          if (fichesConcernees.length === 0) return;
+          const fichesNettoyees = (dossier.fiches || []).map((f) => f.probleme ? { ...f, probleme: false, noteProbleme: "" } : f);
+          setVerifications((prev) => prev.map((v) => v.id === dossier.id ? { ...v, fiches: fichesNettoyees } : v));
+          try {
+            await chf.updateEpisode(dossier.id, toEpisodeApi({ fiches: fichesNettoyees }));
+            showToast(`Marquage retir\xE9 pour ${dossier.nomPatient}`, "success");
+          } catch (error) {
+            if (error.isOfflineQueue) showToast("\u{1F4F4} Changement enregistr\xE9 hors ligne", "info");
+            else showToast("Erreur: " + error.message, "error");
+          }
         };
         return /* @__PURE__ */ React.createElement("div", { className: "space-y-4 text-xs" }, /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Type"), /* @__PURE__ */ React.createElement("select", { value: filtreType, onChange: (e) => setFiltreType(e.target.value), className: "border rounded-lg p-1.5 bg-white outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Tous"), /* @__PURE__ */ React.createElement("option", { value: "ONG" }, "\u{1F3E5} Partenaire"), /* @__PURE__ */ React.createElement("option", { value: "PRIVE" }, "\u{1F4B3} Priv\xE9"))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Partenaire"), /* @__PURE__ */ React.createElement("select", { value: filtreOng, onChange: (e) => setFiltreOng(e.target.value), className: "border rounded-lg p-1.5 bg-white outline-none", disabled: filtreType === "PRIVE" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Tous"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o)))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Nom"), /* @__PURE__ */ React.createElement("input", { type: "text", value: rechercheNomPatient, onChange: (e) => setRechercheNomPatient(e.target.value), placeholder: "Nom...", className: "border rounded-lg p-1.5 outline-none" })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Date d\xE9but"), /* @__PURE__ */ React.createElement("input", { type: "date", value: filtreDateDebut, onChange: (e) => setFiltreDateDebut(e.target.value), className: "border rounded-lg p-1.5 bg-white outline-none" })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Date fin"), /* @__PURE__ */ React.createElement("input", { type: "date", value: filtreDateFin, onChange: (e) => setFiltreDateFin(e.target.value), className: "border rounded-lg p-1.5 bg-white outline-none" })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Cat\xE9gorie"), /* @__PURE__ */ React.createElement("select", { value: filtreCategorie, onChange: (e) => setFiltreCategorie(e.target.value), className: "border rounded-lg p-1.5 bg-white outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Toutes"), CATEGORIES_LISTE.map((c) => /* @__PURE__ */ React.createElement("option", { key: c.key, value: c.key }, c.label)))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Statut"), /* @__PURE__ */ React.createElement("select", { value: filtreStatut, onChange: (e) => setFiltreStatut(e.target.value), className: "border rounded-lg p-1.5 bg-white outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Tous"), /* @__PURE__ */ React.createElement("option", { value: "actif" }, "Actif"), /* @__PURE__ */ React.createElement("option", { value: "suspendu" }, "Suspendu"), /* @__PURE__ */ React.createElement("option", { value: "reporte" }, "Report\xE9"), /* @__PURE__ */ React.createElement("option", { value: "archived" }, "Archiv\xE9")))), /* @__PURE__ */ React.createElement("div", { className: "flex justify-end" }, /* @__PURE__ */ React.createElement("button", { onClick: () => {
           setFiltreType("");
@@ -3278,22 +3510,38 @@
         }, className: "bg-gray-200 text-gray-700 px-3 py-1 rounded text-xs font-bold" }, "R\xE9initialiser")), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 border-b" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setSousOngletArchives("dossiers"), className: `px-4 py-2 text-xs font-bold rounded-t-lg ${sousOngletArchives === "dossiers" ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-500"}` }, "\u{1F4C1} Dossiers"), peutExporter && /* @__PURE__ */ React.createElement("button", { onClick: () => setSousOngletArchives("lots"), className: `px-4 py-2 text-xs font-bold rounded-t-lg ${sousOngletArchives === "lots" ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-500"}` }, "\u{1F4E6} Lots & Facturation")), sousOngletArchives === "lots" && peutExporter && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border border-purple-300 shadow-sm space-y-3" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Partenaire"), /* @__PURE__ */ React.createElement("select", { value: lotOngSelectionne, onChange: (e) => {
           setLotOngSelectionne(e.target.value);
           setLotFocusedNumero(null);
-        }, className: "border rounded-lg p-1.5 text-xs bg-white font-bold outline-none max-w-xs" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- S\xE9lectionner --"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o)))), lotOngSelectionne && !lotFocused && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-4 items-center bg-gray-50 p-3 rounded-lg border border-dashed" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-gray-700" }, "\u{1F195} ", dossiersEnAttenteDeLot.length, " dossier(s) en attente \u2014 ", formatGourdes(dossiersEnAttenteDeLot.reduce((s, v) => s + (v.totalGlobal || 0), 0)), " Gdes"), /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1 font-bold text-purple-900 cursor-pointer" }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: appliqueRabais10, onChange: (e) => setAppliqueRabais10(e.target.checked), className: "rounded" }), " Rabais 10%"), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1" }, /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-gray-500" }, "Dons:"), /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", value: montantDonIntrants, onChange: (e) => setMontantDonIntrants(e.target.value), placeholder: "0", className: "border rounded p-1 w-24 font-mono font-bold text-right text-red-700 outline-none" })), /* @__PURE__ */ React.createElement("button", { onClick: () => genererProchainLot(lotOngSelectionne), disabled: dossiersEnAttenteDeLot.length === 0, className: "bg-purple-700 text-white font-bold px-3 py-1.5 rounded flex items-center gap-1 shadow disabled:opacity-30" }, /* @__PURE__ */ React.createElement(Download, { size: 13 }), " G\xE9n\xE9rer le prochain lot")), /* @__PURE__ */ React.createElement("h3", { className: "font-black text-gray-700 text-xs uppercase border-b pb-1" }, "Lots d\xE9j\xE0 envoy\xE9s"), lotsDuPartenaire.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "text-gray-400 text-center py-3" }, "Aucun lot envoy\xE9 pour ce partenaire encore."), /* @__PURE__ */ React.createElement("div", { className: "divide-y" }, lotsDuPartenaire.map((lot) => /* @__PURE__ */ React.createElement("div", { key: lot.numero, className: "flex justify-between items-center py-2 text-xs" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-gray-700" }, "Lot ", lot.numero, " \u2014 ", lot.dossiers.length, " dossier(s) \u2014 ", formatGourdes(lot.total), " Gdes"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setLotFocusedNumero(lot.numero), className: "text-blue-600 font-bold underline" }, "Voir"), /* @__PURE__ */ React.createElement("button", { onClick: () => reimprimerLot(lotOngSelectionne, lot.numero), className: "text-purple-700 font-bold underline" }, "\u{1F504} R\xE9imprimer")))))), lotFocused && /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-center border-b pb-1" }, /* @__PURE__ */ React.createElement("h3", { className: "font-black text-gray-700 text-xs uppercase" }, "\u{1F4E6} Lot ", lotFocused.numero, " \u2014 ", lotOngSelectionne, " \u2014 ", formatGourdes(lotFocused.total), " Gdes"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => reimprimerLot(lotOngSelectionne, lotFocused.numero), className: "bg-purple-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Download, { size: 12 }), " R\xE9imprimer ce lot"), /* @__PURE__ */ React.createElement("button", { onClick: () => setLotFocusedNumero(null) }, /* @__PURE__ */ React.createElement(X, { size: 14 })))), dossiersEnAttenteDeLot.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 bg-gray-50 border border-dashed rounded-lg p-2" }, /* @__PURE__ */ React.createElement("select", { value: dossierAAjouterAuLot, onChange: (e) => setDossierAAjouterAuLot(e.target.value), className: "border rounded p-1.5 text-xs bg-white flex-1 outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- Ajouter un dossier libre \xE0 ce lot --"), dossiersEnAttenteDeLot.map((v) => /* @__PURE__ */ React.createElement("option", { key: v.id, value: v.id }, v.nomPatient, " \u2014 ", formatGourdes(v.totalGlobal || 0), " Gdes"))), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+        }, className: "border rounded-lg p-1.5 text-xs bg-white font-bold outline-none max-w-xs" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- S\xE9lectionner --"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o)))), lotOngSelectionne && !lotFocused && /* @__PURE__ */ React.createElement(React.Fragment, null, dossiersOrphelinsVerrouilles.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between gap-2 bg-amber-50 border border-amber-300 rounded-lg p-3" }, /* @__PURE__ */ React.createElement("span", { className: "text-amber-800 font-bold" }, "\u26A0\uFE0F ", dossiersOrphelinsVerrouilles.length, " dossier(s) d\xE9j\xE0 envoy\xE9s \xE0 ", lotOngSelectionne, " avant la mise en place des lots \u2014 ", formatGourdes(dossiersOrphelinsVerrouilles.reduce((s, v) => s + (v.totalGlobal || 0), 0)), " Gdes"), /* @__PURE__ */ React.createElement("button", { onClick: () => rattacherOrphelinsAUnLot(lotOngSelectionne), className: "bg-amber-600 text-white font-bold px-2 py-1.5 rounded text-[10px] whitespace-nowrap" }, "Rattacher au prochain lot")), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-4 items-center bg-gray-50 p-3 rounded-lg border border-dashed" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-gray-700" }, "\u{1F195} ", dossiersEnAttenteDeLot.length, " dossier(s) en attente \u2014 ", formatGourdes(dossiersEnAttenteDeLot.reduce((s, v) => s + (v.totalGlobal || 0), 0)), " Gdes"), /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1 font-bold text-purple-900 cursor-pointer" }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: appliqueRabais10, onChange: (e) => setAppliqueRabais10(e.target.checked), className: "rounded" }), " Rabais 10%"), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1" }, /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-gray-500" }, "Dons:"), /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", value: montantDonIntrants, onChange: (e) => setMontantDonIntrants(e.target.value), placeholder: "0", className: "border rounded p-1 w-24 font-mono font-bold text-right text-red-700 outline-none" })), /* @__PURE__ */ React.createElement("button", { onClick: () => genererProchainLot(lotOngSelectionne), className: "bg-purple-700 text-white font-bold px-3 py-1.5 rounded flex items-center gap-1 shadow disabled:opacity-30" }, /* @__PURE__ */ React.createElement(Download, { size: 13 }), " G\xE9n\xE9rer le prochain lot")), /* @__PURE__ */ React.createElement("h3", { className: "font-black text-gray-700 text-xs uppercase border-b pb-1" }, "Lots d\xE9j\xE0 envoy\xE9s"), lotsDuPartenaire.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "text-gray-400 text-center py-3" }, "Aucun lot envoy\xE9 pour ce partenaire encore."), /* @__PURE__ */ React.createElement("div", { className: "divide-y" }, lotsDuPartenaire.map((lot) => /* @__PURE__ */ React.createElement("div", { key: lot.numero, className: "flex justify-between items-center py-2 text-xs" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-gray-700" }, "Lot ", lot.numero, " \u2014 ", lot.dossiers.length, " dossier(s) \u2014 ", formatGourdes(lot.total), " Gdes"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setLotFocusedNumero(lot.numero), className: "text-blue-600 font-bold underline" }, "Voir"), /* @__PURE__ */ React.createElement("button", { onClick: () => reimprimerLot(lotOngSelectionne, lot.numero), className: "text-purple-700 font-bold underline" }, "\u{1F504} R\xE9imprimer")))))), lotFocused && /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-center border-b pb-1" }, /* @__PURE__ */ React.createElement("h3", { className: "font-black text-gray-700 text-xs uppercase" }, "\u{1F4E6} Lot ", lotFocused.numero, " \u2014 ", lotOngSelectionne, " \u2014 ", formatGourdes(lotFocused.total), " Gdes"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => reimprimerLot(lotOngSelectionne, lotFocused.numero), className: "bg-purple-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Download, { size: 12 }), " R\xE9imprimer ce lot"), /* @__PURE__ */ React.createElement("button", { onClick: () => setLotFocusedNumero(null) }, /* @__PURE__ */ React.createElement(X, { size: 14 })))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap items-center gap-4 bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-amber-800" }, "\u{1F4A1} Oubli\xE9 \xE0 la g\xE9n\xE9ration ? Coche/renseigne puis r\xE9imprime ce lot pour l'appliquer :"), /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1 font-bold text-purple-900 cursor-pointer" }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: appliqueRabais10, onChange: (e) => setAppliqueRabais10(e.target.checked), className: "rounded" }), " Rabais 10%"), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1" }, /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-gray-500" }, "Dons:"), /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", value: montantDonIntrants, onChange: (e) => setMontantDonIntrants(e.target.value), placeholder: "0", className: "border rounded p-1 w-24 font-mono font-bold text-right text-red-700 outline-none" }))), dossiersEnAttenteDeLot.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 bg-gray-50 border border-dashed rounded-lg p-2" }, /* @__PURE__ */ React.createElement("select", { value: dossierAAjouterAuLot, onChange: (e) => setDossierAAjouterAuLot(e.target.value), className: "border rounded p-1.5 text-xs bg-white flex-1 outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- Ajouter un dossier libre \xE0 ce lot --"), dossiersEnAttenteDeLot.map((v) => /* @__PURE__ */ React.createElement("option", { key: v.id, value: v.id }, v.nomPatient, " \u2014 ", formatGourdes(v.totalGlobal || 0), " Gdes"))), /* @__PURE__ */ React.createElement("button", { onClick: () => {
           if (dossierAAjouterAuLot) {
             ajouterDossierAuLot(dossierAAjouterAuLot, lotFocused.numero, lotOngSelectionne);
             setDossierAAjouterAuLot("");
           }
-        }, disabled: !dossierAAjouterAuLot, className: "bg-emerald-700 text-white font-bold px-2 py-1.5 rounded text-[10px] disabled:opacity-30 whitespace-nowrap" }, "\u2795 Ajouter")), /* @__PURE__ */ React.createElement("div", { className: "divide-y max-h-80 overflow-y-auto" }, lotFocused.dossiers.map((v) => /* @__PURE__ */ React.createElement("div", { key: v.id, className: "flex justify-between items-center py-2 text-xs font-mono" }, /* @__PURE__ */ React.createElement("span", null, v.nomPatient, " ", /* @__PURE__ */ React.createElement("span", { className: "text-gray-400" }, "\u2014 ", formatGourdes(v.totalGlobal || 0), " Gdes")), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1" }, peutModifier && /* @__PURE__ */ React.createElement("button", { onClick: () => {
+        }, disabled: !dossierAAjouterAuLot, className: "bg-emerald-700 text-white font-bold px-2 py-1.5 rounded text-[10px] disabled:opacity-30 whitespace-nowrap" }, "\u2795 Ajouter")), /* @__PURE__ */ React.createElement("div", { className: "divide-y max-h-80 overflow-y-auto" }, lotFocused.dossiers.map((v) => /* @__PURE__ */ React.createElement("div", { key: v.id, className: "flex justify-between items-start py-2 text-xs font-mono gap-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex-1 min-w-0" }, /* @__PURE__ */ React.createElement("span", { className: `inline-block w-16 ${v.dateEntreePourTri && v.dateEntreePourTri !== "9999-12-31" ? "text-gray-500" : "text-red-500"}` }, v.dateEntreePourTri && v.dateEntreePourTri !== "9999-12-31" ? v.dateEntreePourTri.split("-").reverse().join("/") : "sans exeat"), v.nomPatient, " ", /* @__PURE__ */ React.createElement("span", { className: "text-gray-400" }, "\u2014 ", formatGourdes(v.totalGlobal || 0), " Gdes ", /* @__PURE__ */ React.createElement("span", { className: "text-indigo-400" }, "(", formatDH(v.totalGlobal || 0), " DH)")), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-1 mt-1 pl-16" }, ventilationDossier(v).map((x) => /* @__PURE__ */ React.createElement("span", { key: x.label, className: "bg-indigo-50 text-indigo-700 border border-indigo-100 rounded px-1.5 py-0.5 text-[10px] whitespace-nowrap" }, x.label, ": ", formatDH(x.montant), " DH")))), /* @__PURE__ */ React.createElement("div", { className: "flex gap-1" }, peutModifier && /* @__PURE__ */ React.createElement("button", { onClick: () => {
           if ((v.status || "archived") === "archived" && !confirm(`Ce dossier est d\xE9j\xE0 archiv\xE9 (Lot ${lotFocused.numero}). Le modifier corrigera ce dossier existant \u2014 pense \xE0 r\xE9imprimer le lot ensuite.
 
 Continuer ?`)) return;
-          onChargerPourModif(v);
+          onChargerPourModif(v, { ongPartenaire: lotOngSelectionne, numeroLot: lotFocused.numero });
         }, className: "text-amber-700 p-1 bg-amber-50 rounded", title: "Modifier / corriger" }, /* @__PURE__ */ React.createElement(Pencil, { size: 13 })), peutModifier && /* @__PURE__ */ React.createElement("button", { onClick: () => retirerDossierDuLot(v), className: "text-red-600 p-1 bg-red-50 rounded", title: "Retirer du lot" }, "\u2796"))))))), sousOngletArchives === "dossiers" && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm space-y-2" }, /* @__PURE__ */ React.createElement("h2", { className: "text-xs font-black text-gray-700 uppercase border-b pb-1" }, "\u{1F4C1} Dossiers (", dossiersFiltres.length, dossiersFiltres.length > nombreAffiche ? ` \u2014 ${nombreAffiche} affich\xE9s` : "", ")"), /* @__PURE__ */ React.createElement("div", { className: "overflow-x-auto max-h-96 overflow-y-auto" }, /* @__PURE__ */ React.createElement("table", { className: "w-full text-left" }, /* @__PURE__ */ React.createElement("thead", { className: "sticky top-0 bg-white shadow-sm" }, /* @__PURE__ */ React.createElement("tr", { className: "bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono" }, /* @__PURE__ */ React.createElement("th", { className: "p-2" }, "Date"), /* @__PURE__ */ React.createElement("th", { className: "p-2" }, "Patient"), /* @__PURE__ */ React.createElement("th", { className: "p-2" }, "Type"), /* @__PURE__ */ React.createElement("th", { className: "p-2" }, "Partenaire"), /* @__PURE__ */ React.createElement("th", { className: "p-2 text-center" }, "Vol."), /* @__PURE__ */ React.createElement("th", { className: "p-2 text-right" }, "Total"), /* @__PURE__ */ React.createElement("th", { className: "p-2 text-center" }, "Statut"), /* @__PURE__ */ React.createElement("th", { className: "p-2 text-center" }, "Actions"))), /* @__PURE__ */ React.createElement("tbody", { className: "divide-y divide-gray-100 font-mono text-[11px]" }, dossiersFiltres.slice(0, nombreAffiche).map((v) => {
           const statut = v.status || "archived";
           const isSuspendu = statut === "suspendu";
           const isReporte = statut === "reporte";
           const totalFiable = Number.isFinite(v.totalGlobal) && v.totalGlobal > 0 ? v.totalGlobal : (v.fiches || []).reduce((s, f) => s + (Number(f.totalGlobal) || 0), 0);
-          return /* @__PURE__ */ React.createElement("tr", { key: v.id, className: isSuspendu ? "bg-amber-50/60 border-l-4 border-amber-400" : isReporte ? "bg-indigo-50/60 border-l-4 border-indigo-400" : v.contientErreurs ? "bg-red-50/40 border-l-4 border-red-500" : "hover:bg-gray-50/50" }, /* @__PURE__ */ React.createElement("td", { className: "p-2 text-gray-500" }, v.dateHeure), /* @__PURE__ */ React.createElement("td", { className: "p-2 font-bold font-sans flex items-center gap-1" }, v.verrouilleFacture && /* @__PURE__ */ React.createElement("span", null, "\u{1F512}"), v.nomPatient), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-center" }, (v.typePatient || "ONG") === "ONG" ? "\u{1F3E5} Partenaire" : "\u{1F4B3} Priv\xE9"), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-purple-800 font-bold" }, v.ongPartenaire), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-center text-gray-600" }, (v.fiches || []).length), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-right font-bold text-emerald-800", title: v.totalGlobal !== totalFiable ? "Recalcul\xE9 \xE0 partir des fiches \u2014 la valeur stock\xE9e \xE9tait absente ou \xE0 z\xE9ro" : "" }, formatDH(totalFiable), " DH", v.totalGlobal !== totalFiable && /* @__PURE__ */ React.createElement("span", { className: "text-amber-500" }, " \u26A0\uFE0F")), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-center" }, statut === "suspendu" ? /* @__PURE__ */ React.createElement("span", { className: "text-amber-600 font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Clock, { size: 12 }), " Suspendu") : statut === "reporte" ? /* @__PURE__ */ React.createElement("span", { className: "text-indigo-600 font-bold flex items-center gap-1", title: v.moisReport ? `Report\xE9 \xE0 ${v.moisReport}` : "" }, "\u{1F4C5} Report\xE9", v.moisReport ? ` (${v.moisReport})` : "") : statut === "actif" ? /* @__PURE__ */ React.createElement("span", { className: "text-blue-600" }, "Actif") : /* @__PURE__ */ React.createElement("span", { className: "text-gray-400" }, "Archiv\xE9")), /* @__PURE__ */ React.createElement("td", { className: "p-2 flex justify-center gap-1 flex-wrap" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setFocusedVerif(v), className: "text-blue-600 p-1 bg-blue-50 rounded", title: "Voir" }, /* @__PURE__ */ React.createElement(Eye, { size: 13 })), peutModifier && /* @__PURE__ */ React.createElement("button", { onClick: () => {
+          return /* @__PURE__ */ React.createElement("tr", { key: v.id, className: isSuspendu ? "bg-amber-50/60 border-l-4 border-amber-400" : isReporte ? "bg-indigo-50/60 border-l-4 border-indigo-400" : v.contientErreurs ? "bg-red-50/40 border-l-4 border-red-500" : "hover:bg-gray-50/50" }, /* @__PURE__ */ React.createElement("td", { className: "p-2 text-gray-500" }, v.dateHeure), /* @__PURE__ */ React.createElement("td", { className: "p-2 font-bold font-sans flex items-center gap-1" }, v.verrouilleFacture && /* @__PURE__ */ React.createElement("span", null, "\u{1F512}"), v.noteSuspension && /* @__PURE__ */ React.createElement("span", { title: `\u{1F4DD} Note : ${v.noteSuspension}`, className: "cursor-help" }, "\u{1F4DD}"), (() => {
+            const fp = (v.fiches || []).filter((f) => f.probleme);
+            if (fp.length === 0) return null;
+            if (ficheAValider === v.id) return /* @__PURE__ */ React.createElement("span", { className: "flex items-center gap-0.5" }, /* @__PURE__ */ React.createElement("button", { onClick: () => {
+              validerFichesProblematiques(v);
+              setFicheAValider(null);
+            }, className: "bg-green-700 text-white p-0.5 rounded", title: "Probl\xE8me r\xE9gl\xE9 \u2014 retirer le marquage" }, /* @__PURE__ */ React.createElement(Check, { size: 11 })), /* @__PURE__ */ React.createElement("button", { onClick: () => setFicheAValider(null), className: "border p-0.5 rounded", title: "Pas encore r\xE9gl\xE9 \u2014 garder le marquage" }, /* @__PURE__ */ React.createElement(X, { size: 11 })));
+            return /* @__PURE__ */ React.createElement(
+              "span",
+              {
+                title: `\u2753 ${fp.map((f) => `Fiche N\xB0${f.numeroFiche}${f.noteProbleme ? " \u2014 " + f.noteProbleme : ""}`).join(" | ")}${peutModifier ? " \u2014 clique pour valider" : ""}`,
+                className: peutModifier ? "cursor-pointer" : "cursor-help",
+                onClick: peutModifier ? () => setFicheAValider(v.id) : void 0
+              },
+              "\u2753"
+            );
+          })(), v.nomPatient), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-center" }, (v.typePatient || "ONG") === "ONG" ? "\u{1F3E5} Partenaire" : "\u{1F4B3} Priv\xE9"), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-purple-800 font-bold" }, v.ongPartenaire), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-center text-gray-600" }, (v.fiches || []).length), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-right font-bold text-emerald-800", title: v.totalGlobal !== totalFiable ? "Recalcul\xE9 \xE0 partir des fiches \u2014 la valeur stock\xE9e \xE9tait absente ou \xE0 z\xE9ro" : "" }, formatDH(totalFiable), " DH", v.totalGlobal !== totalFiable && /* @__PURE__ */ React.createElement("span", { className: "text-amber-500" }, " \u26A0\uFE0F")), /* @__PURE__ */ React.createElement("td", { className: "p-2 text-center" }, statut === "suspendu" ? /* @__PURE__ */ React.createElement("span", { className: "text-amber-600 font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Clock, { size: 12 }), " Suspendu") : statut === "reporte" ? /* @__PURE__ */ React.createElement("span", { className: "text-indigo-600 font-bold flex items-center gap-1", title: v.moisReport ? `Report\xE9 \xE0 ${v.moisReport}` : "" }, "\u{1F4C5} Report\xE9", v.moisReport ? ` (${v.moisReport})` : "") : statut === "actif" ? /* @__PURE__ */ React.createElement("span", { className: "text-blue-600" }, "Actif") : /* @__PURE__ */ React.createElement("span", { className: "text-gray-400" }, "Archiv\xE9")), /* @__PURE__ */ React.createElement("td", { className: "p-2 flex justify-center gap-1 flex-wrap" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setFocusedVerif(v), className: "text-blue-600 p-1 bg-blue-50 rounded", title: "Voir" }, /* @__PURE__ */ React.createElement(Eye, { size: 13 })), peutModifier && /* @__PURE__ */ React.createElement("button", { onClick: () => {
             const statut2 = v.status || "archived";
             if (statut2 === "archived" && !confirm(`Ce dossier est d\xE9j\xE0 archiv\xE9. Le modifier corrigera CE dossier existant (pas une nouvelle visite).
 
@@ -3337,8 +3585,8 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
       var { useState, useMemo, useRef } = React;
       var { CONFIG_LITS, CATEGORIES_LISTE } = require_constants();
       var { formatGourdes, formatDH } = require_helpers();
-      var { Search, Plus, X } = require_icons();
-      function Simulateur({ medicaments, actes }) {
+      var { X } = require_icons();
+      function Simulateur({ medicaments, actes, showToast }) {
         const [lignes, setLignes] = useState([]);
         const [dateEntree1, setDateEntree1] = useState("");
         const [dateSortie1, setDateSortie1] = useState("");
@@ -3351,16 +3599,45 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
         const [nomChirSpec, setNomChirSpec] = useState("");
         const [prixChirSpec, setPrixChirSpec] = useState("");
         const [categorie, setCategorie] = useState("med");
-        const [recherche, setRecherche] = useState("");
-        const [quantite, setQuantite] = useState("1");
-        const [selection, setSelection] = useState(null);
-        const inputRechercheRef = useRef(null);
-        const catalogueFiltre = categorie === "med" ? medicaments : actes;
-        const suggestions = useMemo(() => {
-          const q = recherche.trim().toLowerCase();
-          if (!q) return catalogueFiltre.slice(0, 5);
-          return catalogueFiltre.filter((i) => i.nom.toLowerCase().includes(q)).slice(0, 5);
-        }, [recherche, catalogueFiltre]);
+        const [tarifChoisi, setTarifChoisi] = useState("actuel");
+        const [lettreActive, setLettreActive] = useState(null);
+        const [sousCategorieActeActive, setSousCategorieActeActive] = useState(null);
+        const estMobile = window.innerWidth < 768;
+        const holdDelaiRef = useRef(null);
+        const holdIntervalRef = useRef(null);
+        const demarrerRepetition = (fn) => {
+          fn();
+          holdDelaiRef.current = setTimeout(() => {
+            let vitesse = 180;
+            const tick = () => {
+              fn();
+              vitesse = Math.max(35, vitesse - 15);
+              holdIntervalRef.current = setTimeout(tick, vitesse);
+            };
+            tick();
+          }, 400);
+        };
+        const arreterRepetition = () => {
+          clearTimeout(holdDelaiRef.current);
+          clearTimeout(holdIntervalRef.current);
+        };
+        const premiereLettre = (nom) => (nom || "?").normalize("NFD").replace(/[\u0300-\u036f]/g, "")[0].toUpperCase();
+        const lettresDisponibles = useMemo(() => [...new Set(medicaments.map((m) => premiereLettre(m.nom)))].sort(), [medicaments]);
+        const categoriesActesDisponibles = useMemo(() => {
+          const clesUtilisees = new Set(actes.map((a) => a.sub || "chirurgie"));
+          return CATEGORIES_LISTE.filter((c) => c.key !== "hospit" && clesUtilisees.has(c.key));
+        }, [actes]);
+        const catalogueGrille = useMemo(() => {
+          if (categorie === "med") {
+            const lettre = lettreActive || lettresDisponibles[0];
+            return medicaments.filter((m) => premiereLettre(m.nom) === lettre).sort((a, b) => a.nom.localeCompare(b.nom));
+          }
+          const filtres = sousCategorieActeActive ? actes.filter((a) => (a.sub || "chirurgie") === sousCategorieActeActive) : actes;
+          return [...filtres].sort((a, b) => {
+            var _a, _b;
+            return ((_a = a.ordre) != null ? _a : 9999) - ((_b = b.ordre) != null ? _b : 9999) || a.nom.localeCompare(b.nom);
+          });
+        }, [categorie, medicaments, actes, lettreActive, lettresDisponibles, sousCategorieActeActive]);
         const j1 = useMemo(() => {
           if (!dateEntree1 || !dateSortie1) return 0;
           const d = (new Date(dateSortie1) - new Date(dateEntree1)) / 864e5;
@@ -3368,13 +3645,13 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             setDateSortie1("");
             return 0;
           }
-          return d === 0 ? 1 : Math.floor(d);
+          return Math.max(0, Math.floor(d));
         }, [dateEntree1, dateSortie1]);
         const totalE1 = j1 * CONFIG_LITS[typeLit1].prix;
         const j2 = useMemo(() => {
           if (!multiPeriode || !dateEntree2 || !dateSortie2) return 0;
           const d = (new Date(dateSortie2) - new Date(dateEntree2)) / 864e5;
-          return d <= 0 ? 1 : Math.floor(d);
+          return Math.max(0, Math.floor(d));
         }, [multiPeriode, dateEntree2, dateSortie2]);
         const totalE2 = multiPeriode ? j2 * CONFIG_LITS[typeLit2].prix : 0;
         const totalGeneralExeat = totalE1 + totalE2;
@@ -3399,21 +3676,16 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
         }, [lignes, totalGeneralExeat, totalChirSpec]);
         const grandTotal = useMemo(() => Object.values(totalsParService).reduce((a, b) => a + b, 0), [totalsParService]);
         const injecterLigne = (item, cat, qte) => {
+          const prixEffectif = tarifChoisi === "nouveau" && item.nouveauPrix != null && item.nouveauPrix !== "" ? parseFloat(item.nouveauPrix) : item.prix;
           setLignes((prev) => {
             const index = prev.findIndex((l) => l.itemId === item.id && l.type === cat);
             if (index !== -1) return prev.map((l, idx) => idx === index ? { ...l, qte: l.qte + qte } : l);
-            return [...prev, { id: "l-" + Math.random().toString(36).slice(2, 6), itemId: item.id, type: cat, sub: item.sub || "", nom: item.nom, qte, prix: item.prix }];
+            return [...prev, { id: "l-" + Math.random().toString(36).slice(2, 6), itemId: item.id, type: cat, sub: item.sub || "", nom: item.nom, qte, prix: prixEffectif }];
           });
         };
-        const actionAjouterSoin = () => {
-          if (!selection) return;
-          const q = parseFloat(quantite);
-          if (isNaN(q) || q <= 0) return;
-          injecterLigne(selection, categorie, q);
-          setRecherche("");
-          setSelection(null);
-          setQuantite("1");
-          if (inputRechercheRef.current) inputRechercheRef.current.focus();
+        const ajouterAvecQuantite = (item, q) => {
+          if (!item || isNaN(q) || q <= 0) return;
+          injecterLigne(item, categorie, q);
         };
         const vider = () => {
           setLignes([]);
@@ -3427,36 +3699,35 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
           setHasChirSpec(false);
           setNomChirSpec("");
           setPrixChirSpec("");
-          setRecherche("");
-          setSelection(null);
-          setQuantite("1");
+          setTarifChoisi("actuel");
+          setLettreActive(null);
+          setSousCategorieActeActive(null);
         };
-        return /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm" }, /* @__PURE__ */ React.createElement("h3", { className: "text-sm font-black text-center border-b pb-2" }, "\u{1F9EE} Simulateur de facturation (hors base)"), /* @__PURE__ */ React.createElement("div", { className: "space-y-3 mt-3" }, /* @__PURE__ */ React.createElement("p", { className: "text-[11px] font-bold uppercase text-gray-400" }, "1. H\xE9bergement & S\xE9jour (Optionnel)"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 sm:grid-cols-3 gap-3" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-500 uppercase" }, "Date entr\xE9e"), /* @__PURE__ */ React.createElement("input", { type: "date", value: dateEntree1, onChange: (e) => setDateEntree1(e.target.value), className: "border rounded-lg p-1.5 text-xs w-full" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-500 uppercase" }, "Date sortie"), /* @__PURE__ */ React.createElement("input", { type: "date", value: dateSortie1, onChange: (e) => setDateSortie1(e.target.value), className: "border rounded-lg p-1.5 text-xs w-full" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-500 uppercase" }, "Type de lit"), /* @__PURE__ */ React.createElement("select", { value: typeLit1, onChange: (e) => setTypeLit1(e.target.value), className: "border rounded-lg p-1.5 bg-white text-xs w-full" }, /* @__PURE__ */ React.createElement("option", { value: "normal" }, "Normal (250 Gdes)"), /* @__PURE__ */ React.createElement("option", { value: "semi_prive" }, "Semi Priv\xE9 (500)"), /* @__PURE__ */ React.createElement("option", { value: "prive" }, "Priv\xE9 (750)"), /* @__PURE__ */ React.createElement("option", { value: "isolette" }, "Isolette (1250)"), /* @__PURE__ */ React.createElement("option", { value: "incubateur" }, "Incubateur (2500)")))), /* @__PURE__ */ React.createElement("div", { className: "flex gap-4 pt-1 border-t border-dashed mt-2" }, /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1.5 text-xs font-semibold text-gray-600 cursor-pointer" }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: multiPeriode, onChange: (e) => setMultiPeriode(e.target.checked), className: "rounded" }), " Seconde p\xE9riode"), /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1.5 text-xs font-semibold text-gray-600 cursor-pointer" }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: hasChirSpec, onChange: (e) => setHasChirSpec(e.target.checked), className: "rounded" }), " Chirurgie hors-catalogue")), multiPeriode && /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 sm:grid-cols-3 gap-2 bg-amber-50/20 p-2 rounded-lg border" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[9px] font-bold text-amber-800" }, "Entr\xE9e P2"), /* @__PURE__ */ React.createElement("input", { type: "date", value: dateEntree2, onChange: (e) => setDateEntree2(e.target.value), className: "border rounded-lg p-1 text-xs w-full bg-white" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[9px] font-bold text-amber-800" }, "Sortie P2"), /* @__PURE__ */ React.createElement("input", { type: "date", value: dateSortie2, onChange: (e) => setDateSortie2(e.target.value), className: "border rounded-lg p-1 text-xs w-full bg-white" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[9px] font-bold text-amber-800" }, "Lit P2"), /* @__PURE__ */ React.createElement("select", { value: typeLit2, onChange: (e) => setTypeLit2(e.target.value), className: "border rounded-lg p-1 text-xs w-full bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "normal" }, "Normal"), /* @__PURE__ */ React.createElement("option", { value: "semi_prive" }, "Semi Priv\xE9"), /* @__PURE__ */ React.createElement("option", { value: "prive" }, "Priv\xE9")))), hasChirSpec && /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-2 bg-red-50/20 p-2 rounded-lg border" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[9px] font-bold text-red-800" }, "Libell\xE9"), /* @__PURE__ */ React.createElement("input", { type: "text", value: nomChirSpec, onChange: (e) => setNomChirSpec(e.target.value), placeholder: "Nom...", className: "border rounded-lg p-1 text-xs w-full bg-white outline-none" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[9px] font-bold text-red-800" }, "Montant (Gdes)"), /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", value: prixChirSpec, onChange: (e) => setPrixChirSpec(e.target.value), placeholder: "0", className: "border rounded-lg p-1 text-xs w-full bg-white outline-none" })))), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border space-y-3 shadow-sm mt-4" }, /* @__PURE__ */ React.createElement("p", { className: "text-[11px] font-bold uppercase text-gray-400" }, "2. Actes, Laboratoire & Ordonnance"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 text-xs font-semibold" }, /* @__PURE__ */ React.createElement("button", { onClick: () => {
+        return /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm" }, /* @__PURE__ */ React.createElement("h3", { className: "text-sm font-black text-center border-b pb-2" }, "\u{1F9EE} Simulateur de facturation (hors base \u2014 n'affecte ni le stock ni aucun dossier)"), /* @__PURE__ */ React.createElement("div", { className: "space-y-3 mt-3" }, /* @__PURE__ */ React.createElement("p", { className: "text-[11px] font-bold uppercase text-gray-400" }, "1. H\xE9bergement & S\xE9jour (Optionnel)"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 sm:grid-cols-3 gap-3" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-500 uppercase" }, "Date entr\xE9e"), /* @__PURE__ */ React.createElement("input", { type: "date", value: dateEntree1, onChange: (e) => setDateEntree1(e.target.value), className: "border rounded-lg p-1.5 text-xs w-full" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-500 uppercase" }, "Date sortie"), /* @__PURE__ */ React.createElement("input", { type: "date", value: dateSortie1, onChange: (e) => setDateSortie1(e.target.value), className: "border rounded-lg p-1.5 text-xs w-full" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-500 uppercase" }, "Type de lit"), /* @__PURE__ */ React.createElement("select", { value: typeLit1, onChange: (e) => setTypeLit1(e.target.value), className: "border rounded-lg p-1.5 bg-white text-xs w-full" }, /* @__PURE__ */ React.createElement("option", { value: "normal" }, "Normal (250 Gdes)"), /* @__PURE__ */ React.createElement("option", { value: "semi_prive" }, "Semi Priv\xE9 (500)"), /* @__PURE__ */ React.createElement("option", { value: "prive" }, "Priv\xE9 (750)"), /* @__PURE__ */ React.createElement("option", { value: "isolette" }, "Isolette (1250)"), /* @__PURE__ */ React.createElement("option", { value: "incubateur" }, "Incubateur (2500)")))), /* @__PURE__ */ React.createElement("div", { className: "flex gap-4 pt-1 border-t border-dashed mt-2" }, /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1.5 text-xs font-semibold text-gray-600 cursor-pointer" }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: multiPeriode, onChange: (e) => setMultiPeriode(e.target.checked), className: "rounded" }), " Seconde p\xE9riode"), /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1.5 text-xs font-semibold text-gray-600 cursor-pointer" }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: hasChirSpec, onChange: (e) => setHasChirSpec(e.target.checked), className: "rounded" }), " Chirurgie hors-catalogue")), multiPeriode && /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 sm:grid-cols-3 gap-2 bg-amber-50/20 p-2 rounded-lg border" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[9px] font-bold text-amber-800" }, "Entr\xE9e P2"), /* @__PURE__ */ React.createElement("input", { type: "date", value: dateEntree2, onChange: (e) => setDateEntree2(e.target.value), className: "border rounded-lg p-1 text-xs w-full bg-white" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[9px] font-bold text-amber-800" }, "Sortie P2"), /* @__PURE__ */ React.createElement("input", { type: "date", value: dateSortie2, onChange: (e) => setDateSortie2(e.target.value), className: "border rounded-lg p-1 text-xs w-full bg-white" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[9px] font-bold text-amber-800" }, "Lit P2"), /* @__PURE__ */ React.createElement("select", { value: typeLit2, onChange: (e) => setTypeLit2(e.target.value), className: "border rounded-lg p-1 text-xs w-full bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "normal" }, "Normal"), /* @__PURE__ */ React.createElement("option", { value: "semi_prive" }, "Semi Priv\xE9"), /* @__PURE__ */ React.createElement("option", { value: "prive" }, "Priv\xE9")))), hasChirSpec && /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-2 bg-red-50/20 p-2 rounded-lg border" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[9px] font-bold text-red-800" }, "Libell\xE9"), /* @__PURE__ */ React.createElement("input", { type: "text", value: nomChirSpec, onChange: (e) => setNomChirSpec(e.target.value), placeholder: "Nom...", className: "border rounded-lg p-1 text-xs w-full bg-white outline-none" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[9px] font-bold text-red-800" }, "Montant (Gdes)"), /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", value: prixChirSpec, onChange: (e) => setPrixChirSpec(e.target.value), placeholder: "0", className: "border rounded-lg p-1 text-xs w-full bg-white outline-none" })))), /* @__PURE__ */ React.createElement("div", { className: estMobile ? "mt-4" : "grid grid-cols-[3fr_2fr] gap-4 items-start mt-4" }, /* @__PURE__ */ React.createElement("div", { className: `bg-white p-4 rounded-xl border space-y-3 shadow-sm ${estMobile ? "" : "max-h-[75vh] overflow-y-auto"}` }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-center" }, /* @__PURE__ */ React.createElement("p", { className: "text-[11px] font-bold uppercase text-gray-400" }, "2. Actes, Laboratoire & Ordonnance"), /* @__PURE__ */ React.createElement("div", { className: "flex text-[10px] font-bold rounded-lg border overflow-hidden" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setTarifChoisi("actuel"), className: `px-2 py-1 ${tarifChoisi !== "nouveau" ? "bg-[#1E2A24] text-white" : "bg-gray-50 text-gray-500"}` }, "Tarif Actuel"), /* @__PURE__ */ React.createElement("button", { onClick: () => setTarifChoisi("nouveau"), className: `px-2 py-1 ${tarifChoisi === "nouveau" ? "bg-indigo-700 text-white" : "bg-gray-50 text-gray-500"}` }, "Nouveau prix"))), tarifChoisi === "nouveau" && /* @__PURE__ */ React.createElement("p", { className: "text-[9px] text-indigo-600 font-bold" }, "\u26A0\uFE0F Les articles ajout\xE9s utiliseront le nouveau prix (\xE0 venir) quand il existe."), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 text-xs font-semibold" }, /* @__PURE__ */ React.createElement("button", { onClick: () => {
           setCategorie("med");
-          setRecherche("");
-          setSelection(null);
         }, className: `flex-1 py-1.5 border rounded-lg ${categorie === "med" ? "bg-[#1E2A24] text-white" : "bg-gray-50"}` }, "\u{1F48A} Pharmacie"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
           setCategorie("acte");
-          setRecherche("");
-          setSelection(null);
-        }, className: `flex-1 py-1.5 border rounded-lg ${categorie === "acte" ? "bg-[#1E2A24] text-white" : "bg-gray-50"}` }, "\u{1F52C} Examens / Actes")), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("div", { className: "relative flex-1" }, /* @__PURE__ */ React.createElement("input", { ref: inputRechercheRef, type: "text", value: recherche, onChange: (e) => {
-          setRecherche(e.target.value);
-          setSelection(null);
-        }, onKeyDown: (e) => {
-          if (e.key === "Enter" && suggestions.length > 0) {
-            setSelection(suggestions[0]);
-            setRecherche(suggestions[0].nom);
-          }
-        }, placeholder: "Rechercher...", className: "w-full border rounded-lg p-2 text-xs pl-8 outline-none" }), /* @__PURE__ */ React.createElement("span", { className: "absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" }, /* @__PURE__ */ React.createElement(Search, { size: 14 })), suggestions.length > 0 && /* @__PURE__ */ React.createElement("ul", { className: "absolute z-20 left-0 right-0 bg-white border rounded-lg shadow-2xl mt-1 text-xs max-h-48 overflow-y-auto divide-y" }, suggestions.map((i) => /* @__PURE__ */ React.createElement("li", { key: i.id }, /* @__PURE__ */ React.createElement("button", { type: "button", onClick: () => {
-          setSelection(i);
-          setRecherche(i.nom);
-        }, className: "w-full text-left px-3 py-2 hover:bg-gray-100 flex justify-between" }, /* @__PURE__ */ React.createElement("span", null, i.nom), /* @__PURE__ */ React.createElement("span", { className: "text-gray-500 font-mono" }, formatGourdes(i.prix), " Gdes")))))), /* @__PURE__ */ React.createElement("input", { type: "number", min: "1", value: quantite, onChange: (e) => setQuantite(e.target.value), onKeyDown: (e) => {
-          if (e.key === "Enter") actionAjouterSoin();
-        }, className: "w-16 border rounded-lg p-2 text-xs text-center font-mono font-bold bg-gray-50" }), /* @__PURE__ */ React.createElement("button", { onClick: actionAjouterSoin, disabled: !selection, className: "bg-[#1E2A24] text-white px-4 py-2 rounded-lg text-xs font-bold disabled:opacity-30 flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Plus, null), " Ajouter"))), /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl border overflow-hidden shadow-sm mt-4" }, /* @__PURE__ */ React.createElement("table", { className: "w-full text-xs text-left" }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", { className: "bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono" }, /* @__PURE__ */ React.createElement("th", { className: "p-3" }, "D\xE9signation"), /* @__PURE__ */ React.createElement("th", { className: "p-3 w-16 text-center" }, "Qt\xE9"), /* @__PURE__ */ React.createElement("th", { className: "p-3 text-right w-24" }, "Prix"), /* @__PURE__ */ React.createElement("th", { className: "p-3 text-right w-24" }, "Total"), /* @__PURE__ */ React.createElement("th", { className: "w-8" }))), /* @__PURE__ */ React.createElement("tbody", { className: "divide-y divide-gray-100" }, j1 > 0 && /* @__PURE__ */ React.createElement("tr", { className: "bg-amber-50/20" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-amber-900" }, "S\xE9jour : ", CONFIG_LITS[typeLit1].nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-bold" }, j1, " jrs"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(CONFIG_LITS[typeLit1].prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalE1)), /* @__PURE__ */ React.createElement("td", null)), multiPeriode && j2 > 0 && /* @__PURE__ */ React.createElement("tr", { className: "bg-amber-50/40" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-amber-900" }, "S\xE9jour P2 : ", CONFIG_LITS[typeLit2].nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-bold" }, j2, " jrs"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(CONFIG_LITS[typeLit2].prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalE2)), /* @__PURE__ */ React.createElement("td", null)), hasChirSpec && nomChirSpec && /* @__PURE__ */ React.createElement("tr", { className: "bg-red-50/20" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-red-900" }, "Chirurgie : ", nomChirSpec), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center" }, "1"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(totalChirSpec)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalChirSpec)), /* @__PURE__ */ React.createElement("td", null)), lignes.map((l) => /* @__PURE__ */ React.createElement("tr", { key: l.id, className: "zebra-row" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-gray-800" }, /* @__PURE__ */ React.createElement("span", { className: `text-[8px] font-bold uppercase px-1 rounded mr-1 ${l.type === "med" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}` }, l.type === "med" ? "Pharma" : "Acte"), l.nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-mono font-bold" }, l.qte), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(l.prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(l.qte * l.prix)), /* @__PURE__ */ React.createElement("td", { className: "text-center" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setLignes((p) => p.filter((x) => x.id !== l.id)), className: "text-gray-300 hover:text-red-600" }, /* @__PURE__ */ React.createElement(X, { size: 12 }))))))), /* @__PURE__ */ React.createElement("div", { className: "p-4 bg-gray-50 border-t border-b text-[11px] text-gray-600 font-mono space-y-1 shadow-inner" }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 font-bold text-[#1E2A24] border-b pb-1 mb-2" }, /* @__PURE__ */ React.createElement("span", null, "R\xC9CAPITULATIF"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "Gdes"), /* @__PURE__ */ React.createElement("span", { className: "text-right text-emerald-800" }, "\u{1F4B5} DH")), CATEGORIES_LISTE.map((srv) => {
+        }, className: `flex-1 py-1.5 border rounded-lg ${categorie === "acte" ? "bg-[#1E2A24] text-white" : "bg-gray-50"}` }, "\u{1F52C} Examens / Actes")), /* @__PURE__ */ React.createElement("p", { className: "text-[9px] text-gray-400" }, "\u{1F4A1} Clique une lettre puis un r\xE9sultat pour l'ajouter (quantit\xE9 1) \u2014 aucune saisie, ajuste la quantit\xE9 juste en dessous."), /* @__PURE__ */ React.createElement("div", { className: estMobile ? "space-y-2" : "border-t pt-2 space-y-2" }, /* @__PURE__ */ React.createElement("p", { className: "text-[10px] font-bold text-gray-400 uppercase" }, categorie === "med" ? "Choisir une lettre" : "Choisir une cat\xE9gorie"), categorie === "med" ? /* @__PURE__ */ React.createElement("div", { className: "flex gap-1 flex-wrap" }, lettresDisponibles.map((l) => /* @__PURE__ */ React.createElement("button", { key: l, onClick: () => setLettreActive(l), className: `rounded font-bold ${estMobile ? "w-10 h-10 text-sm" : "w-7 h-7 text-xs"} ${(lettreActive || lettresDisponibles[0]) === l ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-600"}` }, l))) : /* @__PURE__ */ React.createElement("div", { className: "flex gap-1 flex-wrap" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setSousCategorieActeActive(null), className: `rounded font-bold ${estMobile ? "px-4 py-2 text-sm" : "px-3 py-1 text-xs"} ${sousCategorieActeActive === null ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-600"}` }, "Toutes"), categoriesActesDisponibles.map((c) => /* @__PURE__ */ React.createElement("button", { key: c.key, onClick: () => setSousCategorieActeActive(c.key), className: `rounded font-bold ${estMobile ? "px-4 py-2 text-sm" : "px-3 py-1 text-xs"} ${sousCategorieActeActive === c.key ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-600"}` }, c.label))), /* @__PURE__ */ React.createElement("div", { className: `grid gap-1.5 overflow-y-auto ${estMobile ? "grid-cols-2 max-h-72" : "grid-cols-5 max-h-96"}` }, catalogueGrille.map((item) => /* @__PURE__ */ React.createElement("button", { key: item.id, onClick: () => ajouterAvecQuantite(item, 1), className: `border rounded-lg text-left hover:bg-emerald-50 hover:border-emerald-400 active:bg-emerald-100 ${estMobile ? "p-3" : "p-2"}` }, /* @__PURE__ */ React.createElement("div", { className: `font-semibold text-gray-800 line-clamp-2 ${estMobile ? "text-sm" : "text-xs"}` }, item.nom)))))), /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl border overflow-hidden shadow-sm mt-4 lg:mt-0" }, /* @__PURE__ */ React.createElement("table", { className: "w-full text-xs text-left" }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", { className: "bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono" }, /* @__PURE__ */ React.createElement("th", { className: "p-3" }, "D\xE9signation"), /* @__PURE__ */ React.createElement("th", { className: "p-3 w-20 text-center" }, "Qt\xE9"), /* @__PURE__ */ React.createElement("th", { className: "p-3 text-right w-24" }, "Prix"), /* @__PURE__ */ React.createElement("th", { className: "p-3 text-right w-24" }, "Total"), /* @__PURE__ */ React.createElement("th", { className: "w-8" }))), /* @__PURE__ */ React.createElement("tbody", { className: "divide-y divide-gray-100" }, j1 > 0 && /* @__PURE__ */ React.createElement("tr", { className: "bg-amber-50/20" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-amber-900" }, "S\xE9jour : ", CONFIG_LITS[typeLit1].nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-bold" }, j1, " jrs"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(CONFIG_LITS[typeLit1].prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalE1)), /* @__PURE__ */ React.createElement("td", null)), multiPeriode && j2 > 0 && /* @__PURE__ */ React.createElement("tr", { className: "bg-amber-50/40" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-amber-900" }, "S\xE9jour P2 : ", CONFIG_LITS[typeLit2].nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-bold" }, j2, " jrs"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(CONFIG_LITS[typeLit2].prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalE2)), /* @__PURE__ */ React.createElement("td", null)), hasChirSpec && nomChirSpec && /* @__PURE__ */ React.createElement("tr", { className: "bg-red-50/20" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-red-900" }, "Chirurgie : ", nomChirSpec), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center" }, "1"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(totalChirSpec)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalChirSpec)), /* @__PURE__ */ React.createElement("td", null)), lignes.map((l) => {
+          const decrementer = () => setLignes((p) => p.map((x) => x.id === l.id ? { ...x, qte: Math.max(1, x.qte - 1) } : x));
+          const incrementer = () => setLignes((p) => p.map((x) => x.id === l.id ? { ...x, qte: x.qte + 1 } : x));
+          return /* @__PURE__ */ React.createElement("tr", { key: l.id, className: "zebra-row" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-gray-800" }, /* @__PURE__ */ React.createElement("span", { className: `text-[8px] font-bold uppercase px-1 rounded mr-1 ${l.type === "med" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}` }, l.type === "med" ? "Pharma" : "Acte"), l.nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-center gap-1" }, /* @__PURE__ */ React.createElement("button", { onMouseDown: () => demarrerRepetition(decrementer), onMouseUp: arreterRepetition, onMouseLeave: arreterRepetition, onTouchStart: (e) => {
+            e.preventDefault();
+            demarrerRepetition(decrementer);
+          }, onTouchEnd: (e) => {
+            e.preventDefault();
+            arreterRepetition();
+          }, onTouchCancel: arreterRepetition, className: "w-8 h-8 bg-gray-100 active:bg-gray-300 rounded-lg font-bold text-gray-700 select-none" }, "\u2212"), /* @__PURE__ */ React.createElement("span", { className: "font-mono font-bold w-6 text-center" }, l.qte), /* @__PURE__ */ React.createElement("button", { onMouseDown: () => demarrerRepetition(incrementer), onMouseUp: arreterRepetition, onMouseLeave: arreterRepetition, onTouchStart: (e) => {
+            e.preventDefault();
+            demarrerRepetition(incrementer);
+          }, onTouchEnd: (e) => {
+            e.preventDefault();
+            arreterRepetition();
+          }, onTouchCancel: arreterRepetition, className: "w-8 h-8 bg-gray-100 active:bg-gray-300 rounded-lg font-bold text-gray-700 select-none" }, "+"))), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(l.prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(l.qte * l.prix)), /* @__PURE__ */ React.createElement("td", { className: "text-center" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setLignes((p) => p.filter((x) => x.id !== l.id)), className: "text-gray-300 hover:text-red-600" }, /* @__PURE__ */ React.createElement(X, { size: 12 }))));
+        }))), /* @__PURE__ */ React.createElement("div", { className: "p-4 bg-gray-50 border-t border-b text-[11px] text-gray-600 font-mono space-y-1 shadow-inner" }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 font-bold text-[#1E2A24] border-b pb-1 mb-2" }, /* @__PURE__ */ React.createElement("span", null, "R\xC9CAPITULATIF"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "Gdes"), /* @__PURE__ */ React.createElement("span", { className: "text-right text-emerald-800" }, "\u{1F4B5} DH")), CATEGORIES_LISTE.map((srv) => {
           const m = totalsParService[srv.key];
           if (m === 0) return null;
           return /* @__PURE__ */ React.createElement("div", { key: srv.key, className: "grid grid-cols-3 py-0.5" }, /* @__PURE__ */ React.createElement("span", null, "\u2022 ", srv.label), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, formatGourdes(m)), /* @__PURE__ */ React.createElement("span", { className: "text-right font-bold" }, formatDH(m), " DH"));
-        })), /* @__PURE__ */ React.createElement("div", { className: "bg-[#1E2A24] text-white p-4 flex justify-between items-center font-bold text-sm font-mono" }, /* @__PURE__ */ React.createElement("span", null, "TOTAL SIMUL\xC9 :"), /* @__PURE__ */ React.createElement("span", null, formatGourdes(grandTotal), " Gdes (", formatDH(grandTotal), " DH)")), /* @__PURE__ */ React.createElement("div", { className: "p-3 flex justify-end" }, /* @__PURE__ */ React.createElement("button", { onClick: vider, className: "bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-xs font-bold" }, "\u{1F9F9} Vider")))));
+        })), /* @__PURE__ */ React.createElement("div", { className: "bg-[#1E2A24] text-white p-4 flex justify-between items-center font-bold text-sm font-mono" }, /* @__PURE__ */ React.createElement("span", null, "TOTAL SIMUL\xC9 :"), /* @__PURE__ */ React.createElement("span", null, formatGourdes(grandTotal), " Gdes (", formatDH(grandTotal), " DH)")), /* @__PURE__ */ React.createElement("div", { className: "p-3 flex justify-end" }, /* @__PURE__ */ React.createElement("button", { onClick: vider, className: "bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-xs font-bold" }, "\u{1F9F9} Vider"))))));
       }
       module.exports = Simulateur;
     }
@@ -3490,7 +3761,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
         setInputTelephone,
         listeOng
       }) {
-        return /* @__PURE__ */ React.createElement("div", { className: "bg-white p-6 rounded-xl border shadow-sm space-y-4" }, /* @__PURE__ */ React.createElement("h3", { className: "text-base font-black text-center border-b pb-2" }, "\u{1F195} Nouveau Dossier (\xC9pisode)"), /* @__PURE__ */ React.createElement("div", { className: "relative" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Rechercher un patient existant"), /* @__PURE__ */ React.createElement("input", { type: "text", value: searchPatientText, onChange: (e) => setSearchPatientText(e.target.value), placeholder: "Nom ou num\xE9ro de dossier...", className: "border rounded-lg p-2 w-full text-xs outline-none pl-8" }), /* @__PURE__ */ React.createElement("span", { className: "absolute left-2 top-7 text-gray-400" }, /* @__PURE__ */ React.createElement(Search, { size: 14 })), suggestionsPatients.length > 0 && /* @__PURE__ */ React.createElement("ul", { className: "absolute z-20 left-0 right-0 bg-white border rounded-lg shadow-2xl mt-1 text-xs max-h-48 overflow-y-auto divide-y" }, suggestionsPatients.map((p) => /* @__PURE__ */ React.createElement("li", { key: p.id }, /* @__PURE__ */ React.createElement("button", { type: "button", onClick: () => choisirPatientExistant(p), className: "w-full text-left px-3 py-2 hover:bg-gray-100 flex justify-between" }, /* @__PURE__ */ React.createElement("span", null, p.nomPatient), /* @__PURE__ */ React.createElement("span", { className: "text-gray-500" }, p.numDossier || "N/R", " - ", p.ongPartenaire || "Priv\xE9")))))), /* @__PURE__ */ React.createElement("div", { className: "text-center text-gray-400 text-[10px]" }, "\u2014 ou cr\xE9er un nouveau \u2014"), peutCreerDossier ? /* @__PURE__ */ React.createElement("form", { onSubmit: onSoumettre, className: "space-y-3" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Nom complet"), /* @__PURE__ */ React.createElement("input", { type: "text", value: inputNom, onChange: (e) => setInputNom(e.target.value), placeholder: "Nom et pr\xE9nom...", className: "border rounded-lg p-2 text-xs outline-none", required: true })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Type de patient"), /* @__PURE__ */ React.createElement("select", { value: inputTypePatient, onChange: (e) => setInputTypePatient(e.target.value), className: "border rounded-lg p-2 text-xs bg-white outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "ONG" }, "\u{1F3E5} Patient Partenaire"), /* @__PURE__ */ React.createElement("option", { value: "PRIVE" }, "\u{1F4B3} Patient Priv\xE9"))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Service pr\xE9vu"), /* @__PURE__ */ React.createElement("select", { value: serviceChoisi, onChange: (e) => setServiceChoisi(e.target.value), className: "border rounded-lg p-2 text-xs bg-white outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- Non pr\xE9cis\xE9 (d\xE9duit automatiquement) --"), /* @__PURE__ */ React.createElement("option", { value: "Urgences" }, "\u{1F6A8} Urgences"), /* @__PURE__ */ React.createElement("option", { value: "P\xE9diatrie" }, "\u{1F9D2} P\xE9diatrie"), /* @__PURE__ */ React.createElement("option", { value: "G\xE9n\xE9ral" }, "\u{1FA7A} G\xE9n\xE9ral"), /* @__PURE__ */ React.createElement("option", { value: "Chirurgie" }, "\u{1F52A} Chirurgie"), /* @__PURE__ */ React.createElement("option", { value: "Maternit\xE9" }, "\u{1F930} Maternit\xE9"), /* @__PURE__ */ React.createElement("option", { value: "N\xE9onatologie" }, "\u{1F476} N\xE9onatologie")), /* @__PURE__ */ React.createElement("p", { className: "text-[9px] text-gray-400" }, "Aide le tableau de bord Pilotage CHF \xE0 classer ce dossier tout de suite, m\xEAme avant qu'un acte soit factur\xE9.")), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Partenaire"), /* @__PURE__ */ React.createElement("select", { value: inputOng, onChange: (e) => setInputOng(e.target.value), className: "border rounded-lg p-2 text-xs bg-white outline-none", disabled: inputTypePatient !== "ONG" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- S\xE9lectionner --"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o)))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Num\xE9ro de dossier"), /* @__PURE__ */ React.createElement("input", { type: "text", value: inputNumDossier, onChange: (e) => setInputNumDossier(e.target.value), placeholder: "ex: F-2024-045", className: "border rounded-lg p-2 text-xs outline-none" })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Date de naissance"), /* @__PURE__ */ React.createElement("input", { type: "date", value: inputDateNaissance, onChange: (e) => setInputDateNaissance(e.target.value), className: "border rounded-lg p-2 text-xs outline-none" })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "T\xE9l\xE9phone"), /* @__PURE__ */ React.createElement("input", { type: "text", value: inputTelephone, onChange: (e) => setInputTelephone(e.target.value), placeholder: "509-1234-5678", className: "border rounded-lg p-2 text-xs outline-none" })), /* @__PURE__ */ React.createElement("button", { type: "submit", className: "w-full bg-[#1E2A24] text-white py-2 rounded-lg text-xs font-bold" }, "\u{1F680} Ouvrir le dossier")) : /* @__PURE__ */ React.createElement("p", { className: "text-gray-500 text-center" }, "Vous n'avez pas la permission de cr\xE9er un dossier."));
+        return /* @__PURE__ */ React.createElement("div", { className: "bg-white p-6 rounded-xl border shadow-sm space-y-4" }, /* @__PURE__ */ React.createElement("h3", { className: "text-base font-black text-center border-b pb-2" }, "\u{1F195} Nouveau Dossier (\xC9pisode)"), /* @__PURE__ */ React.createElement("div", { className: "relative" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Rechercher un patient existant"), /* @__PURE__ */ React.createElement("input", { type: "text", value: searchPatientText, onChange: (e) => setSearchPatientText(e.target.value), placeholder: "Nom ou num\xE9ro de dossier...", className: "border rounded-lg p-2 w-full text-xs outline-none pl-8" }), /* @__PURE__ */ React.createElement("span", { className: "absolute left-2 top-7 text-gray-400" }, /* @__PURE__ */ React.createElement(Search, { size: 14 })), suggestionsPatients.length > 0 && /* @__PURE__ */ React.createElement("ul", { className: "absolute z-20 left-0 right-0 bg-white border rounded-lg shadow-2xl mt-1 text-xs max-h-48 overflow-y-auto divide-y" }, suggestionsPatients.map((p) => /* @__PURE__ */ React.createElement("li", { key: p.id }, /* @__PURE__ */ React.createElement("button", { type: "button", onClick: () => choisirPatientExistant(p), className: "w-full text-left px-3 py-2 hover:bg-gray-100 flex justify-between" }, /* @__PURE__ */ React.createElement("span", null, p.nomPatient, p.dateNaissance && /* @__PURE__ */ React.createElement("span", { className: "text-gray-400" }, " \u2014 n\xE9(e) ", p.dateNaissance.split("-").reverse().join("/"))), /* @__PURE__ */ React.createElement("span", { className: "text-gray-500" }, p.numDossier || "N/R", " - ", p.ongPartenaire || "Priv\xE9")))))), /* @__PURE__ */ React.createElement("div", { className: "text-center text-gray-400 text-[10px]" }, "\u2014 ou cr\xE9er un nouveau \u2014"), peutCreerDossier ? /* @__PURE__ */ React.createElement("form", { onSubmit: onSoumettre, className: "space-y-3" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Nom complet"), /* @__PURE__ */ React.createElement("input", { type: "text", value: inputNom, onChange: (e) => setInputNom(e.target.value), placeholder: "Nom et pr\xE9nom...", className: "border rounded-lg p-2 text-xs outline-none", required: true })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Type de patient"), /* @__PURE__ */ React.createElement("select", { value: inputTypePatient, onChange: (e) => setInputTypePatient(e.target.value), className: "border rounded-lg p-2 text-xs bg-white outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "ONG" }, "\u{1F3E5} Patient Partenaire"), /* @__PURE__ */ React.createElement("option", { value: "PRIVE" }, "\u{1F4B3} Patient Priv\xE9"))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Service pr\xE9vu"), /* @__PURE__ */ React.createElement("select", { value: serviceChoisi, onChange: (e) => setServiceChoisi(e.target.value), className: "border rounded-lg p-2 text-xs bg-white outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- Non pr\xE9cis\xE9 (d\xE9duit automatiquement) --"), /* @__PURE__ */ React.createElement("option", { value: "Urgences" }, "\u{1F6A8} Urgences"), /* @__PURE__ */ React.createElement("option", { value: "P\xE9diatrie" }, "\u{1F9D2} P\xE9diatrie"), /* @__PURE__ */ React.createElement("option", { value: "G\xE9n\xE9ral" }, "\u{1FA7A} G\xE9n\xE9ral"), /* @__PURE__ */ React.createElement("option", { value: "Chirurgie" }, "\u{1F52A} Chirurgie"), /* @__PURE__ */ React.createElement("option", { value: "Maternit\xE9" }, "\u{1F930} Maternit\xE9"), /* @__PURE__ */ React.createElement("option", { value: "N\xE9onatologie" }, "\u{1F476} N\xE9onatologie")), /* @__PURE__ */ React.createElement("p", { className: "text-[9px] text-gray-400" }, "Aide le tableau de bord Pilotage CHF \xE0 classer ce dossier tout de suite, m\xEAme avant qu'un acte soit factur\xE9.")), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Partenaire"), /* @__PURE__ */ React.createElement("select", { value: inputOng, onChange: (e) => setInputOng(e.target.value), className: "border rounded-lg p-2 text-xs bg-white outline-none", disabled: inputTypePatient !== "ONG" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- S\xE9lectionner --"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o)))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Num\xE9ro de dossier"), /* @__PURE__ */ React.createElement("input", { type: "text", value: inputNumDossier, onChange: (e) => setInputNumDossier(e.target.value), placeholder: "ex: F-2024-045", className: "border rounded-lg p-2 text-xs outline-none" })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "Date de naissance"), /* @__PURE__ */ React.createElement("input", { type: "date", value: inputDateNaissance, onChange: (e) => setInputDateNaissance(e.target.value), className: "border rounded-lg p-2 text-xs outline-none" })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[11px] font-bold uppercase text-gray-400" }, "T\xE9l\xE9phone"), /* @__PURE__ */ React.createElement("input", { type: "text", value: inputTelephone, onChange: (e) => setInputTelephone(e.target.value), placeholder: "509-1234-5678", className: "border rounded-lg p-2 text-xs outline-none" })), /* @__PURE__ */ React.createElement("button", { type: "submit", className: "w-full bg-[#1E2A24] text-white py-2 rounded-lg text-xs font-bold" }, "\u{1F680} Ouvrir le dossier")) : /* @__PURE__ */ React.createElement("p", { className: "text-gray-500 text-center" }, "Vous n'avez pas la permission de cr\xE9er un dossier."));
       }
       module.exports = NouveauDossierForm;
     }
@@ -3544,6 +3815,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
       function CalculateurPanel({
         medicaments,
         actes,
+        setActes,
         lignes,
         setLignes,
         dossierActif,
@@ -3554,11 +3826,16 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
         onCloturerDossier,
         fichesDossier,
         onSupprimerFicheDossier,
+        onMarquerProblemeFiche,
         idFicheEnCoursDEdition,
         // ID de la fiche en cours d'édition (passé par le parent)
         onEditerFiche,
         // NOUVELLE PROP : fonction pour charger une fiche en édition
         numeroFicheCourante,
+        dateFiche,
+        setDateFiche,
+        prescritPar,
+        setPrescritPar,
         dateEntree1,
         setDateEntree1,
         dateSortie1,
@@ -3584,12 +3861,15 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
         prixChirSpec,
         setPrixChirSpec,
         totalsParService,
+        coutsParService,
         grandTotal,
         totalDossierGourdes,
         onEnregistrerFiche,
         onViderFicheActive,
         injecterLigne,
         modeSimulation,
+        tarifChoisi,
+        setTarifChoisi,
         userRole,
         userDisplayName,
         setMedicaments,
@@ -3619,8 +3899,17 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
         const [inputDateNaissance, setInputDateNaissance] = useState("");
         const [inputTelephone, setInputTelephone] = useState("");
         const [categorie, setCategorie] = useState("med");
+        const [detailOuvert, setDetailOuvert] = useState(false);
         const [recherche, setRecherche] = useState("");
         const [ouvert, setOuvert] = useState(false);
+        const [lettreActive, setLettreActive] = useState(null);
+        const [sousCategorieActeActive, setSousCategorieActeActive] = useState(null);
+        const [estMobile, setEstMobile] = useState(typeof window !== "undefined" ? window.innerWidth < 768 : false);
+        useEffect(() => {
+          const onResize = () => setEstMobile(window.innerWidth < 768);
+          window.addEventListener("resize", onResize);
+          return () => window.removeEventListener("resize", onResize);
+        }, []);
         const [selection, setSelection] = useState(null);
         const [quantite, setQuantite] = useState("1");
         const [montantVerse, setMontantVerse] = useState("");
@@ -3635,20 +3924,106 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
         const [depots, setDepots] = useState([]);
         const [searchPatientText, setSearchPatientText] = useState("");
         const [suggestionsPatients, setSuggestionsPatients] = useState([]);
-        const [confirmModal, setConfirmModal2] = useState(null);
+        const [confirmModal, setConfirmModal] = useState(null);
         const [editTypeOuvert, setEditTypeOuvert] = useState(false);
         const [nouveauTypeEdit, setNouveauTypeEdit] = useState("ONG");
         const [nouvelOngEdit, setNouvelOngEdit] = useState("");
         const [editNomOuvert, setEditNomOuvert] = useState(false);
         const [nouveauNomEdit, setNouveauNomEdit] = useState("");
+        const [fileImport, setFileImport] = useState(() => {
+          try {
+            return JSON.parse(localStorage.getItem("chf-file-import") || "[]");
+          } catch (e) {
+            return [];
+          }
+        });
+        useEffect(() => {
+          localStorage.setItem("chf-file-import", JSON.stringify(fileImport));
+        }, [fileImport]);
+        const [fileOuverte, setFileOuverte] = useState(false);
+        const [collageJson, setCollageJson] = useState("");
+        const [idEntreeChargee, setIdEntreeChargee] = useState(null);
+        const trouverDansCatalogue = (nom, type) => {
+          const source = type === "med" ? medicaments : actes;
+          const cible = (nom || "").trim().toLowerCase();
+          return source.find((i) => i.nom.trim().toLowerCase() === cible);
+        };
+        const chargerEntreeFile = (entree) => {
+          const p = entree.patient || {};
+          if (!dossierActif) {
+            setInputNom(p.nom || "");
+            setInputOng(p.ong || "");
+            setInputTypePatient(p.typePatient || "ONG");
+          }
+          const introuvables = [];
+          (entree.lignes || []).forEach((l) => {
+            const item = trouverDansCatalogue(l.nom, l.type);
+            if (item) injecterLigne(item, l.type, l.qte || 1);
+            else introuvables.push(l.nom);
+          });
+          if (introuvables.length > 0) showToast(`Introuvable(s) dans le catalogue : ${introuvables.join(", ")}`, "error");
+          setIdEntreeChargee(entree._id);
+          setFileOuverte(false);
+        };
+        const ajouterAuCollage = () => {
+          try {
+            const parsed = JSON.parse(collageJson);
+            const entrees = Array.isArray(parsed) ? parsed : [parsed];
+            const avecId = entrees.map((e) => ({ ...e, _id: "fi-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6) }));
+            setFileImport((prev) => [...prev, ...avecId]);
+            setCollageJson("");
+            showToast(`${avecId.length} fiche(s) ajout\xE9e(s) \xE0 la file`, "success");
+          } catch (e) {
+            showToast("JSON invalide : " + e.message, "error");
+          }
+        };
+        const retirerDeLaFile = (id) => setFileImport((prev) => prev.filter((e) => e._id !== id));
         const refZone = useRef(null);
         const inputRechercheRef = useRef(null);
+        const holdDelaiRef = useRef(null);
+        const holdIntervalRef = useRef(null);
+        const demarrerRepetition = (fn) => {
+          fn();
+          holdDelaiRef.current = setTimeout(() => {
+            let vitesse = 180;
+            const tick = () => {
+              fn();
+              vitesse = Math.max(35, vitesse - 15);
+              holdIntervalRef.current = setTimeout(tick, vitesse);
+            };
+            tick();
+          }, 400);
+        };
+        const arreterRepetition = () => {
+          clearTimeout(holdDelaiRef.current);
+          clearTimeout(holdIntervalRef.current);
+        };
         const catalogueFiltre = categorie === "med" ? medicaments : actes;
         const suggestions = useMemo(() => {
           const q = recherche.trim().toLowerCase();
           if (!q) return catalogueFiltre.slice(0, 5);
           return catalogueFiltre.filter((i) => i.nom.toLowerCase().includes(q)).slice(0, 5);
         }, [recherche, catalogueFiltre]);
+        const premiereLettre = (nom) => (nom || "?").normalize("NFD").replace(/[\u0300-\u036f]/g, "")[0].toUpperCase();
+        const lettresDisponibles = useMemo(() => {
+          return [...new Set(medicaments.map((m) => premiereLettre(m.nom)))].sort();
+        }, [medicaments]);
+        const categoriesActesDisponibles = useMemo(() => {
+          const { CATEGORIES_LISTE } = require_constants();
+          const clesUtilisees = new Set(actes.map((a) => a.sub || "chirurgie"));
+          return CATEGORIES_LISTE.filter((c) => c.key !== "hospit" && clesUtilisees.has(c.key));
+        }, [actes]);
+        const catalogueGrille = useMemo(() => {
+          if (categorie === "med") {
+            const lettre = lettreActive || lettresDisponibles[0];
+            return medicaments.filter((m) => premiereLettre(m.nom) === lettre).sort((a, b) => a.nom.localeCompare(b.nom));
+          }
+          const filtres = sousCategorieActeActive ? actes.filter((a) => (a.sub || "chirurgie") === sousCategorieActeActive) : actes;
+          return [...filtres].sort((a, b) => {
+            var _a, _b;
+            return ((_a = a.ordre) != null ? _a : 9999) - ((_b = b.ordre) != null ? _b : 9999) || a.nom.localeCompare(b.nom);
+          });
+        }, [categorie, medicaments, actes, lettreActive, lettresDisponibles, sousCategorieActeActive]);
         useEffect(() => {
           if (!dossierId) {
             setDepots([]);
@@ -3694,22 +4069,20 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
           return Math.max(0, vers - montantRestantApresDepots);
         }, [montantVerse, montantRestantApresDepots]);
         const soldeRestantDepot = totalDossierGourdes + grandTotal - totalDepots - (parseFloat(montantDepot) || 0);
-        const actionAjouterSoin = () => {
-          if (!selection) return;
-          const q = parseFloat(quantite);
-          if (isNaN(q) || q <= 0) return;
+        const ajouterAvecQuantite = (item, q) => {
+          if (!item || isNaN(q) || q <= 0) return;
           if (categorie === "med") {
-            const stockActuel = selection.quantite || 0;
+            const stockActuel = item.quantite || 0;
             if (stockActuel < q) {
-              showToast(`Stock insuffisant pour "${selection.nom}". Restant : ${stockActuel}`, "error");
+              showToast(`Stock insuffisant pour "${item.nom}". Restant : ${stockActuel}`, "error");
               return;
             }
           }
-          injecterLigne(selection, categorie, q);
-          if (categorie === "med" && selection.quantite !== void 0) {
+          injecterLigne(item, categorie, q);
+          if (categorie === "med" && item.quantite !== void 0) {
             const updated = medicaments.map((m) => {
-              if (m.id === selection.id) {
-                return { ...m, quantite: Math.max(0, (m.quantite || 0) - q) };
+              if (m.id === item.id) {
+                return { ...m, quantite: Math.max(0, (m.quantite || 0) - q), nbUtilisations: (m.nbUtilisations || 0) + 1 };
               }
               return m;
             });
@@ -3717,12 +4090,22 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             const { LOG_MEDS_KEY } = require_firebase();
             localStorage.setItem(LOG_MEDS_KEY, JSON.stringify(updated));
             chf.updateCatalog("medicaments", updated).catch((e) => console.warn(e));
+          } else if (categorie === "acte" && setActes) {
+            const updated = actes.map((a) => a.id === item.id ? { ...a, nbUtilisations: (a.nbUtilisations || 0) + 1 } : a);
+            setActes(updated);
+            const { LOG_ACTES_KEY } = require_firebase();
+            localStorage.setItem(LOG_ACTES_KEY, JSON.stringify(updated));
+            chf.updateCatalog("actes", updated).catch((e) => console.warn(e));
           }
           setRecherche("");
           setSelection(null);
           setQuantite("1");
           if (inputRechercheRef.current) inputRechercheRef.current.focus();
           setPaiementEffectue(false);
+        };
+        const actionAjouterSoin = () => {
+          const q = parseFloat(quantite);
+          ajouterAvecQuantite(selection, q);
         };
         const demanderExoneration = async () => {
           var _a, _b;
@@ -3838,10 +4221,32 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
           setSearchPatientText("");
           setSuggestionsPatients([]);
         };
-        const reimprimerFicheValidee = (fiche) => {
+        const genererCorpsTicket = (fiche) => {
           var _a;
           const lignesDetaillees = ((_a = fiche.rawState) == null ? void 0 : _a.lignesCalcul) || [];
-          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N\xB0${fiche.numeroFiche}</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p><p>R\xC9IMPRESSION \u2014 ${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")} ${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p></div><div style="font-weight:bold;font-size:11px;margin-bottom:6px;">Patient: ${echapperHTML(nomPatient)} \u2014 Fiche N\xB0${fiche.numeroFiche}</div><div style="font-size:10px;margin-bottom:6px;">Type: ${typePatient === "ONG" ? "Partenaire" : "Priv\xE9"}${typePatient === "ONG" && selectedOng ? ` \u2014 Partenaire: ${echapperHTML(selectedOng)}` : ""}</div><table><thead><tr><th>D\xE9signation</th><th class="qte">Qt\xE9</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${lignesDetaillees.map((l) => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte * l.prix)}</td></tr>`).join("")}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes (${formatDH(fiche.totalGlobal)} DH)</div><p style="font-size:10px;margin-top:4px;">Mode: ${echapperHTML((fiche.modePaiement || "cash").toUpperCase())} | Encaiss\xE9 par: ${echapperHTML(fiche.creePar || "inconnu")}</p><div class="footer">Merci de votre visite !<br/>CHF Syst\xE8me Hospitalier \u2013 ${(/* @__PURE__ */ new Date()).getFullYear()}</div></body></html>`;
+          const dateAffichee = (fiche.dateCreation ? new Date(fiche.dateCreation) : /* @__PURE__ */ new Date()).toLocaleDateString("fr-FR");
+          return `<div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p></div><div style="font-weight:bold;font-size:11px;margin-bottom:6px;">Patient: ${echapperHTML(nomPatient)} \u2014 Fiche N\xB0${fiche.numeroFiche}</div><div style="font-size:10px;margin-bottom:2px;">${typePatient === "ONG" ? `Partenaire : ${echapperHTML(selectedOng || "N/R")}` : "Priv\xE9"}</div><div style="font-size:10px;margin-bottom:2px;">\u{1F4DE} ${echapperHTML(telephone || "N/R")}</div><div style="font-size:11px;font-weight:bold;margin-bottom:6px;">Date : ${dateAffichee}</div><table><thead><tr><th>D\xE9signation</th><th class="qte">Qt\xE9</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${lignesDetaillees.map((l) => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte * l.prix)}</td></tr>`).join("")}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes (${formatDH(fiche.totalGlobal)} DH)</div><p style="font-size:10px;margin-top:4px;">${fiche.prescritPar ? `Prescrit par : ${echapperHTML(fiche.prescritPar)}` : ""}</p><div class="footer">Merci de votre visite ! Bonne gu\xE9rison !<br/>CHF-${(/* @__PURE__ */ new Date()).getFullYear()}</div>`;
+        };
+        const STYLE_TICKET = `@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.page-fiche{page-break-after:always;}`;
+        const reimprimerFicheValidee = (fiche) => {
+          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N\xB0${fiche.numeroFiche}</title><style>${STYLE_TICKET}</style></head><body>${genererCorpsTicket(fiche)}</body></html>`;
+          const win = window.open("", "_blank", "width=500,height=700");
+          if (!win) {
+            showToast("Impression bloqu\xE9e par le navigateur. R\xE9essaie en cliquant sur Imprimer \u2014 si \xE7a ne marche toujours pas, demande \xE0 quelqu'un de v\xE9rifier les r\xE9glages.", "error");
+            return;
+          }
+          win.document.write(contenu);
+          win.document.close();
+          win.focus();
+          setTimeout(() => win.print(), 400);
+        };
+        const imprimerToutesLesFichesDuDossier = () => {
+          if (fichesDossier.length === 0) {
+            showToast("Aucune fiche \xE0 imprimer.", "error");
+            return;
+          }
+          const corps = fichesDossier.map((f) => `<div class="page-fiche">${genererCorpsTicket(f)}</div>`).join("");
+          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${fichesDossier.length} fiches \u2014 ${echapperHTML(nomPatient)}</title><style>${STYLE_TICKET}</style></head><body>${corps}</body></html>`;
           const win = window.open("", "_blank", "width=500,height=700");
           if (!win) {
             showToast("Impression bloqu\xE9e par le navigateur. R\xE9essaie en cliquant sur Imprimer \u2014 si \xE7a ne marche toujours pas, demande \xE0 quelqu'un de v\xE9rifier les r\xE9glages.", "error");
@@ -3855,19 +4260,15 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
         const imprimerTicket = (forcer = false) => {
           var _a;
           if (!forcer && !paiementEffectue) {
-            showToast("Veuillez d'abord effectuer le paiement avant d'imprimer.", "error");
+            showToast("Enregistre d'abord la fiche avant d'imprimer.", "error");
             return;
           }
           const data = {
             nomPatient: nomPatient || "Patient non renseign\xE9",
             selectedOng: selectedOng || "\u2014",
             numDossier: numDossierPatient || "N/R",
-            modePaiement: modePaiement || "cash",
             lignes: lignes || [],
             grandTotal: grandTotal || 0,
-            montantVerse: parseFloat(montantVerse) || 0,
-            monnaieARendre: monnaieARendre || 0,
-            exoneration: autorisationExoneration && modePaiement === "exoneration" ? { pourcentage: pourcentageExoneration, montantExonere } : null,
             dateEntree1,
             dateSortie1,
             totalE1,
@@ -3886,10 +4287,9 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             dateNaissance: dateNaissance || "N/R",
             typePatient: typePatient || "ONG",
             creePar: ((_a = auth.currentUser) == null ? void 0 : _a.displayName) || "inconnu",
-            solde: modePaiement === "credit" ? montantRestantApresDepots : 0,
-            depots: totalDepots
+            prescritPar: prescritPar.trim() || ""
           };
-          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket CHF</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:17px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:27px;margin:4px 0;}.entete p{margin:2px 0;font-size:16px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:16px;margin-bottom:6px;}.info-patient{font-size:15px;margin-bottom:4px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:16px;}th,td{padding:5px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:14px;text-transform:uppercase;}.total{font-weight:bold;font-size:23px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:13px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.exoneration{color:red;font-weight:bold;font-size:19px;}.monnaie{font-size:19px;color:#006600;}.solde{color:#cc0000;font-weight:bold;}.depot-info{font-size:17px;color:#555;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p><p>${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")} ${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p></div><div class="info"><span>Patient: ${echapperHTML(data.nomPatient)}</span><span>${data.typePatient === "ONG" ? `Partenaire: ${echapperHTML(data.selectedOng || "N/R")}` : "Priv\xE9"}</span></div><div class="info"><span>Dossier: ${echapperHTML(data.numDossier)}</span><span>Mode: ${echapperHTML(data.modePaiement).toUpperCase()}</span></div><div class="info info-patient"><span>\u{1F4DE} ${echapperHTML(data.telephone)}</span><span>Type: ${data.typePatient === "ONG" ? "Partenaire" : "Priv\xE9"}</span></div><div class="info info-patient"><span>Enregistr\xE9 par: ${echapperHTML(data.creePar)}</span></div>${data.dateEntree1 && data.dateSortie1 ? `<p style="font-size:10px; margin:4px 0;"><strong>S\xE9jour:</strong> ${data.dateEntree1.split("-").reverse().slice(0, 2).join("/")} \u2192 ${data.dateSortie1.split("-").reverse().slice(0, 2).join("/")}</p>` : ""}<table><thead><tr><th>D\xE9signation</th><th class="qte">Qt\xE9</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${data.dateEntree1 && data.dateSortie1 ? `<tr><td>H\xE9bergement</td><td class="qte">${data.j1}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit1].prix)}</td><td class="sous-total">${formatGourdes(data.totalE1)}</td></tr>` : ""}${data.multiPeriode && data.dateEntree2 && data.dateSortie2 ? `<tr><td>H\xE9bergement P2</td><td class="qte">${data.j2}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit2].prix)}</td><td class="sous-total">${formatGourdes(data.totalE2)}</td></tr>` : ""}${data.hasChirSpec && data.nomChirSpec ? `<tr><td>Chirurgie: ${echapperHTML(data.nomChirSpec)}</td><td class="qte">1</td><td class="prix">${formatGourdes(data.totalChirSpec)}</td><td class="sous-total">${formatGourdes(data.totalChirSpec)}</td></tr>` : ""}${data.lignes.map((l) => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte * l.prix)}</td></tr>`).join("")}</tbody></table>${data.exoneration ? `<div class="exoneration">Exon\xE9ration: ${data.exoneration.pourcentage}% (${formatGourdes(data.exoneration.montantExonere)} Gdes)</div>` : ""}${data.depots > 0 ? `<div class="depot-info">D\xE9p\xF4ts d\xE9j\xE0 effectu\xE9s: ${formatGourdes(data.depots)} Gdes</div>` : ""}<div class="total">TOTAL \xC0 PAYER (apr\xE8s d\xE9duction des d\xE9p\xF4ts): ${formatGourdes(montantRestantApresDepots)} Gdes<br/>${formatDH(montantRestantApresDepots)} DH</div>${data.solde > 0 ? `<p class="solde">Solde restant : ${formatGourdes(data.solde)} Gdes</p>` : ""}<div style="margin-top:6px; border-top:2px dashed #000; padding-top:6px;">${data.modePaiement === "cash" ? `<div style="display:flex; justify-content:space-between; font-size:12px;"><span>Montant vers\xE9:</span><span>${formatGourdes(data.montantVerse)} Gdes</span></div><div style="display:flex; justify-content:space-between; font-size:16px; font-weight:bold; color:#006600;"><span>Monnaie \xE0 rendre:</span><span>${formatGourdes(data.monnaieARendre)} Gdes</span></div>` : ""}</div><div class="footer">Merci de votre visite !<br/>CHF Syst\xE8me Hospitalier \u2013 ${(/* @__PURE__ */ new Date()).getFullYear()}</div></body></html>`;
+          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket CHF</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:17px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:27px;margin:4px 0;}.entete p{margin:2px 0;font-size:16px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:16px;margin-bottom:6px;}.info-patient{font-size:15px;margin-bottom:4px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:16px;}th,td{padding:5px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:14px;text-transform:uppercase;}.total{font-weight:bold;font-size:23px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:13px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.exoneration{color:red;font-weight:bold;font-size:19px;}.monnaie{font-size:19px;color:#006600;}.solde{color:#cc0000;font-weight:bold;}.depot-info{font-size:17px;color:#555;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p></div><div class="info"><span>Patient: ${echapperHTML(data.nomPatient)}</span><span>${data.typePatient === "ONG" ? `Partenaire: ${echapperHTML(data.selectedOng || "N/R")}` : "Priv\xE9"}</span></div><div class="info info-patient"><span>\u{1F4DE} ${echapperHTML(data.telephone)}</span><span>\u{1F4C1} ${echapperHTML(data.numDossier)}</span></div><div class="info info-patient" style="font-weight:bold;">Date : ${dateFiche.split("-").reverse().join("/")}</div><div class="info info-patient"><span>${data.prescritPar ? `Prescrit par: ${echapperHTML(data.prescritPar)}` : ""}</span></div>${data.dateEntree1 && data.dateSortie1 ? `<p style="font-size:10px; margin:4px 0;"><strong>S\xE9jour:</strong> ${data.dateEntree1.split("-").reverse().slice(0, 2).join("/")} \u2192 ${data.dateSortie1.split("-").reverse().slice(0, 2).join("/")}</p>` : ""}<table><thead><tr><th>D\xE9signation</th><th class="qte">Qt\xE9</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${data.dateEntree1 && data.dateSortie1 ? `<tr><td>H\xE9bergement</td><td class="qte">${data.j1}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit1].prix)}</td><td class="sous-total">${formatGourdes(data.totalE1)}</td></tr>` : ""}${data.multiPeriode && data.dateEntree2 && data.dateSortie2 ? `<tr><td>H\xE9bergement P2</td><td class="qte">${data.j2}j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit2].prix)}</td><td class="sous-total">${formatGourdes(data.totalE2)}</td></tr>` : ""}${data.hasChirSpec && data.nomChirSpec ? `<tr><td>Chirurgie: ${echapperHTML(data.nomChirSpec)}</td><td class="qte">1</td><td class="prix">${formatGourdes(data.totalChirSpec)}</td><td class="sous-total">${formatGourdes(data.totalChirSpec)}</td></tr>` : ""}${data.lignes.map((l) => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte * l.prix)}</td></tr>`).join("")}</tbody></table><div class="total">TOTAL: ${formatGourdes(data.grandTotal)} Gdes<br/>${formatDH(data.grandTotal)} DH</div><div class="footer">Merci de votre visite ! Bonne gu\xE9rison !<br/>CHF-${(/* @__PURE__ */ new Date()).getFullYear()}</div></body></html>`;
           const win = window.open("", "_blank", "width=500,height=700");
           if (!win) {
             showToast("Impression bloqu\xE9e par le navigateur. R\xE9essaie en cliquant sur Imprimer \u2014 si \xE7a ne marche toujours pas, demande \xE0 quelqu'un de v\xE9rifier les r\xE9glages.", "error");
@@ -3901,11 +4301,91 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
           setTimeout(() => win.print(), 500);
         };
         const imprimerFicheA4 = () => {
+          var _a, _b;
           if (!paiementEffectue) {
-            showToast("Veuillez d'abord effectuer le paiement.", "error");
+            showToast("Enregistre d'abord la fiche.", "error");
             return;
           }
-          showToast("Impression A4 (fonction pr\xEAte)", "success");
+          const numeroFicheReelle = idFicheEnCoursDEdition ? ((_a = fichesDossier.find((f) => f.id === idFicheEnCoursDEdition)) == null ? void 0 : _a.numeroFiche) || numeroFicheCourante : numeroFicheCourante;
+          const data = {
+            nomPatient: nomPatient || "Patient non renseign\xE9",
+            selectedOng: selectedOng || "\u2014",
+            numDossier: numDossierPatient || "N/R",
+            lignes: lignes || [],
+            grandTotal: grandTotal || 0,
+            dateEntree1,
+            dateSortie1,
+            totalE1,
+            totalE2,
+            j1,
+            j2,
+            typeLit1,
+            typeLit2,
+            multiPeriode,
+            dateEntree2,
+            dateSortie2,
+            hasChirSpec,
+            nomChirSpec,
+            totalChirSpec,
+            telephone: telephone || "N/R",
+            dateNaissance: dateNaissance || "N/R",
+            typePatient: typePatient || "ONG",
+            creePar: ((_b = auth.currentUser) == null ? void 0 : _b.displayName) || "inconnu",
+            prescritPar: prescritPar.trim() || ""
+          };
+          const ligneHebergement = data.dateEntree1 && data.dateSortie1 ? `<tr><td>H\xE9bergement \u2014 ${echapperHTML(CONFIG_LITS[data.typeLit1].nom)}</td><td class="qte">${data.j1} j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit1].prix)}</td><td class="mtotal">${formatGourdes(data.totalE1)}</td></tr>` : "";
+          const ligneHebergement2 = data.multiPeriode && data.dateEntree2 && data.dateSortie2 ? `<tr><td>H\xE9bergement (2e p\xE9riode) \u2014 ${echapperHTML(CONFIG_LITS[data.typeLit2].nom)}</td><td class="qte">${data.j2} j</td><td class="prix">${formatGourdes(CONFIG_LITS[data.typeLit2].prix)}</td><td class="mtotal">${formatGourdes(data.totalE2)}</td></tr>` : "";
+          const ligneChir = data.hasChirSpec && data.nomChirSpec ? `<tr><td>Chirurgie : ${echapperHTML(data.nomChirSpec)}</td><td class="qte">1</td><td class="prix">${formatGourdes(data.totalChirSpec)}</td><td class="mtotal">${formatGourdes(data.totalChirSpec)}</td></tr>` : "";
+          const lignesArticles = data.lignes.map((l) => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="mtotal">${formatGourdes(l.qte * l.prix)}</td></tr>`).join("");
+          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N\xB0${numeroFicheReelle} - ${echapperHTML(data.nomPatient)}</title><style>
+      @page{size:A4;margin:18mm;}
+      body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;font-size:13px;}
+      .entete{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1E2A24;padding-bottom:14px;margin-bottom:20px;}
+      .entete-gauche h1{font-size:24px;margin:0 0 4px;color:#1E2A24;}
+      .entete-gauche p{margin:1px 0;font-size:11px;color:#555;}
+      .entete-droite{text-align:right;font-size:11px;color:#555;}
+      .titre-doc{text-align:center;font-size:16px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;margin:10px 0 20px;color:#1E2A24;}
+      .infos-patient{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;background:#f7f5f0;border:1px solid #ddd;border-radius:8px;padding:14px 18px;margin-bottom:20px;font-size:12px;}
+      .infos-patient .label{color:#888;font-size:10px;text-transform:uppercase;font-weight:bold;}
+      .infos-patient .valeur{font-weight:bold;color:#1a1a1a;}
+      table{width:100%;border-collapse:collapse;margin-bottom:16px;}
+      th{background:#1E2A24;color:white;text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;}
+      td{padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;}
+      .qte,th.qte{text-align:center;}
+      .prix,.mtotal,th.prix,th.mtotal{text-align:right;}
+      .total-general{display:flex;justify-content:flex-end;margin-top:10px;}
+      .total-general .montant{font-size:22px;font-weight:bold;color:#1E2A24;border-top:3px solid #1E2A24;padding-top:8px;margin-top:4px;text-align:right;}
+      .footer{margin-top:50px;display:flex;justify-content:space-between;align-items:flex-end;font-size:11px;color:#555;}
+      .signature{border-top:1px solid #999;width:180px;text-align:center;padding-top:4px;}
+      </style></head><body>
+      <div class="entete">
+        <div class="entete-gauche"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p></div>
+        <div class="entete-droite"><p>Fiche N\xB0${numeroFicheReelle}</p></div>
+      </div>
+      <div class="titre-doc">Fiche de facturation</div>
+      <div class="infos-patient">
+        <div><span class="label">Patient</span><br/><span class="valeur">${echapperHTML(data.nomPatient)}</span></div>
+        <div><span class="label">${data.typePatient === "ONG" ? "Partenaire" : "Type"}</span><br/><span class="valeur">${data.typePatient === "ONG" ? echapperHTML(data.selectedOng) : "Priv\xE9"}</span></div>
+        <div><span class="label">N\xB0 Dossier</span><br/><span class="valeur">${echapperHTML(data.numDossier)}</span></div>
+        <div><span class="label">T\xE9l\xE9phone</span><br/><span class="valeur">${echapperHTML(data.telephone)}</span></div>
+        <div><span class="label">Date</span><br/><span class="valeur">${dateFiche.split("-").reverse().join("/")}</span></div>
+        <div><span class="label">Date de naissance</span><br/><span class="valeur">${echapperHTML(data.dateNaissance)}</span></div>
+        ${data.prescritPar ? `<div><span class="label">Prescrit par</span><br/><span class="valeur">${echapperHTML(data.prescritPar)}</span></div>` : ""}
+      </div>
+      ${data.dateEntree1 && data.dateSortie1 ? `<p style="font-size:12px;margin-bottom:12px;"><strong>S\xE9jour :</strong> du ${data.dateEntree1.split("-").reverse().join("/")} au ${data.dateSortie1.split("-").reverse().join("/")}</p>` : ""}
+      <table><thead><tr><th>D\xE9signation</th><th class="qte">Qt\xE9</th><th class="prix">Prix unitaire</th><th class="mtotal">Total</th></tr></thead><tbody>${ligneHebergement}${ligneHebergement2}${ligneChir}${lignesArticles}</tbody></table>
+      <div class="total-general"><div class="montant">${formatGourdes(data.grandTotal)} Gdes <span style="font-size:14px;color:#555;">(${formatDH(data.grandTotal)} DH)</span></div></div>
+      <div class="footer"><div class="signature">Signature / Cachet</div><div>CHF \u2014 Document g\xE9n\xE9r\xE9 le ${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")}</div></div>
+      </body></html>`;
+          const win = window.open("", "_blank", "width=850,height=1100");
+          if (!win) {
+            showToast("Impression bloqu\xE9e par le navigateur. R\xE9essaie en cliquant sur Imprimer \u2014 si \xE7a ne marche toujours pas, demande \xE0 quelqu'un de v\xE9rifier les r\xE9glages.", "error");
+            return;
+          }
+          win.document.write(contenu);
+          win.document.close();
+          win.focus();
+          setTimeout(() => win.print(), 500);
         };
         const executerEncaissement = async () => {
           var _a, _b;
@@ -3994,16 +4474,16 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             setMotifExoneration("");
             setAutorisationExoneration(false);
             setPaiementEffectue(true);
-            setConfirmModal2({
+            setConfirmModal({
               titre: "\u{1F5A8}\uFE0F Imprimer le ticket ?",
               message: "Le paiement a bien \xE9t\xE9 enregistr\xE9.",
               confirmLabel: "Imprimer",
               cancelLabel: "Plus tard",
               onConfirm: () => {
-                setConfirmModal2(null);
+                setConfirmModal(null);
                 imprimerTicket(true);
               },
-              onCancel: () => setConfirmModal2(null)
+              onCancel: () => setConfirmModal(null)
             });
           } catch (error) {
             showToast("Erreur: " + error.message, "error");
@@ -4015,7 +4495,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             return;
           }
           const libellesMode = { cash: "\u{1F4B5} Cash", credit: "\u{1F4DD} Cr\xE9dit", ong: "\u{1F3E5} Partenaire", exoneration: "\u{1F3AF} Exon\xE9ration" };
-          setConfirmModal2({
+          setConfirmModal({
             titre: "Confirmer l'encaissement",
             message: `Patient : ${nomPatient}
 Mode de paiement : ${libellesMode[modePaiement] || modePaiement}`,
@@ -4023,10 +4503,10 @@ Mode de paiement : ${libellesMode[modePaiement] || modePaiement}`,
             confirmLabel: "\u{1F4B3} Encaisser",
             cancelLabel: "Annuler",
             onConfirm: () => {
-              setConfirmModal2(null);
+              setConfirmModal(null);
               executerEncaissement();
             },
-            onCancel: () => setConfirmModal2(null)
+            onCancel: () => setConfirmModal(null)
           });
         };
         const peutCreerDossier = userRole === "comptable" || userRole === "direction" || userRole === "administrateur";
@@ -4037,7 +4517,67 @@ Mode de paiement : ${libellesMode[modePaiement] || modePaiement}`,
         const peutAnnulerDossier = userRole === "direction" || userRole === "administrateur";
         const peutSuspendre = userRole === "comptable" || userRole === "direction" || userRole === "administrateur";
         if (modeSimulation) return /* @__PURE__ */ React.createElement("div", { className: "bg-blue-50 p-4" }, "\u{1F9EE} Mode simulation");
-        return /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, confirmModal && /* @__PURE__ */ React.createElement(ConfirmModal, { ...confirmModal }), !dossierActif ? /* @__PURE__ */ React.createElement(
+        const enregistrerFicheActive = () => {
+          var _a, _b;
+          if (lignes.length === 0 && j1 === 0 && !hasChirSpec && !dateEntree1) {
+            showToast("Fiche vide", "error");
+            return;
+          }
+          const fiche = {
+            id: idFicheEnCoursDEdition || "fiche-" + Date.now(),
+            numeroFiche: idFicheEnCoursDEdition ? ((_a = fichesDossier.find((f) => f.id === idFicheEnCoursDEdition)) == null ? void 0 : _a.numeroFiche) || numeroFicheCourante : numeroFicheCourante,
+            breakdown: { ...totalsParService },
+            totalGlobal: grandTotal,
+            exeat: dateEntree1 && dateSortie1 ? {
+              dateEntree: dateEntree1,
+              dateSortie: dateSortie1,
+              nbJours: j1,
+              typeLit: typeLit1,
+              prixParJour: CONFIG_LITS[typeLit1].prix,
+              totalHebergement: totalE1,
+              multiPeriode,
+              dateEntree2,
+              dateSortie2,
+              typeLit2,
+              nbJours2: j2,
+              totalHebergement2: totalE2
+            } : null,
+            dateCreation: (/* @__PURE__ */ new Date(dateFiche + "T12:00:00")).toISOString(),
+            creePar: ((_b = auth.currentUser) == null ? void 0 : _b.displayName) || "inconnu",
+            prescritPar: prescritPar.trim() || "",
+            rawState: { lignesCalcul: [...lignes], dateEntree1, dateSortie1, typeLit1, multiPeriode, dateEntree2, dateSortie2, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
+          };
+          onEnregistrerFiche(fiche);
+          if (idEntreeChargee) {
+            retirerDeLaFile(idEntreeChargee);
+            setIdEntreeChargee(null);
+          }
+          setPaiementEffectue(true);
+          showToast(idFicheEnCoursDEdition ? "Fiche mise \xE0 jour" : "Fiche enregistr\xE9e", "success");
+        };
+        return /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, confirmModal && /* @__PURE__ */ React.createElement(ConfirmModal, { ...confirmModal }), /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl border shadow-sm p-3 text-xs" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setFileOuverte((o) => !o), className: "w-full flex justify-between items-center font-bold text-gray-700" }, /* @__PURE__ */ React.createElement("span", null, "\u{1F4E5} File d'import ", fileImport.length > 0 && /* @__PURE__ */ React.createElement("span", { className: "ml-1 bg-orange-600 text-white rounded-full px-2 py-0.5 text-[10px]" }, fileImport.length, " en attente")), /* @__PURE__ */ React.createElement("span", null, fileOuverte ? "\u25B2" : "\u25BC")), fileOuverte && /* @__PURE__ */ React.createElement("div", { className: "mt-3 space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "space-y-1" }, fileImport.map((e) => {
+          var _a, _b;
+          return /* @__PURE__ */ React.createElement("div", { key: e._id, className: "flex justify-between items-center bg-gray-50 border rounded-lg p-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => chargerEntreeFile(e), className: "text-left flex-1 font-medium text-gray-800" }, ((_a = e.patient) == null ? void 0 : _a.nom) || "(sans nom)", " ", ((_b = e.patient) == null ? void 0 : _b.ong) ? `\u2014 ${e.patient.ong}` : ""), /* @__PURE__ */ React.createElement("button", { onClick: () => retirerDeLaFile(e._id), className: "text-gray-300 hover:text-red-600 ml-2" }, /* @__PURE__ */ React.createElement(X, { size: 12 })));
+        }), fileImport.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "text-gray-400 italic" }, "File vide.")), /* @__PURE__ */ React.createElement(
+          "textarea",
+          {
+            value: collageJson,
+            onChange: (e) => setCollageJson(e.target.value),
+            rows: 3,
+            placeholder: "Coller un JSON (une fiche ou un tableau de fiches)",
+            className: "w-full border rounded-lg p-2 font-mono text-[11px]"
+          }
+        ), /* @__PURE__ */ React.createElement("button", { onClick: ajouterAuCollage, disabled: !collageJson.trim(), className: "w-full bg-[#1E2A24] text-white rounded-lg py-1.5 disabled:opacity-40" }, "Ajouter \xE0 la file"))), dossierActif && /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: enregistrerFicheActive,
+            disabled: !peutArchiver,
+            className: "fixed right-2 z-50 bg-emerald-700 active:bg-emerald-800 hover:bg-emerald-800 text-white rounded-full shadow-2xl disabled:opacity-40 flex flex-col items-center justify-center gap-0.5 w-16 h-16",
+            style: { top: "42%" }
+          },
+          /* @__PURE__ */ React.createElement("span", { className: "text-xl leading-none" }, "\u{1F4BE}"),
+          /* @__PURE__ */ React.createElement("span", { className: "text-[8px] font-black leading-none" }, idFicheEnCoursDEdition ? "M\xE0j" : "Sauver")
+        ), !dossierActif ? /* @__PURE__ */ React.createElement(
           NouveauDossierForm,
           {
             searchPatientText,
@@ -4047,6 +4587,23 @@ Mode de paiement : ${libellesMode[modePaiement] || modePaiement}`,
             peutCreerDossier,
             onSoumettre: (e) => {
               e.preventDefault();
+              const nomNormalise = inputNom.trim().toLowerCase();
+              const doublon = patientsExistants.find((p) => (p.nomPatient || "").trim().toLowerCase() === nomNormalise);
+              if (doublon) {
+                const infos = [
+                  `dossier ${doublon.numDossier || "sans num\xE9ro"}`,
+                  `ouvert le ${doublon.dateHeure || "?"}`,
+                  `statut : ${doublon.status || "actif"}`,
+                  doublon.dateNaissance ? `n\xE9(e) le ${doublon.dateNaissance.split("-").reverse().join("/")}` : null,
+                  doublon.telephone ? `t\xE9l ${doublon.telephone}` : null
+                ].filter(Boolean).join(", ");
+                const continuer = confirm(`\u26A0\uFE0F Un patient nomm\xE9 "${doublon.nomPatient}" existe d\xE9j\xE0 (${infos}).
+
+Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
+
+(Annuler pour plut\xF4t chercher/charger le dossier existant en haut)`);
+                if (!continuer) return;
+              }
               if (inputOng) localStorage.setItem("chf-dernier-ong", inputOng);
               onNouveauDossier(inputNom, inputOng, inputNumDossier, inputTypePatient, inputDateNaissance, inputTelephone, serviceChoisi);
             },
@@ -4079,9 +4636,19 @@ Mode de paiement : ${libellesMode[modePaiement] || modePaiement}`,
         }, className: "text-[9px] font-bold text-blue-600 underline" }, "\u270F\uFE0F Changer")) : /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5 items-center mt-1 flex-wrap" }, /* @__PURE__ */ React.createElement("select", { value: nouveauTypeEdit, onChange: (e) => setNouveauTypeEdit(e.target.value), className: "border rounded p-1 text-xs bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "ONG" }, "\u{1F3E5} Partenaire"), /* @__PURE__ */ React.createElement("option", { value: "PRIVE" }, "\u{1F4B3} Priv\xE9")), nouveauTypeEdit === "ONG" && /* @__PURE__ */ React.createElement("select", { value: nouvelOngEdit, onChange: (e) => setNouvelOngEdit(e.target.value), className: "border rounded p-1 text-xs bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- Partenaire --"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o))), /* @__PURE__ */ React.createElement("button", { onClick: () => {
           if (onChangerTypeOng) onChangerTypeOng(nouveauTypeEdit, nouveauTypeEdit === "ONG" ? nouvelOngEdit : "");
           setEditTypeOuvert(false);
-        }, className: "bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(Check, { size: 10 })), /* @__PURE__ */ React.createElement("button", { onClick: () => setEditTypeOuvert(false), className: "border text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(X, { size: 10 })))), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 flex-wrap" }, peutAnnulerDossier && /* @__PURE__ */ React.createElement("button", { onClick: onAnnulerDossier, className: "bg-red-50 text-red-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-red-200" }, "Abandonner"), peutSuspendre && /* @__PURE__ */ React.createElement("button", { onClick: onSuspendreDossier, className: "bg-amber-50 text-amber-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-amber-200 flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Clock, { size: 12 }), " Suspendre"), peutSuspendre && onReporterDossier && /* @__PURE__ */ React.createElement("button", { onClick: onReporterDossier, className: "bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-indigo-200 flex items-center gap-1" }, "\u{1F4C5} Reporter au mois suivant"), peutArchiver && /* @__PURE__ */ React.createElement("button", { onClick: onCloturerDossier, className: "bg-emerald-700 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg" }, "\u{1F3C1} Cl\xF4turer"))), fichesDossier.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm space-y-1.5" }, /* @__PURE__ */ React.createElement("span", { className: "text-[9px] uppercase font-black text-gray-400" }, "Fiches valid\xE9es ", idFicheEnCoursDEdition ? "(modification en cours)" : ""), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-1.5" }, fichesDossier.map((f) => {
+        }, className: "bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(Check, { size: 10 })), /* @__PURE__ */ React.createElement("button", { onClick: () => setEditTypeOuvert(false), className: "border text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(X, { size: 10 })))), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 flex-wrap" }, peutAnnulerDossier && /* @__PURE__ */ React.createElement("button", { onClick: onAnnulerDossier, className: "bg-red-50 text-red-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-red-200" }, "Abandonner"), peutSuspendre && /* @__PURE__ */ React.createElement("button", { onClick: onSuspendreDossier, className: "bg-amber-50 text-amber-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-amber-200 flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Clock, { size: 12 }), " Suspendre"), peutSuspendre && onReporterDossier && /* @__PURE__ */ React.createElement("button", { onClick: onReporterDossier, className: "bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-indigo-200 flex items-center gap-1" }, "\u{1F4C5} Reporter au mois suivant"), peutArchiver && /* @__PURE__ */ React.createElement("button", { onClick: onCloturerDossier, className: "bg-emerald-700 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg" }, "\u{1F3C1} Cl\xF4turer"))), fichesDossier.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm space-y-1.5" }, /* @__PURE__ */ React.createElement("span", { className: "text-[9px] uppercase font-black text-gray-400" }, "Fiches valid\xE9es ", idFicheEnCoursDEdition ? "(modification en cours)" : ""), /* @__PURE__ */ React.createElement("button", { onClick: imprimerToutesLesFichesDuDossier, className: "ml-2 bg-[#1E2A24] text-white text-[9px] font-bold px-2 py-1 rounded-lg" }, "\u{1F5A8}\uFE0F Imprimer les ", fichesDossier.length, " fiche", fichesDossier.length > 1 ? "s" : "", " d'affil\xE9e"), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-1.5" }, fichesDossier.map((f) => {
           const isEditing = f.id === idFicheEnCoursDEdition;
-          return /* @__PURE__ */ React.createElement("div", { key: f.id, className: `flex items-center rounded-lg font-mono text-[11px] font-bold border overflow-hidden shadow-sm ${isEditing ? "bg-blue-100 border-blue-400" : "bg-gray-50 border-gray-200"}` }, /* @__PURE__ */ React.createElement("button", { onClick: () => reimprimerFicheValidee(f), className: "pl-2.5 pr-2 py-1 hover:text-blue-700", title: "R\xE9imprimer cette fiche" }, "\u{1F5A8}\uFE0F Fiche N\xB0", f.numeroFiche, " (", formatGourdes(f.totalGlobal), " Gdes)"), onEditerFiche && /* @__PURE__ */ React.createElement(
+          return /* @__PURE__ */ React.createElement("div", { key: f.id, className: `flex items-center rounded-lg font-mono text-[11px] font-bold border overflow-hidden shadow-sm ${isEditing ? "bg-blue-100 border-blue-400" : f.probleme ? "bg-red-100 border-red-400" : "bg-gray-50 border-gray-200"}` }, /* @__PURE__ */ React.createElement("button", { onClick: () => reimprimerFicheValidee(f), className: "pl-2.5 pr-2 py-1 hover:text-blue-700", title: "R\xE9imprimer cette fiche" }, f.probleme && "\u2753 ", "\u{1F5A8}\uFE0F Fiche N\xB0", f.numeroFiche, " (", formatGourdes(f.totalGlobal), " Gdes)"), onMarquerProblemeFiche && /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              onClick: () => onMarquerProblemeFiche(f.id),
+              className: `px-2 py-1 border-l transition-colors font-bold text-[10px] ${f.probleme ? "bg-amber-500/10 hover:bg-amber-600 hover:text-white text-amber-700" : "bg-emerald-500/10 hover:bg-emerald-600 hover:text-white text-emerald-700"}`,
+              title: f.probleme ? f.noteProbleme ? `\u2753 ${f.noteProbleme}
+
+(clique pour retirer le marquage)` : "Retirer le marquage \u2014 probl\xE8me r\xE9gl\xE9" : "Tout va bien \u2014 clique pour signaler un probl\xE8me"
+            },
+            f.probleme ? "\u2753" : "\u2705"
+          ), onEditerFiche && /* @__PURE__ */ React.createElement(
             "button",
             {
               onClick: () => onEditerFiche(f.id),
@@ -4116,95 +4683,62 @@ Mode de paiement : ${libellesMode[modePaiement] || modePaiement}`,
             prixChirSpec,
             setPrixChirSpec
           }
-        ), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border space-y-3 shadow-sm", ref: refZone }, /* @__PURE__ */ React.createElement("p", { className: "text-[11px] font-bold uppercase text-gray-400" }, "2. Actes, Laboratoire & Ordonnance"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 text-xs font-semibold" }, /* @__PURE__ */ React.createElement("button", { onClick: () => {
+        ), /* @__PURE__ */ React.createElement("div", { className: "bg-amber-50 border border-amber-200 rounded-xl p-2.5 flex flex-wrap items-center gap-4" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5" }, /* @__PURE__ */ React.createElement("label", { className: "text-[9px] font-bold text-amber-800 uppercase" }, "\u{1F4C5} Date", idFicheEnCoursDEdition ? " (fiche)" : " (nouvelle fiche)"), /* @__PURE__ */ React.createElement("input", { type: "date", value: dateFiche, onChange: (e) => setDateFiche(e.target.value), className: "border rounded p-1.5 text-xs font-mono bg-white" })), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1.5" }, /* @__PURE__ */ React.createElement("label", { className: "text-[9px] font-bold text-amber-800 uppercase" }, "\u{1FA7A} Prescrit par"), /* @__PURE__ */ React.createElement("input", { type: "text", value: prescritPar, onChange: (e) => setPrescritPar(e.target.value), placeholder: "Nom du m\xE9decin/infirmi\xE8re", className: "border rounded p-1.5 text-xs w-40 bg-white" }))), /* @__PURE__ */ React.createElement("div", { className: estMobile ? "" : "grid grid-cols-[3fr_2fr] gap-4 items-start" }, /* @__PURE__ */ React.createElement("div", { className: `bg-white p-4 rounded-xl border space-y-3 shadow-sm ${estMobile ? "" : "max-h-[80vh] overflow-y-auto"}`, ref: refZone }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-center" }, /* @__PURE__ */ React.createElement("p", { className: "text-[11px] font-bold uppercase text-gray-400" }, "2. Actes, Laboratoire & Ordonnance"), setTarifChoisi && /* @__PURE__ */ React.createElement("div", { className: "flex text-[10px] font-bold rounded-lg border overflow-hidden" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setTarifChoisi("actuel"), className: `px-2 py-1 ${tarifChoisi !== "nouveau" ? "bg-[#1E2A24] text-white" : "bg-gray-50 text-gray-500"}` }, "Tarif Actuel"), /* @__PURE__ */ React.createElement("button", { onClick: () => setTarifChoisi("nouveau"), className: `px-2 py-1 ${tarifChoisi === "nouveau" ? "bg-indigo-700 text-white" : "bg-gray-50 text-gray-500"}` }, "Nouveau prix"))), fichesDossier.length > 1 && (() => {
+          var _a;
+          const fichesTriees = [...fichesDossier].sort((a, b) => a.numeroFiche - b.numeroFiche);
+          const indexActuel = idFicheEnCoursDEdition ? fichesTriees.findIndex((f) => f.id === idFicheEnCoursDEdition) : fichesTriees.length;
+          const peutPrecedente = indexActuel > 0;
+          const peutSuivante = idFicheEnCoursDEdition && indexActuel < fichesTriees.length - 1;
+          return /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-center gap-3 bg-gray-50 rounded-lg py-1.5 border" }, /* @__PURE__ */ React.createElement("button", { onClick: () => peutPrecedente && onEditerFiche(fichesTriees[indexActuel - 1].id), disabled: !peutPrecedente, className: "px-2 py-0.5 text-gray-600 disabled:opacity-20 disabled:cursor-not-allowed font-bold text-lg" }, "\u25C0"), /* @__PURE__ */ React.createElement("span", { className: "text-[10px] font-bold text-gray-500 font-mono" }, idFicheEnCoursDEdition ? `Fiche N\xB0${(_a = fichesTriees[indexActuel]) == null ? void 0 : _a.numeroFiche} (${indexActuel + 1}/${fichesTriees.length})` : "Nouvelle fiche"), /* @__PURE__ */ React.createElement("button", { onClick: () => peutSuivante && onEditerFiche(fichesTriees[indexActuel + 1].id), disabled: !peutSuivante, className: "px-2 py-0.5 text-gray-600 disabled:opacity-20 disabled:cursor-not-allowed font-bold text-lg" }, "\u25B6"));
+        })(), tarifChoisi === "nouveau" && /* @__PURE__ */ React.createElement("p", { className: "text-[9px] text-indigo-600 font-bold" }, "\u26A0\uFE0F Les articles ajout\xE9s utiliseront le nouveau prix (\xE0 venir) quand il existe."), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 text-xs font-semibold" }, /* @__PURE__ */ React.createElement("button", { onClick: () => {
           setCategorie("med");
-          setRecherche("");
           setSelection(null);
         }, className: `flex-1 py-1.5 border rounded-lg ${categorie === "med" ? "bg-[#1E2A24] text-white" : "bg-gray-50"}` }, "\u{1F48A} Pharmacie"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
           setCategorie("acte");
-          setRecherche("");
           setSelection(null);
-        }, className: `flex-1 py-1.5 border rounded-lg ${categorie === "acte" ? "bg-[#1E2A24] text-white" : "bg-gray-50"}` }, "\u{1F52C} Examens / Actes")), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("div", { className: "relative flex-1" }, /* @__PURE__ */ React.createElement("input", { ref: inputRechercheRef, type: "text", value: recherche, onChange: (e) => {
-          setRecherche(e.target.value);
-          setOuvert(true);
-          setSelection(null);
-        }, onFocus: () => setOuvert(true), onKeyDown: (e) => {
-          if (e.key === "Enter" && suggestions.length > 0) {
-            setSelection(suggestions[0]);
-            setRecherche(suggestions[0].nom);
-            setOuvert(false);
-          }
-        }, placeholder: "Rechercher un soin ou un m\xE9dicament...", className: "w-full border rounded-lg p-2 text-xs pl-8 outline-none", disabled: !peutAjouterLignes }), /* @__PURE__ */ React.createElement("span", { className: "absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" }, /* @__PURE__ */ React.createElement(Search, { size: 14 })), ouvert && suggestions.length > 0 && /* @__PURE__ */ React.createElement("ul", { className: "absolute z-20 left-0 right-0 bg-white border rounded-lg shadow-2xl mt-1 text-xs max-h-48 overflow-y-auto divide-y" }, suggestions.map((i) => /* @__PURE__ */ React.createElement("li", { key: i.id }, /* @__PURE__ */ React.createElement("button", { type: "button", onClick: () => {
-          setSelection(i);
-          setRecherche(i.nom);
-          setOuvert(false);
-        }, onDoubleClick: () => {
-          setSelection(i);
-          setQuantite("1");
-          setTimeout(actionAjouterSoin, 40);
-        }, className: "w-full text-left px-3 py-2 hover:bg-gray-100 flex justify-between" }, /* @__PURE__ */ React.createElement("span", null, i.nom), /* @__PURE__ */ React.createElement("span", { className: "text-gray-500 font-mono" }, formatGourdes(i.prix), " Gdes")))))), /* @__PURE__ */ React.createElement("input", { type: "number", min: "1", value: quantite, onChange: (e) => setQuantite(e.target.value), onKeyDown: (e) => {
-          if (e.key === "Enter") actionAjouterSoin();
-        }, className: "w-16 border rounded-lg p-2 text-xs text-center font-mono font-bold bg-gray-50", disabled: !peutAjouterLignes }), /* @__PURE__ */ React.createElement("button", { onClick: actionAjouterSoin, disabled: !selection || !peutAjouterLignes, className: "bg-[#1E2A24] text-white px-4 py-2 rounded-lg text-xs font-bold disabled:opacity-30 flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Plus, null), " Ajouter")), /* @__PURE__ */ React.createElement("p", { className: "text-[9px] text-gray-400" }, "\u{1F4A1} Astuce : double-clique un r\xE9sultat dans la liste pour l'ajouter tout de suite, sans passer par le bouton Ajouter.")), /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl border overflow-hidden shadow-sm" }, /* @__PURE__ */ React.createElement("table", { className: "w-full text-xs text-left" }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", { className: "bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono" }, /* @__PURE__ */ React.createElement("th", { className: "p-3" }, "D\xE9signation"), /* @__PURE__ */ React.createElement("th", { className: "p-3 w-16 text-center" }, "Qt\xE9"), /* @__PURE__ */ React.createElement("th", { className: "p-3 text-right w-24" }, "Prix"), /* @__PURE__ */ React.createElement("th", { className: "p-3 text-right w-24" }, "Total"), /* @__PURE__ */ React.createElement("th", { className: "w-8" }))), /* @__PURE__ */ React.createElement("tbody", { className: "divide-y divide-gray-100" }, dateEntree1 && dateSortie1 && /* @__PURE__ */ React.createElement("tr", { className: "bg-amber-50/20" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-amber-900" }, "S\xE9jour : ", CONFIG_LITS[typeLit1].nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-bold" }, j1, " jrs"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(CONFIG_LITS[typeLit1].prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalE1)), /* @__PURE__ */ React.createElement("td", null)), multiPeriode && dateEntree2 && dateSortie2 && /* @__PURE__ */ React.createElement("tr", { className: "bg-amber-50/40" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-amber-900" }, "S\xE9jour P2 : ", CONFIG_LITS[typeLit2].nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-bold" }, j2, " jrs"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(CONFIG_LITS[typeLit2].prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalE2)), /* @__PURE__ */ React.createElement("td", null)), hasChirSpec && nomChirSpec && /* @__PURE__ */ React.createElement("tr", { className: "bg-red-50/20" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-red-900" }, "Chirurgie : ", nomChirSpec), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center" }, "1"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(totalChirSpec)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalChirSpec)), /* @__PURE__ */ React.createElement("td", null)), lignes.map((l) => /* @__PURE__ */ React.createElement("tr", { key: l.id, className: "zebra-row" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-gray-800" }, /* @__PURE__ */ React.createElement("span", { className: `text-[8px] font-bold uppercase px-1 rounded mr-1 ${l.type === "med" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}` }, l.type === "med" ? "Pharma" : "Acte"), l.nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-mono font-bold" }, l.qte), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(l.prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(l.qte * l.prix)), /* @__PURE__ */ React.createElement("td", { className: "text-center" }, peutSupprimerFiche && /* @__PURE__ */ React.createElement("button", { onClick: () => setLignes((p) => p.filter((x) => x.id !== l.id)), className: "text-gray-300 hover:text-red-600" }, /* @__PURE__ */ React.createElement(X, { size: 12 }))))))), /* @__PURE__ */ React.createElement("div", { className: "p-4 bg-gray-50 border-t border-b text-[11px] text-gray-600 font-mono space-y-1 shadow-inner" }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 font-bold text-[#1E2A24] border-b pb-1 mb-2" }, /* @__PURE__ */ React.createElement("span", null, "R\xC9CAPITULATIF DE LA FICHE"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "Gdes"), /* @__PURE__ */ React.createElement("span", { className: "text-right text-emerald-800" }, "\u{1F4B5} DH")), require_constants().CATEGORIES_LISTE.map((srv) => {
+        }, className: `flex-1 py-1.5 border rounded-lg ${categorie === "acte" ? "bg-[#1E2A24] text-white" : "bg-gray-50"}` }, "\u{1F52C} Examens / Actes")), /* @__PURE__ */ React.createElement("p", { className: "text-[9px] text-gray-400" }, "\u{1F4A1} Clique une lettre puis un r\xE9sultat pour l'ajouter (quantit\xE9 1) \u2014 aucune saisie, ajuste la quantit\xE9 juste en dessous."), /* @__PURE__ */ React.createElement("div", { className: estMobile ? "space-y-2" : "border-t pt-2 space-y-2" }, /* @__PURE__ */ React.createElement("p", { className: "text-[10px] font-bold text-gray-400 uppercase" }, categorie === "med" ? "Choisir une lettre" : "Choisir une cat\xE9gorie"), categorie === "med" ? /* @__PURE__ */ React.createElement("div", { className: "flex gap-1 flex-wrap" }, lettresDisponibles.map((l) => /* @__PURE__ */ React.createElement("button", { key: l, onClick: () => setLettreActive(l), className: `rounded font-bold ${estMobile ? "w-10 h-10 text-sm" : "w-7 h-7 text-xs"} ${(lettreActive || lettresDisponibles[0]) === l ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-600"}` }, l))) : /* @__PURE__ */ React.createElement("div", { className: "flex gap-1 flex-wrap" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setSousCategorieActeActive(null), className: `rounded font-bold ${estMobile ? "px-4 py-2 text-sm" : "px-3 py-1 text-xs"} ${sousCategorieActeActive === null ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-600"}` }, "Toutes"), categoriesActesDisponibles.map((c) => /* @__PURE__ */ React.createElement("button", { key: c.key, onClick: () => setSousCategorieActeActive(c.key), className: `rounded font-bold ${estMobile ? "px-4 py-2 text-sm" : "px-3 py-1 text-xs"} ${sousCategorieActeActive === c.key ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-600"}` }, c.label))), /* @__PURE__ */ React.createElement("div", { className: `grid gap-1.5 overflow-y-auto ${estMobile ? "grid-cols-2 max-h-72" : "grid-cols-5 max-h-[32rem]"}` }, catalogueGrille.map((item) => /* @__PURE__ */ React.createElement("button", { key: item.id, onClick: () => ajouterAvecQuantite(item, 1), disabled: !peutAjouterLignes, className: `border rounded-lg text-left hover:bg-emerald-50 hover:border-emerald-400 active:bg-emerald-100 disabled:opacity-30 disabled:cursor-not-allowed ${estMobile ? "p-3" : "p-2"}` }, /* @__PURE__ */ React.createElement("div", { className: `font-semibold text-gray-800 line-clamp-2 ${estMobile ? "text-sm" : "text-xs"}` }, item.nom))), catalogueGrille.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "col-span-2 text-center text-gray-400 text-xs py-3" }, "Rien dans cette section.")))), !estMobile && /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl border overflow-hidden shadow-sm max-h-[75vh] overflow-y-auto" }, /* @__PURE__ */ React.createElement("table", { className: "w-full text-xs text-left table-fixed" }, /* @__PURE__ */ React.createElement("thead", { className: "sticky top-0" }, /* @__PURE__ */ React.createElement("tr", { className: "bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono" }, /* @__PURE__ */ React.createElement("th", { className: "p-3 w-[46%]" }, "D\xE9signation"), /* @__PURE__ */ React.createElement("th", { className: "p-3 w-[14%] text-center" }, "Qt\xE9"), /* @__PURE__ */ React.createElement("th", { className: "p-3 text-right w-[17%]" }, "Prix"), /* @__PURE__ */ React.createElement("th", { className: "p-3 text-right w-[17%]" }, "Total"), /* @__PURE__ */ React.createElement("th", { className: "w-[6%]" }))), /* @__PURE__ */ React.createElement("tbody", { className: "divide-y divide-gray-100" }, dateEntree1 && dateSortie1 && /* @__PURE__ */ React.createElement("tr", { className: "bg-amber-50/20" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-amber-900" }, "S\xE9jour : ", CONFIG_LITS[typeLit1].nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-bold" }, j1, " jrs"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(CONFIG_LITS[typeLit1].prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalE1)), /* @__PURE__ */ React.createElement("td", null)), multiPeriode && dateEntree2 && dateSortie2 && /* @__PURE__ */ React.createElement("tr", { className: "bg-amber-50/40" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-amber-900" }, "S\xE9jour P2 : ", CONFIG_LITS[typeLit2].nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-bold" }, j2, " jrs"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(CONFIG_LITS[typeLit2].prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalE2)), /* @__PURE__ */ React.createElement("td", null)), hasChirSpec && nomChirSpec && /* @__PURE__ */ React.createElement("tr", { className: "bg-red-50/20" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-red-900" }, "Chirurgie : ", nomChirSpec), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center" }, "1"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(totalChirSpec)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalChirSpec)), /* @__PURE__ */ React.createElement("td", null)), lignes.map((l) => {
+          const decrementer = () => setLignes((p) => p.map((x) => x.id === l.id ? { ...x, qte: Math.max(1, x.qte - 1) } : x));
+          const incrementer = () => setLignes((p) => p.map((x) => x.id === l.id ? { ...x, qte: x.qte + 1 } : x));
+          return /* @__PURE__ */ React.createElement("tr", { key: l.id, className: "zebra-row" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-gray-800" }, /* @__PURE__ */ React.createElement("span", { className: `text-[8px] font-bold uppercase px-1 rounded mr-1 ${l.type === "med" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}` }, l.type === "med" ? "Pharma" : "Acte"), l.nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-center gap-1" }, /* @__PURE__ */ React.createElement("button", { onMouseDown: () => demarrerRepetition(decrementer), onMouseUp: arreterRepetition, onMouseLeave: arreterRepetition, onTouchStart: (e) => {
+            e.preventDefault();
+            demarrerRepetition(decrementer);
+          }, onTouchEnd: (e) => {
+            e.preventDefault();
+            arreterRepetition();
+          }, onTouchCancel: arreterRepetition, className: "w-7 h-7 bg-gray-100 active:bg-gray-300 rounded-lg font-bold text-gray-700 select-none" }, "\u2212"), /* @__PURE__ */ React.createElement("span", { className: "font-mono font-bold w-6 text-center" }, l.qte), /* @__PURE__ */ React.createElement("button", { onMouseDown: () => demarrerRepetition(incrementer), onMouseUp: arreterRepetition, onMouseLeave: arreterRepetition, onTouchStart: (e) => {
+            e.preventDefault();
+            demarrerRepetition(incrementer);
+          }, onTouchEnd: (e) => {
+            e.preventDefault();
+            arreterRepetition();
+          }, onTouchCancel: arreterRepetition, className: "w-7 h-7 bg-gray-100 active:bg-gray-300 rounded-lg font-bold text-gray-700 select-none" }, "+"))), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(l.prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(l.qte * l.prix)), /* @__PURE__ */ React.createElement("td", { className: "text-center" }, peutSupprimerFiche && /* @__PURE__ */ React.createElement("button", { onClick: () => setLignes((p) => p.filter((x) => x.id !== l.id)), className: "text-gray-300 hover:text-red-600" }, /* @__PURE__ */ React.createElement(X, { size: 12 }))));
+        }))), /* @__PURE__ */ React.createElement("div", { className: "p-4 bg-gray-50 border-t border-b text-[11px] text-gray-600 font-mono space-y-1 shadow-inner" }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 font-bold text-[#1E2A24] border-b pb-1 mb-2" }, /* @__PURE__ */ React.createElement("span", null, "R\xC9CAPITULATIF DE LA FICHE"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "Gdes"), /* @__PURE__ */ React.createElement("span", { className: "text-right text-emerald-800" }, "\u{1F4B5} DH")), require_constants().CATEGORIES_LISTE.map((srv) => {
+          var _a;
+          const m = totalsParService[srv.key];
+          if (m === 0) return null;
+          const c = ((_a = coutsParService == null ? void 0 : coutsParService.valeurs) == null ? void 0 : _a[srv.key]) || 0;
+          return /* @__PURE__ */ React.createElement("div", { key: srv.key }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 py-0.5" }, /* @__PURE__ */ React.createElement("span", null, "\u2022 ", srv.label), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, formatGourdes(m)), /* @__PURE__ */ React.createElement("span", { className: "text-right font-bold" }, formatDH(m), " DH")), c > 0 && /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 pb-0.5 text-[10px] text-orange-600" }, /* @__PURE__ */ React.createElement("span", { className: "pl-3" }, "\u21B3 Co\xFBt"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, formatGourdes(c)), /* @__PURE__ */ React.createElement("span", { className: `text-right font-bold ${m - c >= 0 ? "text-emerald-700" : "text-red-600"}` }, "Marge ", formatGourdes(m - c))));
+        }), (coutsParService == null ? void 0 : coutsParService.incomplet) && Object.values(coutsParService.valeurs).some((v) => v > 0) && /* @__PURE__ */ React.createElement("p", { className: "text-[9px] text-gray-400 italic pt-1" }, "Co\xFBt partiel : certains articles de cette fiche (ou l'h\xE9bergement/chirurgie sp\xE9ciale) n'ont pas encore de co\xFBt renseign\xE9 dans le catalogue.")), /* @__PURE__ */ React.createElement("div", { className: "bg-[#1E2A24] text-white p-4 flex justify-between items-center font-bold text-sm font-mono sticky bottom-0" }, /* @__PURE__ */ React.createElement("span", null, "SOUS-TOTAL FICHE ", idFicheEnCoursDEdition ? "EN MODIFICATION" : `N\xB0${numeroFicheCourante}`, " :"), /* @__PURE__ */ React.createElement("span", null, formatGourdes(grandTotal), " Gdes (", formatDH(grandTotal), " DH)")))), estMobile && dossierActif && /* @__PURE__ */ React.createElement("button", { onClick: () => setDetailOuvert(true), className: "fixed bottom-0 left-0 right-0 z-40 bg-[#1E2A24] text-white px-4 py-3 flex justify-between items-center font-bold text-sm shadow-2xl" }, /* @__PURE__ */ React.createElement("span", null, lignes.length + (dateEntree1 && dateSortie1 ? 1 : 0) + (multiPeriode && dateEntree2 && dateSortie2 ? 1 : 0) + (hasChirSpec && nomChirSpec ? 1 : 0), " article(s)"), /* @__PURE__ */ React.createElement("span", null, formatDH(grandTotal), " DH \u25B2")), estMobile && detailOuvert && /* @__PURE__ */ React.createElement("div", { className: "fixed inset-0 z-50 bg-black/40 flex items-end", onClick: () => setDetailOuvert(false) }, /* @__PURE__ */ React.createElement("div", { className: "bg-white w-full rounded-t-2xl max-h-[85vh] overflow-y-auto", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "sticky top-0 bg-white p-3 border-b flex justify-between items-center z-10" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-sm text-gray-800" }, "R\xE9capitulatif de la fiche"), /* @__PURE__ */ React.createElement("button", { onClick: () => setDetailOuvert(false), className: "p-2 text-gray-500" }, /* @__PURE__ */ React.createElement(X, { size: 18 }))), /* @__PURE__ */ React.createElement("table", { className: "w-full text-xs text-left table-fixed" }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", { className: "bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono" }, /* @__PURE__ */ React.createElement("th", { className: "p-3 w-[40%]" }, "D\xE9signation"), /* @__PURE__ */ React.createElement("th", { className: "p-3 w-[22%] text-center" }, "Qt\xE9"), /* @__PURE__ */ React.createElement("th", { className: "p-3 text-right w-[19%]" }, "Prix"), /* @__PURE__ */ React.createElement("th", { className: "p-3 text-right w-[19%]" }, "Total"), /* @__PURE__ */ React.createElement("th", { className: "w-8" }))), /* @__PURE__ */ React.createElement("tbody", { className: "divide-y divide-gray-100" }, dateEntree1 && dateSortie1 && /* @__PURE__ */ React.createElement("tr", { className: "bg-amber-50/20" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-amber-900" }, "S\xE9jour : ", CONFIG_LITS[typeLit1].nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-bold" }, j1, " jrs"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(CONFIG_LITS[typeLit1].prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalE1)), /* @__PURE__ */ React.createElement("td", null)), multiPeriode && dateEntree2 && dateSortie2 && /* @__PURE__ */ React.createElement("tr", { className: "bg-amber-50/40" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-amber-900" }, "S\xE9jour P2 : ", CONFIG_LITS[typeLit2].nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-bold" }, j2, " jrs"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(CONFIG_LITS[typeLit2].prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalE2)), /* @__PURE__ */ React.createElement("td", null)), hasChirSpec && nomChirSpec && /* @__PURE__ */ React.createElement("tr", { className: "bg-red-50/20" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-red-900" }, "Chirurgie : ", nomChirSpec), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center" }, "1"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(totalChirSpec)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalChirSpec)), /* @__PURE__ */ React.createElement("td", null)), lignes.map((l) => {
+          const decrementer = () => setLignes((p) => p.map((x) => x.id === l.id ? { ...x, qte: Math.max(1, x.qte - 1) } : x));
+          const incrementer = () => setLignes((p) => p.map((x) => x.id === l.id ? { ...x, qte: x.qte + 1 } : x));
+          return /* @__PURE__ */ React.createElement("tr", { key: l.id, className: "zebra-row" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-gray-800" }, /* @__PURE__ */ React.createElement("span", { className: `text-[8px] font-bold uppercase px-1 rounded mr-1 ${l.type === "med" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}` }, l.type === "med" ? "Pharma" : "Acte"), l.nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-center gap-1" }, /* @__PURE__ */ React.createElement("button", { onMouseDown: () => demarrerRepetition(decrementer), onMouseUp: arreterRepetition, onMouseLeave: arreterRepetition, onTouchStart: (e) => {
+            e.preventDefault();
+            demarrerRepetition(decrementer);
+          }, onTouchEnd: (e) => {
+            e.preventDefault();
+            arreterRepetition();
+          }, onTouchCancel: arreterRepetition, className: "w-8 h-8 bg-gray-100 active:bg-gray-300 rounded-lg font-bold text-gray-700 select-none" }, "\u2212"), /* @__PURE__ */ React.createElement("span", { className: "font-mono font-bold w-6 text-center" }, l.qte), /* @__PURE__ */ React.createElement("button", { onMouseDown: () => demarrerRepetition(incrementer), onMouseUp: arreterRepetition, onMouseLeave: arreterRepetition, onTouchStart: (e) => {
+            e.preventDefault();
+            demarrerRepetition(incrementer);
+          }, onTouchEnd: (e) => {
+            e.preventDefault();
+            arreterRepetition();
+          }, onTouchCancel: arreterRepetition, className: "w-8 h-8 bg-gray-100 active:bg-gray-300 rounded-lg font-bold text-gray-700 select-none" }, "+"))), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(l.prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(l.qte * l.prix)), /* @__PURE__ */ React.createElement("td", { className: "text-center" }, peutSupprimerFiche && /* @__PURE__ */ React.createElement("button", { onClick: () => setLignes((p) => p.filter((x) => x.id !== l.id)), className: "text-gray-300 hover:text-red-600" }, /* @__PURE__ */ React.createElement(X, { size: 12 }))));
+        }), lignes.length === 0 && !dateEntree1 && !hasChirSpec && /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", { colSpan: 5, className: "p-6 text-center text-gray-400" }, "Fiche vide pour l'instant.")))), /* @__PURE__ */ React.createElement("div", { className: "p-4 bg-gray-50 border-t border-b text-[11px] text-gray-600 font-mono space-y-1" }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 font-bold text-[#1E2A24] border-b pb-1 mb-2" }, /* @__PURE__ */ React.createElement("span", null, "R\xC9CAPITULATIF DE LA FICHE"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "Gdes"), /* @__PURE__ */ React.createElement("span", { className: "text-right text-emerald-800" }, "\u{1F4B5} DH")), require_constants().CATEGORIES_LISTE.map((srv) => {
           const m = totalsParService[srv.key];
           if (m === 0) return null;
           return /* @__PURE__ */ React.createElement("div", { key: srv.key, className: "grid grid-cols-3 py-0.5" }, /* @__PURE__ */ React.createElement("span", null, "\u2022 ", srv.label), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, formatGourdes(m)), /* @__PURE__ */ React.createElement("span", { className: "text-right font-bold" }, formatDH(m), " DH"));
-        })), /* @__PURE__ */ React.createElement("div", { className: "bg-[#1E2A24] text-white p-4 flex justify-between items-center font-bold text-sm font-mono" }, /* @__PURE__ */ React.createElement("span", null, "SOUS-TOTAL FICHE ", idFicheEnCoursDEdition ? "EN MODIFICATION" : `N\xB0${numeroFicheCourante}`, " :"), /* @__PURE__ */ React.createElement("span", null, formatGourdes(grandTotal), " Gdes (", formatDH(grandTotal), " DH)")), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 border-t border-gray-300 space-y-3" }, /* @__PURE__ */ React.createElement("h4", { className: "font-bold text-gray-700 text-xs uppercase tracking-wider" }, "\u{1F4B5} Encaissement"), totalDepots > 0 && /* @__PURE__ */ React.createElement("div", { className: "bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex justify-between items-center text-xs" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-blue-800" }, "\u{1F4B0} D\xE9p\xF4ts d\xE9j\xE0 vers\xE9s : ", formatGourdes(totalDepots), " Gdes"), /* @__PURE__ */ React.createElement("span", { className: "font-bold text-emerald-700" }, "Solde restant \xE0 payer : ", formatGourdes(montantRestantApresDepots), " Gdes")), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => {
-          setModePaiement("cash");
-          setModeDepot(false);
-        }, className: `px-4 py-1.5 rounded-lg text-xs font-bold ${modePaiement === "cash" ? "bg-emerald-700 text-white" : "bg-gray-100"}` }, "\u{1F4B5} Cash"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
-          setModePaiement("credit");
-          setModeDepot(false);
-        }, className: `px-4 py-1.5 rounded-lg text-xs font-bold ${modePaiement === "credit" ? "bg-orange-600 text-white" : "bg-gray-100"}` }, "\u{1F4DD} Cr\xE9dit"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
-          setModePaiement("ong");
-          setModeDepot(false);
-        }, className: `px-4 py-1.5 rounded-lg text-xs font-bold ${modePaiement === "ong" ? "bg-purple-700 text-white" : "bg-gray-100"}`, disabled: typePatient !== "ONG" }, "\u{1F3E5} Partenaire"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
-          setModePaiement("exoneration");
-          setModeDepot(false);
-        }, className: `px-4 py-1.5 rounded-lg text-xs font-bold ${modePaiement === "exoneration" ? "bg-red-600 text-white" : "bg-gray-100"}`, disabled: userRole !== "direction" && userRole !== "administrateur" && userRole !== "comptable" }, "\u{1F3AF} Exon\xE9ration"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
-          setModeDepot(!modeDepot);
-          if (!modeDepot) setModePaiement("depot");
-          else setModePaiement("cash");
-        }, className: `px-4 py-1.5 rounded-lg text-xs font-bold ${modeDepot ? "bg-blue-700 text-white" : "bg-gray-100"}` }, "\u{1F4B0} D\xE9p\xF4t/Acompte")), modeDepot && /* @__PURE__ */ React.createElement("div", { className: "bg-blue-50 p-3 rounded-lg border border-blue-200 space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ React.createElement("label", { className: "text-xs font-bold text-blue-800" }, "Montant du d\xE9p\xF4t :"), /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", step: "100", value: montantDepot, onChange: (e) => setMontantDepot(e.target.value), placeholder: "0", className: "border rounded p-1.5 w-32 font-mono" }), /* @__PURE__ */ React.createElement("span", { className: "text-xs text-gray-600" }, "Solde restant apr\xE8s d\xE9p\xF4t : ", formatGourdes(soldeRestantDepot), " Gdes")), /* @__PURE__ */ React.createElement("button", { onClick: enregistrerDepot, disabled: !dossierId, className: "bg-blue-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold" }, "\u{1F4BE} Enregistrer le d\xE9p\xF4t"), /* @__PURE__ */ React.createElement("p", { className: "text-[10px] text-gray-500" }, "D\xE9p\xF4ts d\xE9j\xE0 effectu\xE9s : ", formatGourdes(totalDepots), " Gdes")), modePaiement === "ong" && !modeDepot && /* @__PURE__ */ React.createElement("div", { className: "mt-2" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-purple-800" }, "Partenaire"), /* @__PURE__ */ React.createElement("select", { value: ongPartenaireFiche, onChange: (e) => setOngPartenaireFiche(e.target.value), className: "border rounded-lg p-1.5 text-xs w-full bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "S\xE9lectionner"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o)))), modePaiement === "exoneration" && !modeDepot && /* @__PURE__ */ React.createElement("div", { className: "mt-2 space-y-2 bg-red-50 p-2 rounded-lg" }, /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", max: "100", value: pourcentageExoneration, onChange: (e) => setPourcentageExoneration(e.target.value), placeholder: "%", className: "w-20 border rounded-lg p-1.5 text-xs" }), /* @__PURE__ */ React.createElement("input", { type: "text", value: motifExoneration, onChange: (e) => setMotifExoneration(e.target.value), placeholder: "Motif...", className: "flex-1 border rounded-lg p-1.5 text-xs" })), userRole === "direction" || userRole === "administrateur" ? /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1 text-xs" }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: autorisationExoneration, onChange: (e) => {
-          if (!e.target.checked) {
-            setAutorisationExoneration(false);
-            return;
-          }
-          setConfirmModal2({
-            titre: "Autoriser l'exon\xE9ration ?",
-            message: `Patient : ${nomPatient}
-Motif : ${motifExoneration || "(non pr\xE9cis\xE9)"}
-Pourcentage : ${pourcentageExoneration}%`,
-            detail: `Montant exon\xE9r\xE9 : ${formatGourdes(grandTotal * (parseFloat(pourcentageExoneration) || 0) / 100)} Gdes`,
-            confirmLabel: "Autoriser",
-            danger: true,
-            onConfirm: () => {
-              enregistrerAudit("autorisation_exoneration", {
-                nomPatient,
-                pourcentage: parseFloat(pourcentageExoneration) || 0,
-                montantExonere: grandTotal * (parseFloat(pourcentageExoneration) || 0) / 100,
-                motif: motifExoneration
-              });
-              setAutorisationExoneration(true);
-              setConfirmModal2(null);
-            },
-            onCancel: () => setConfirmModal2(null)
-          });
-        } }), " Autoriser") : /* @__PURE__ */ React.createElement("button", { onClick: demanderExoneration, disabled: !pourcentageExoneration || pourcentageExoneration == 0, className: "bg-amber-500 text-white px-3 py-1 rounded text-xs disabled:opacity-30" }, "\u{1F4E8} Demander")), modePaiement === "cash" && !modeDepot && /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-3" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-500" }, "Montant vers\xE9"), /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", value: montantVerse, onChange: (e) => setMontantVerse(e.target.value), placeholder: "0", className: "border rounded-lg p-2 w-full text-sm font-mono", disabled: !peutEncaisser })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-500" }, "Monnaie"), /* @__PURE__ */ React.createElement("div", { className: "bg-gray-100 p-2 rounded-lg text-right font-mono font-bold text-lg text-emerald-700" }, formatGourdes(monnaieARendre), " Gdes"))), !modeDepot && /* @__PURE__ */ React.createElement("button", { onClick: demanderConfirmationEncaissement, disabled: !peutEncaisser || modePaiement === "exoneration" && !(userRole === "direction" || userRole === "administrateur"), className: "w-full bg-emerald-700 hover:bg-emerald-800 text-white py-2.5 rounded-lg text-sm font-bold shadow-md disabled:opacity-50" }, "\u{1F4B3} Encaisser cette fiche"))), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 flex-wrap" }, /* @__PURE__ */ React.createElement("button", { onClick: onViderFicheActive, className: "flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl py-3 text-xs font-bold" }, "\u{1F9F9} Vider l'\xE9cran"), /* @__PURE__ */ React.createElement("button", { onClick: imprimerFicheA4, disabled: !paiementEffectue, className: `flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}` }, "\u{1F5A8}\uFE0F A4"), /* @__PURE__ */ React.createElement("button", { onClick: imprimerTicket, disabled: !paiementEffectue, className: `flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? "bg-green-600 hover:bg-green-700 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}` }, "\u{1F9FE} Ticket"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
-          var _a;
-          if (lignes.length === 0 && j1 === 0 && !hasChirSpec && !dateEntree1) {
-            showToast("Fiche vide", "error");
-            return;
-          }
-          const fiche = {
-            id: idFicheEnCoursDEdition || "fiche-" + Date.now(),
-            numeroFiche: idFicheEnCoursDEdition ? ((_a = fichesDossier.find((f) => f.id === idFicheEnCoursDEdition)) == null ? void 0 : _a.numeroFiche) || numeroFicheCourante : numeroFicheCourante,
-            breakdown: { ...totalsParService },
-            totalGlobal: grandTotal,
-            rawState: { lignesCalcul: [...lignes], dateEntree1, dateSortie1, typeLit1, multiPeriode, dateEntree2, dateSortie2, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
-          };
-          onEnregistrerFiche(fiche);
-          showToast(idFicheEnCoursDEdition ? "Fiche mise \xE0 jour" : "Fiche enregistr\xE9e (sans paiement)", "success");
-        }, disabled: !peutArchiver, className: "flex-[2] bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl py-3 text-xs font-black shadow-md disabled:opacity-50" }, idFicheEnCoursDEdition ? "\u{1F4BE} Mettre \xE0 jour la Fiche" : `\u{1F4BE} Enregistrer la Fiche N\xB0${numeroFicheCourante} au Dossier`))));
+        })), /* @__PURE__ */ React.createElement("div", { className: "bg-[#1E2A24] text-white p-4 flex justify-between items-center font-bold text-sm font-mono" }, /* @__PURE__ */ React.createElement("span", null, "SOUS-TOTAL FICHE ", idFicheEnCoursDEdition ? "EN MODIFICATION" : `N\xB0${numeroFicheCourante}`, " :"), /* @__PURE__ */ React.createElement("span", null, formatGourdes(grandTotal), " Gdes (", formatDH(grandTotal), " DH)")), /* @__PURE__ */ React.createElement("button", { onClick: () => setDetailOuvert(false), className: "w-full py-3 text-center text-gray-500 text-xs font-bold border-t" }, "Fermer"))), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 flex-wrap" }, /* @__PURE__ */ React.createElement("button", { onClick: onViderFicheActive, className: "flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl py-3 text-xs font-bold" }, "\u{1F9F9} Vider l'\xE9cran"), /* @__PURE__ */ React.createElement("button", { onClick: imprimerFicheA4, disabled: !paiementEffectue, className: `flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}` }, "\u{1F5A8}\uFE0F A4"), /* @__PURE__ */ React.createElement("button", { onClick: imprimerTicket, disabled: !paiementEffectue, className: `flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? "bg-green-600 hover:bg-green-700 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}` }, "\u{1F9FE} Ticket"), /* @__PURE__ */ React.createElement("button", { onClick: enregistrerFicheActive, disabled: !peutArchiver, className: "flex-[2] bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl py-3 text-xs font-black shadow-md disabled:opacity-50" }, idFicheEnCoursDEdition ? "\u{1F4BE} Mettre \xE0 jour la Fiche" : `\u{1F4BE} Enregistrer la Fiche N\xB0${numeroFicheCourante} au Dossier`))));
       }
       module.exports = CalculateurPanel;
     }
@@ -4424,7 +4958,7 @@ Pourcentage : ${pourcentageExoneration}%`,
       var { useState, useEffect, useMemo } = React;
       var { chf } = require_supabase();
       var { formatGourdes } = require_helpers();
-      function AccueilPanel({ verifications, paiements, medicaments, userRole, userDisplayName, onNaviguer, onOuvrirAchatExpress }) {
+      function AccueilPanel({ verifications, paiements, medicaments, userRole, userDisplayName, onNaviguer, onOuvrirAchatExpress, showToast }) {
         const [enAttente, setEnAttente] = useState(0);
         useEffect(() => {
           const interval = setInterval(() => setEnAttente(chf.countPending()), 2e3);
@@ -4446,7 +4980,10 @@ Pourcentage : ${pourcentageExoneration}%`,
         const stockCritique = useMemo(() => medicaments.filter((m) => (m.quantite || 0) <= (m.seuilAlerte || 5)), [medicaments]);
         const peutVendre = userRole === "comptable" || userRole === "direction" || userRole === "administrateur";
         const peutGererStock = userRole === "administrateur" || userRole === "direction";
-        return /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "bg-[#1E2A24] text-white p-4 rounded-xl shadow-sm" }, /* @__PURE__ */ React.createElement("p", { className: "text-[10px] uppercase tracking-widest text-[#9FB8A8]" }, "Bienvenue"), /* @__PURE__ */ React.createElement("h2", { className: "text-lg font-black" }, userDisplayName), /* @__PURE__ */ React.createElement("p", { className: "text-xs text-[#9FB8A8]" }, (/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" }))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h3", { className: "text-xs font-black text-gray-500 uppercase mb-2" }, "Raccourcis"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-4 gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => onNaviguer("calcul"), className: "bg-white border rounded-xl p-3 text-center shadow-sm hover:shadow-md transition" }, /* @__PURE__ */ React.createElement("div", { className: "text-xl" }, "\u{1F195}"), /* @__PURE__ */ React.createElement("div", { className: "text-[10px] font-bold mt-1" }, "Nouveau Dossier")), peutVendre && /* @__PURE__ */ React.createElement("button", { onClick: onOuvrirAchatExpress, className: "bg-white border rounded-xl p-3 text-center shadow-sm hover:shadow-md transition" }, /* @__PURE__ */ React.createElement("div", { className: "text-xl" }, "\u26A1"), /* @__PURE__ */ React.createElement("div", { className: "text-[10px] font-bold mt-1" }, "Achat Express")), /* @__PURE__ */ React.createElement("button", { onClick: () => onNaviguer("verifie"), className: "bg-white border rounded-xl p-3 text-center shadow-sm hover:shadow-md transition" }, /* @__PURE__ */ React.createElement("div", { className: "text-xl" }, "\u{1F4C1}"), /* @__PURE__ */ React.createElement("div", { className: "text-[10px] font-bold mt-1" }, "Archives")), peutGererStock && /* @__PURE__ */ React.createElement("button", { onClick: () => onNaviguer("stock"), className: "bg-white border rounded-xl p-3 text-center shadow-sm hover:shadow-md transition" }, /* @__PURE__ */ React.createElement("div", { className: "text-xl" }, "\u{1F4E6}"), /* @__PURE__ */ React.createElement("div", { className: "text-[10px] font-bold mt-1" }, "Stock")))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h3", { className: "text-xs font-black text-gray-500 uppercase mb-2" }, "R\xE9sum\xE9 du jour"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-4 gap-3" }, /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "CA aujourd'hui"), /* @__PURE__ */ React.createElement("p", { className: "text-lg font-black text-emerald-700" }, formatGourdes(resume.caJour), " Gdes")), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Consultations"), /* @__PURE__ */ React.createElement("p", { className: "text-lg font-black text-purple-600" }, resume.consultationsJour)), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Dossiers actifs"), /* @__PURE__ */ React.createElement("p", { className: "text-lg font-black text-blue-600" }, resume.dossiersActifs)), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Suspendus"), /* @__PURE__ */ React.createElement("p", { className: "text-lg font-black text-amber-600" }, resume.dossiersSuspendus)))), (stockCritique.length > 0 || enAttente > 0) && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h3", { className: "text-xs font-black text-gray-500 uppercase mb-2" }, "Alertes"), /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, stockCritique.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "bg-red-50 border border-red-200 rounded-xl p-3 flex justify-between items-center text-xs" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-red-700" }, "\u26A0\uFE0F ", stockCritique.length, " article(s) en stock critique"), peutGererStock && /* @__PURE__ */ React.createElement("button", { onClick: () => onNaviguer("stock"), className: "text-red-700 underline font-bold" }, "Voir")), enAttente > 0 && /* @__PURE__ */ React.createElement("div", { className: "bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-amber-700" }, "\u23F3 ", enAttente, " op\xE9ration(s) en attente de synchronisation")))));
+        return /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "bg-[#1E2A24] text-white p-4 rounded-xl shadow-sm" }, /* @__PURE__ */ React.createElement("p", { className: "text-[10px] uppercase tracking-widest text-[#9FB8A8]" }, "Bienvenue"), /* @__PURE__ */ React.createElement("h2", { className: "text-lg font-black" }, userDisplayName), /* @__PURE__ */ React.createElement("p", { className: "text-xs text-[#9FB8A8]" }, (/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" }))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h3", { className: "text-xs font-black text-gray-500 uppercase mb-2" }, "Raccourcis"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-4 gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => onNaviguer("calcul"), className: "bg-white border rounded-xl p-3 text-center shadow-sm hover:shadow-md transition" }, /* @__PURE__ */ React.createElement("div", { className: "text-xl" }, "\u{1F195}"), /* @__PURE__ */ React.createElement("div", { className: "text-[10px] font-bold mt-1" }, "Nouveau Dossier")), peutVendre && /* @__PURE__ */ React.createElement("button", { onClick: onOuvrirAchatExpress, className: "bg-white border rounded-xl p-3 text-center shadow-sm hover:shadow-md transition" }, /* @__PURE__ */ React.createElement("div", { className: "text-xl" }, "\u26A1"), /* @__PURE__ */ React.createElement("div", { className: "text-[10px] font-bold mt-1" }, "Achat Express")), /* @__PURE__ */ React.createElement("button", { onClick: () => onNaviguer("verifie"), className: "bg-white border rounded-xl p-3 text-center shadow-sm hover:shadow-md transition" }, /* @__PURE__ */ React.createElement("div", { className: "text-xl" }, "\u{1F4C1}"), /* @__PURE__ */ React.createElement("div", { className: "text-[10px] font-bold mt-1" }, "Archives")), peutGererStock && /* @__PURE__ */ React.createElement("button", { onClick: () => onNaviguer("stock"), className: "bg-white border rounded-xl p-3 text-center shadow-sm hover:shadow-md transition" }, /* @__PURE__ */ React.createElement("div", { className: "text-xl" }, "\u{1F4E6}"), /* @__PURE__ */ React.createElement("div", { className: "text-[10px] font-bold mt-1" }, "Stock")))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h3", { className: "text-xs font-black text-gray-500 uppercase mb-2" }, "R\xE9sum\xE9 du jour"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-4 gap-3" }, /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "CA aujourd'hui"), /* @__PURE__ */ React.createElement("p", { className: "text-lg font-black text-emerald-700" }, formatGourdes(resume.caJour), " Gdes")), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Consultations"), /* @__PURE__ */ React.createElement("p", { className: "text-lg font-black text-purple-600" }, resume.consultationsJour)), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Dossiers actifs"), /* @__PURE__ */ React.createElement("p", { className: "text-lg font-black text-blue-600" }, resume.dossiersActifs)), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Suspendus"), /* @__PURE__ */ React.createElement("p", { className: "text-lg font-black text-amber-600" }, resume.dossiersSuspendus)))), (stockCritique.length > 0 || enAttente > 0) && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h3", { className: "text-xs font-black text-gray-500 uppercase mb-2" }, "Alertes"), /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, stockCritique.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "bg-red-50 border border-red-200 rounded-xl p-3 flex justify-between items-center text-xs" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-red-700" }, "\u26A0\uFE0F ", stockCritique.length, " article(s) en stock critique"), peutGererStock && /* @__PURE__ */ React.createElement("button", { onClick: () => onNaviguer("stock"), className: "text-red-700 underline font-bold" }, "Voir")), enAttente > 0 && /* @__PURE__ */ React.createElement("div", { className: "bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-center" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-amber-700" }, "\u23F3 ", enAttente, " op\xE9ration(s) en attente de synchronisation"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+          chf.syncPending();
+          showToast == null ? void 0 : showToast("Nouvelle tentative en cours...", "info");
+        }, className: "text-amber-800 font-bold underline whitespace-nowrap" }, "\u{1F504} R\xE9essayer maintenant")), /* @__PURE__ */ React.createElement("div", { className: "divide-y divide-amber-200/60" }, chf.getPendingDetails().map((d, i) => /* @__PURE__ */ React.createElement("div", { key: i, className: "flex justify-between py-1 text-amber-800" }, /* @__PURE__ */ React.createElement("span", null, d.texte), /* @__PURE__ */ React.createElement("span", { className: "text-amber-600" }, d.quand)))), /* @__PURE__ */ React.createElement("p", { className: "text-[10px] text-amber-600" }, "Ces changements sont d\xE9j\xE0 enregistr\xE9s sur cet appareil \u2014 ils partiront vers le serveur d\xE8s qu'une connexion fonctionne. R\xE9essaie manuellement si \xE7a persiste apr\xE8s plusieurs minutes.")))));
       }
       module.exports = AccueilPanel;
     }
@@ -4774,7 +5311,43 @@ Pourcentage : ${pourcentageExoneration}%`,
             showToast("Erreur lors de la suppression.", "error");
           }
         };
-        return /* @__PURE__ */ React.createElement("div", { className: "space-y-4 text-xs" }, /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm space-y-2" }, /* @__PURE__ */ React.createElement("h2", { className: "font-black text-gray-800 mb-1" }, "\u{1F91D} Partenaires"), /* @__PURE__ */ React.createElement("p", { className: "text-gray-500" }, "Ajoute un partenaire pour qu'il apparaisse dans les listes de s\xE9lection (nouveau dossier, factures, archives, caisse)."), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement(
+        const groupesDoublons = Object.values(
+          listeOngDocs.reduce((acc, o) => {
+            const cle = (o.nom || "").trim().toLowerCase();
+            (acc[cle] = acc[cle] || []).push(o);
+            return acc;
+          }, {})
+        ).filter((g) => g.length > 1);
+        const nettoyerDoublons = async () => {
+          const nbDoublons = groupesDoublons.reduce((s, g) => s + (g.length - 1), 0);
+          if (!confirm(`${groupesDoublons.length} partenaire(s) en double trouv\xE9(s) (${nbDoublons} fiche(s) en trop au total). Garder une seule fiche par partenaire et supprimer le reste ?`)) return;
+          try {
+            const batch = db.batch();
+            groupesDoublons.forEach((groupe) => {
+              const aGarder = groupe.reduce((m, o) => (o.prochainNumero || 1) > (m.prochainNumero || 1) ? o : m, groupe[0]);
+              groupe.forEach((o) => {
+                if (o.id !== aGarder.id) batch.delete(db.collection("ong_partenaires").doc(o.id));
+              });
+            });
+            await batch.commit();
+            enregistrerAudit("nettoyage_doublons_ong_partenaires", { nbSupprimes: nbDoublons });
+            showToast(`${nbDoublons} doublon(s) supprim\xE9(s)`, "success");
+          } catch (e) {
+            showToast("Erreur lors du nettoyage.", "error");
+          }
+        };
+        const modifierProchainNumero = async (id, nom, valeur) => {
+          const numero = parseInt(valeur, 10);
+          if (!numero || numero < 1) return;
+          try {
+            await db.collection("ong_partenaires").doc(id).update({ prochainNumero: numero });
+            enregistrerAudit("modification_prochain_numero_lot", { nom, prochainNumero: numero });
+            showToast(`Prochain num\xE9ro de ${nom} r\xE9gl\xE9 sur ${numero}`, "success");
+          } catch (e) {
+            showToast("Erreur lors de la mise \xE0 jour.", "error");
+          }
+        };
+        return /* @__PURE__ */ React.createElement("div", { className: "space-y-4 text-xs" }, /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border shadow-sm space-y-2" }, /* @__PURE__ */ React.createElement("h2", { className: "font-black text-gray-800 mb-1" }, "\u{1F91D} Partenaires"), /* @__PURE__ */ React.createElement("p", { className: "text-gray-500" }, `Ajoute un partenaire pour qu'il apparaisse dans les listes de s\xE9lection (nouveau dossier, factures, archives, caisse). Le "Prochain N\xB0" de chaque partenaire (ci-dessous) d\xE9finit le num\xE9ro du prochain lot/facture g\xE9n\xE9r\xE9 pour lui.`), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement(
           "input",
           {
             type: "text",
@@ -4786,7 +5359,19 @@ Pourcentage : ${pourcentageExoneration}%`,
             placeholder: "Nom du partenaire...",
             className: "border rounded-lg p-2 flex-1 outline-none"
           }
-        ), /* @__PURE__ */ React.createElement("button", { onClick: ajouter, className: "bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold" }, "Ajouter"))), /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl border overflow-hidden divide-y" }, listeOngDocs.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "text-gray-500 p-3" }, "Aucun partenaire enregistr\xE9."), listeOngDocs.map((o) => /* @__PURE__ */ React.createElement("div", { key: o.id, className: "p-3 flex justify-between items-center hover:bg-gray-50" }, /* @__PURE__ */ React.createElement("span", { className: "font-medium text-gray-700" }, o.nom), /* @__PURE__ */ React.createElement("button", { onClick: () => supprimer(o.id, o.nom), className: "text-gray-300 hover:text-red-600 p-1" }, /* @__PURE__ */ React.createElement(Trash2, { size: 12 }))))));
+        ), /* @__PURE__ */ React.createElement("button", { onClick: ajouter, className: "bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold" }, "Ajouter")), groupesDoublons.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg p-2 mt-1" }, /* @__PURE__ */ React.createElement("span", { className: "text-amber-800 font-semibold" }, "\u26A0\uFE0F ", groupesDoublons.length, " partenaire(s) en double d\xE9tect\xE9(s) dans la liste ci-dessous."), /* @__PURE__ */ React.createElement("button", { onClick: nettoyerDoublons, className: "bg-amber-600 text-white px-3 py-1.5 rounded-lg font-bold whitespace-nowrap" }, "\u{1F9F9} Nettoyer les doublons"))), /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl border overflow-hidden divide-y" }, listeOngDocs.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "text-gray-500 p-3" }, "Aucun partenaire enregistr\xE9."), listeOngDocs.map((o) => /* @__PURE__ */ React.createElement("div", { key: o.id, className: "p-3 flex justify-between items-center hover:bg-gray-50" }, /* @__PURE__ */ React.createElement("span", { className: "font-medium text-gray-700" }, o.nom), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-3" }, /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1.5 text-[10px] text-gray-500" }, "Prochain N\xB0", /* @__PURE__ */ React.createElement(
+          "input",
+          {
+            type: "number",
+            min: "1",
+            defaultValue: o.prochainNumero || 1,
+            key: o.id + "-" + (o.prochainNumero || 1),
+            onBlur: (e) => {
+              if (parseInt(e.target.value, 10) !== (o.prochainNumero || 1)) modifierProchainNumero(o.id, o.nom, e.target.value);
+            },
+            className: "w-16 border rounded p-1 text-xs text-center outline-none"
+          }
+        )), /* @__PURE__ */ React.createElement("button", { onClick: () => supprimer(o.id, o.nom), className: "text-gray-300 hover:text-red-600 p-1" }, /* @__PURE__ */ React.createElement(Trash2, { size: 12 })))))));
       }
       module.exports = GestionOngPanel;
     }
@@ -4823,8 +5408,8 @@ Pourcentage : ${pourcentageExoneration}%`,
       var AccueilPanel = require_AccueilPanel();
       var AnalyticsPanel = require_AnalyticsPanel();
       var GestionOngPanel = require_GestionOng();
-      function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
-        const [onglet, setOnglet] = useState("accueil");
+      function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, roleParDefaut }) {
+        const [onglet, setOnglet] = useState(() => localStorage.getItem("chf-dernier-onglet") || "accueil");
         const [medicaments, setMedicaments] = useState([]);
         const [actes, setActes] = useState([]);
         const [verifications, setVerifications] = useState([]);
@@ -4833,6 +5418,8 @@ Pourcentage : ${pourcentageExoneration}%`,
         const [ongTargets, setOngTargets] = useState({ "MSF-H": 0, "MSF-F": 0, "ALIMA": 0, "AVSI": 0, "GRID MISSION": 0, "WAY TO HEALTH": 0, "TEAM TASSY": 0 });
         const [listeOngDocs, setListeOngDocs] = useState([]);
         const [dossierActif, setDossierActif] = useState(false);
+        const [origineLotEdition, setOrigineLotEdition] = useState(null);
+        const [lotAFocuserAuRetour, setLotAFocuserAuRetour] = useState(null);
         const [nomPatient, setNomPatient] = useState("");
         const [selectedOng, setSelectedOng] = useState("");
         const [typePatient, setTypePatient] = useState("ONG");
@@ -4843,6 +5430,8 @@ Pourcentage : ${pourcentageExoneration}%`,
         const [idFicheEnCoursDEdition, setIdFicheEnCoursDEdition] = useState(null);
         const [modePreValidation, setModePreValidation] = useState(false);
         const [lignesCalcul, setLignesCalcul] = useState([]);
+        const [dateFiche, setDateFiche] = useState(() => (/* @__PURE__ */ new Date()).toISOString().split("T")[0]);
+        const [prescritPar, setPrescritPar] = useState("");
         const [dateEntree1, setDateEntree1] = useState("");
         const [dateSortie1, setDateSortie1] = useState("");
         const [typeLit1, setTypeLit1] = useState("normal");
@@ -4851,6 +5440,7 @@ Pourcentage : ${pourcentageExoneration}%`,
         const [dateSortie2, setDateSortie2] = useState("");
         const [typeLit2, setTypeLit2] = useState("normal");
         const [hasChirSpec, setHasChirSpec] = useState(false);
+        const [tarifChoisi, setTarifChoisi] = useState("actuel");
         const [nomChirSpec, setNomChirSpec] = useState("");
         const [prixChirSpec, setPrixChirSpec] = useState("");
         const [filtreArchivesInitialNom, setFiltreArchivesInitialNom] = useState("");
@@ -4860,7 +5450,7 @@ Pourcentage : ${pourcentageExoneration}%`,
         const [dossierUpdatedAtOuverture, setDossierUpdatedAtOuverture] = useState(null);
         const [paiementEffectue, setPaiementEffectue] = useState(false);
         const [achatExpressOuvert, setAchatExpressOuvert] = useState(false);
-        const [confirmModal, setConfirmModal2] = useState(null);
+        const [confirmModal, setConfirmModal] = useState(null);
         const [avertissementInactivite, setAvertissementInactivite] = useState(false);
         const [toasts, setToasts] = useState([]);
         const showToast = (message, type = "info") => {
@@ -4871,6 +5461,14 @@ Pourcentage : ${pourcentageExoneration}%`,
           }, 4e3);
         };
         const removeToast = (id) => setToasts((prev) => prev.filter((t) => t.id !== id));
+        useEffect(() => {
+          if (roleParDefaut) {
+            showToast("\u26A0\uFE0F Ton r\xF4le habituel n'a pas pu \xEAtre retrouv\xE9 \u2014 connect\xE9 en Auditeur (lecture seule) par d\xE9faut. Si ce n'est pas normal, pr\xE9viens un administrateur.", "error");
+          }
+        }, [roleParDefaut]);
+        useEffect(() => {
+          localStorage.setItem("chf-dernier-onglet", onglet);
+        }, [onglet]);
         const lowStockItems = useMemo(() => medicaments.filter((m) => (m.quantite || 0) <= (m.seuilAlerte || 5)), [medicaments]);
         useEffect(() => {
           const loadData = async () => {
@@ -4910,7 +5508,7 @@ Pourcentage : ${pourcentageExoneration}%`,
           loadData();
           const interval = setInterval(() => {
             if (!document.hidden) loadData();
-          }, 45e3);
+          }, 18e4);
           return () => clearInterval(interval);
         }, []);
         useEffect(() => {
@@ -4921,7 +5519,7 @@ Pourcentage : ${pourcentageExoneration}%`,
           const unsubscribe = db.collection("ong_partenaires").orderBy("nom").onSnapshot((snapshot) => {
             if (snapshot.empty) {
               const batch = db.batch();
-              LISTE_ONG.forEach((nom) => batch.set(db.collection("ong_partenaires").doc(), { nom, dateAjout: firebase2.firestore.FieldValue.serverTimestamp() }));
+              LISTE_ONG.forEach((nom) => batch.set(db.collection("ong_partenaires").doc(nom.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")), { nom, dateAjout: firebase2.firestore.FieldValue.serverTimestamp() }));
               batch.commit().catch((e) => console.warn("Amor\xE7age ong_partenaires:", e));
               return;
             }
@@ -4999,6 +5597,8 @@ Pourcentage : ${pourcentageExoneration}%`,
         const viderLeCalculateurFicheUniquement = () => {
           setLignesCalcul([]);
           setIdFicheEnCoursDEdition(null);
+          setDateFiche((/* @__PURE__ */ new Date()).toISOString().split("T")[0]);
+          setPrescritPar("");
           setDateEntree1("");
           setDateSortie1("");
           setTypeLit1("normal");
@@ -5010,14 +5610,17 @@ Pourcentage : ${pourcentageExoneration}%`,
           setNomChirSpec("");
           setPrixChirSpec("");
           setPaiementEffectue(false);
+          setTarifChoisi("actuel");
         };
-        const editerFiche = (idFiche) => {
+        const editerFiche = (idFiche, silencieux) => {
           const fiche = fichesDossier.find((f) => f.id === idFiche);
           if (!fiche) {
             showToast("Fiche introuvable.", "error");
             return;
           }
           const raw = fiche.rawState || {};
+          setDateFiche(fiche.dateCreation ? fiche.dateCreation.split("T")[0] : (/* @__PURE__ */ new Date()).toISOString().split("T")[0]);
+          setPrescritPar(fiche.prescritPar || "");
           setLignesCalcul(raw.lignesCalcul || []);
           setDateEntree1(raw.dateEntree1 || "");
           setDateSortie1(raw.dateSortie1 || "");
@@ -5031,12 +5634,21 @@ Pourcentage : ${pourcentageExoneration}%`,
           setPrixChirSpec(raw.prixChirSpec || "");
           setIdFicheEnCoursDEdition(idFiche);
           setPaiementEffectue(false);
-          showToast(`\xC9dition de la fiche N\xB0${fiche.numeroFiche}`, "info");
+          if (!silencieux) showToast(`\xC9dition de la fiche N\xB0${fiche.numeroFiche}`, "info");
         };
         const enregistrerFicheModifiee = (nouvelleFiche) => {
-          setFichesDossier((prev) => prev.map((f) => f.id === nouvelleFiche.id ? nouvelleFiche : f));
-          viderLeCalculateurFicheUniquement();
-          showToast("Fiche mise \xE0 jour", "success");
+          const fichesMisesAJour = fichesDossier.map((f) => f.id === nouvelleFiche.id ? nouvelleFiche : f);
+          setFichesDossier(fichesMisesAJour);
+          const triees = [...fichesMisesAJour].sort((a, b) => a.numeroFiche - b.numeroFiche);
+          const idx = triees.findIndex((f) => f.id === nouvelleFiche.id);
+          const suivante = idx !== -1 ? triees[idx + 1] : null;
+          if (suivante) {
+            editerFiche(suivante.id, true);
+            showToast(`Fiche mise \xE0 jour \u2014 Fiche N\xB0${suivante.numeroFiche} charg\xE9e`, "success");
+          } else {
+            viderLeCalculateurFicheUniquement();
+            showToast("Fiche mise \xE0 jour", "success");
+          }
         };
         const enregistrerNouvelleFiche = (fiche) => {
           if (idFicheEnCoursDEdition) {
@@ -5048,6 +5660,7 @@ Pourcentage : ${pourcentageExoneration}%`,
           }
         };
         const initialiserNouveauDossier = async (nom, ong, numDossier, type, naissance, tel, serviceChoisi) => {
+          setOrigineLotEdition(null);
           const propreNom = formaterNomPropre(nom);
           if (!propreNom || !ong && type === "ONG") {
             showToast("Veuillez remplir tous les champs.", "error");
@@ -5099,7 +5712,8 @@ Pourcentage : ${pourcentageExoneration}%`,
           if (idFinal === localId) return;
           showToast(`Dossier de ${propreNom} ouvert`, "success");
         };
-        const chargerDossierExistant = (patientDoc) => {
+        const chargerDossierExistant = (patientDoc, origineLot) => {
+          setOrigineLotEdition(origineLot || null);
           setDossierId(patientDoc.id);
           setDossierUpdatedAtOuverture(patientDoc.updatedAt || null);
           setNomPatient(patientDoc.nomPatient);
@@ -5126,14 +5740,14 @@ Pourcentage : ${pourcentageExoneration}%`,
             return;
           }
           const ficheOriginale = idFicheEnCoursDEdition ? fichesDossier.find((f) => f.id === idFicheEnCoursDEdition) : null;
-          setConfirmModal2({
+          setConfirmModal({
             titre: idFicheEnCoursDEdition ? "Modification non enregistr\xE9e" : "Fiche en cours d\xE9tect\xE9e",
             message: idFicheEnCoursDEdition ? `Tu modifies la Fiche N\xB0${(ficheOriginale == null ? void 0 : ficheOriginale.numeroFiche) || ""} et ces changements ne sont pas encore enregistr\xE9s.` : "Tu as une fiche en cours de saisie qui n'a pas encore \xE9t\xE9 ajout\xE9e au dossier.",
             detail: `${formatGourdes(grandTotalGlobalFiche)} Gdes`,
             confirmLabel: idFicheEnCoursDEdition ? "Oui, enregistrer la modification" : "Oui, l'ajouter",
             cancelLabel: "Non, continuer sans",
             onConfirm: () => {
-              setConfirmModal2(null);
+              setConfirmModal(null);
               const fiche = {
                 id: idFicheEnCoursDEdition || "fiche-" + Date.now(),
                 numeroFiche: idFicheEnCoursDEdition ? (ficheOriginale == null ? void 0 : ficheOriginale.numeroFiche) || numeroFicheCourante : numeroFicheCourante,
@@ -5148,7 +5762,7 @@ Pourcentage : ${pourcentageExoneration}%`,
               callback(fichesFinales);
             },
             onCancel: () => {
-              setConfirmModal2(null);
+              setConfirmModal(null);
               callback(fichesDossier);
             }
           });
@@ -5163,11 +5777,13 @@ Pourcentage : ${pourcentageExoneration}%`,
           });
         };
         const executerArchivage = async () => {
+          var _a;
           const somme = fichesDossier.reduce((s, f) => s + f.totalGlobal, 0);
+          const verrouilleFactureExistante = ((_a = verifications.find((v) => v.id === dossierId)) == null ? void 0 : _a.verrouilleFacture) || false;
           const datesTrouvees = [];
           fichesDossier.forEach((f) => {
-            var _a, _b, _c;
-            if ((_a = f.rawState) == null ? void 0 : _a.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
+            var _a2, _b, _c;
+            if ((_a2 = f.rawState) == null ? void 0 : _a2.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
             if (((_b = f.rawState) == null ? void 0 : _b.multiPeriode) && ((_c = f.rawState) == null ? void 0 : _c.dateEntree2)) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
           });
           let sejourTexte = "\u2014";
@@ -5185,7 +5801,7 @@ Pourcentage : ${pourcentageExoneration}%`,
             totalGlobal: somme,
             totalSaisiePapierDH: 0,
             contientErreurs: false,
-            verrouilleFacture: false,
+            verrouilleFacture: verrouilleFactureExistante,
             fiches: [...fichesDossier],
             status: "archived",
             timestamp: Date.now()
@@ -5210,6 +5826,11 @@ Pourcentage : ${pourcentageExoneration}%`,
             viderLeCalculateurFicheUniquement();
             setDossierId(null);
             localStorage.removeItem(LOG_DOSSIER_BROUILLON_KEY);
+            if (origineLotEdition) {
+              setOnglet("verifie");
+              setLotAFocuserAuRetour(origineLotEdition);
+              setOrigineLotEdition(null);
+            }
             showToast("Dossier archiv\xE9 !", "success");
           } catch (error) {
             if (!error.isOfflineQueue) {
@@ -5228,6 +5849,11 @@ Pourcentage : ${pourcentageExoneration}%`,
             viderLeCalculateurFicheUniquement();
             setDossierId(null);
             localStorage.removeItem(LOG_DOSSIER_BROUILLON_KEY);
+            if (origineLotEdition) {
+              setOnglet("verifie");
+              setLotAFocuserAuRetour(origineLotEdition);
+              setOrigineLotEdition(null);
+            }
             showToast("\u{1F4F4} Dossier archiv\xE9 hors ligne \u2014 sera synchronis\xE9 au retour d'internet", "info");
           }
         };
@@ -5243,35 +5869,35 @@ Pourcentage : ${pourcentageExoneration}%`,
         };
         const finaliserEtArchiverDossierOfficiel = async () => {
           const somme = fichesDossier.reduce((s, f) => s + f.totalGlobal, 0);
-          const demanderConfirmation = () => setConfirmModal2({
+          const demanderConfirmation = () => setConfirmModal({
             titre: "Archiver ce dossier ?",
             message: `Patient : ${nomPatient}
 ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\xE9.`,
             detail: `${formatGourdes(somme)} Gdes  (${formatDH(somme)} DH)`,
             confirmLabel: "\u{1F7E2} Archiver",
             onConfirm: () => {
-              setConfirmModal2(null);
+              setConfirmModal(null);
               executerArchivage();
             },
-            onCancel: () => setConfirmModal2(null)
+            onCancel: () => setConfirmModal(null)
           });
           if (await verifierConflit()) {
-            setConfirmModal2({
+            setConfirmModal({
               titre: "\u26A0\uFE0F Ce dossier a \xE9t\xE9 modifi\xE9 entre-temps",
               message: "Une autre personne (ou un autre appareil) a modifi\xE9 ce dossier depuis que tu l'as ouvert ici. Continuer risque d'\xE9craser ses changements.",
               confirmLabel: "Continuer quand m\xEAme",
               danger: true,
               onConfirm: () => {
-                setConfirmModal2(null);
+                setConfirmModal(null);
                 demanderConfirmation();
               },
-              onCancel: () => setConfirmModal2(null)
+              onCancel: () => setConfirmModal(null)
             });
             return;
           }
           demanderConfirmation();
         };
-        const executerSuspension = async (fichesAUtiliser) => {
+        const executerSuspension = async (fichesAUtiliser, note) => {
           const listeFiches = fichesAUtiliser || fichesDossier;
           const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
           const datesTrouvees = [];
@@ -5294,16 +5920,18 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             dateEntreePourTri: datesTrouvees.length > 0 ? datesTrouvees[0].in : "9999-12-31",
             totalGlobal: somme,
             totalSaisiePapierDH: 0,
-            contientErreurs: false,
+            contientErreurs: !!note,
             verrouilleFacture: false,
             fiches: [...listeFiches],
             // ⬅️ CONSERVE LES FICHES
             status: "suspendu",
             dateSuspension: (/* @__PURE__ */ new Date()).toISOString(),
+            noteSuspension: note || "",
             timestamp: Date.now()
           };
           try {
-            await chf.updateEpisode(dossierId, toEpisodeApi(dossierSuspendu));
+            const { noteSuspension: _omisePourApi, ...dossierSuspenduPourApi } = dossierSuspendu;
+            await chf.updateEpisode(dossierId, toEpisodeApi(dossierSuspenduPourApi));
             const updatedItems = verifications.map((v) => v.id === dossierId ? { ...v, ...dossierSuspendu } : v);
             setVerifications(updatedItems);
             showToast(`Dossier suspendu avec ${listeFiches.length} fiche(s)`, "success");
@@ -5317,6 +5945,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             showToast("\u{1F4F4} Dossier suspendu hors ligne \u2014 sera synchronis\xE9 au retour d'internet", "info");
           }
           setDossierActif(false);
+          setOrigineLotEdition(null);
           setNomPatient("");
           setSelectedOng("");
           setNumDossierPatient("");
@@ -5333,28 +5962,33 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             return;
           }
           avecFicheEnCoursAjoutee((fichesFinales) => {
-            const demanderConfirmation = () => setConfirmModal2({
-              titre: "Suspendre ce dossier ?",
-              message: `Le dossier de ${nomPatient} sera mis en pause. Il pourra \xEAtre rouvert plus tard depuis les Archives.`,
-              confirmLabel: "\u23F8\uFE0F Suspendre",
-              onConfirm: () => {
-                setConfirmModal2(null);
-                executerSuspension(fichesFinales);
-              },
-              onCancel: () => setConfirmModal2(null)
-            });
+            const demanderConfirmation = () => {
+              const note = (window.prompt(`Note sur le probl\xE8me \xE0 ne pas oublier pour le dossier de ${nomPatient} (optionnel \u2014 ex: quelle fiche, quel souci) :`, "") || "").trim();
+              setConfirmModal({
+                titre: "Suspendre ce dossier ?",
+                message: `Le dossier de ${nomPatient} sera mis en pause. Il pourra \xEAtre rouvert plus tard depuis les Archives.${note ? `
+
+\u{1F4DD} Note : ${note}` : ""}`,
+                confirmLabel: "\u23F8\uFE0F Suspendre",
+                onConfirm: () => {
+                  setConfirmModal(null);
+                  executerSuspension(fichesFinales, note);
+                },
+                onCancel: () => setConfirmModal(null)
+              });
+            };
             (async () => {
               if (await verifierConflit()) {
-                setConfirmModal2({
+                setConfirmModal({
                   titre: "\u26A0\uFE0F Ce dossier a \xE9t\xE9 modifi\xE9 entre-temps",
                   message: "Une autre personne (ou un autre appareil) a modifi\xE9 ce dossier depuis que tu l'as ouvert ici. Continuer risque d'\xE9craser ses changements.",
                   confirmLabel: "Continuer quand m\xEAme",
                   danger: true,
                   onConfirm: () => {
-                    setConfirmModal2(null);
+                    setConfirmModal(null);
                     demanderConfirmation();
                   },
-                  onCancel: () => setConfirmModal2(null)
+                  onCancel: () => setConfirmModal(null)
                 });
                 return;
               }
@@ -5412,6 +6046,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             showToast("\u{1F4F4} Report enregistr\xE9 hors ligne \u2014 sera synchronis\xE9 au retour d'internet", "info");
           }
           setDossierActif(false);
+          setOrigineLotEdition(null);
           setNomPatient("");
           setSelectedOng("");
           setNumDossierPatient("");
@@ -5431,28 +6066,28 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             const cibleMois = /* @__PURE__ */ new Date();
             cibleMois.setMonth(cibleMois.getMonth() + 1);
             const libelleMois = cibleMois.toLocaleString("fr-FR", { month: "long", year: "numeric" });
-            const demanderConfirmation = () => setConfirmModal2({
+            const demanderConfirmation = () => setConfirmModal({
               titre: "Reporter ce dossier au mois suivant ?",
               message: `Le dossier de ${nomPatient} n'est pas complet. Il sera report\xE9 \xE0 ${libelleMois} avec ses ${fichesFinales.length} fiche(s), et exclu du rapport Excel du mois en cours.`,
               confirmLabel: "\u{1F4C5} Reporter",
               onConfirm: () => {
-                setConfirmModal2(null);
+                setConfirmModal(null);
                 executerReport(fichesFinales);
               },
-              onCancel: () => setConfirmModal2(null)
+              onCancel: () => setConfirmModal(null)
             });
             (async () => {
               if (await verifierConflit()) {
-                setConfirmModal2({
+                setConfirmModal({
                   titre: "\u26A0\uFE0F Ce dossier a \xE9t\xE9 modifi\xE9 entre-temps",
                   message: "Une autre personne (ou un autre appareil) a modifi\xE9 ce dossier depuis que tu l'as ouvert ici. Continuer risque d'\xE9craser ses changements.",
                   confirmLabel: "Continuer quand m\xEAme",
                   danger: true,
                   onConfirm: () => {
-                    setConfirmModal2(null);
+                    setConfirmModal(null);
                     demanderConfirmation();
                   },
-                  onCancel: () => setConfirmModal2(null)
+                  onCancel: () => setConfirmModal(null)
                 });
                 return;
               }
@@ -5475,6 +6110,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             showToast("\u{1F4F4} Dossier annul\xE9 hors ligne", "info");
           }
           setDossierActif(false);
+          setOrigineLotEdition(null);
           setNomPatient("");
           setSelectedOng("");
           setNumDossierPatient("");
@@ -5491,29 +6127,29 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             showToast("Aucun dossier actif.", "error");
             return;
           }
-          setConfirmModal2({
+          setConfirmModal({
             titre: "Annuler ce dossier ?",
             message: `Le dossier de ${nomPatient} et toutes ses fiches (${fichesDossier.length}) seront d\xE9finitivement supprim\xE9s. Cette action est irr\xE9versible.`,
             confirmLabel: "\u{1F5D1}\uFE0F Annuler le dossier",
             danger: true,
             onConfirm: () => {
-              setConfirmModal2(null);
+              setConfirmModal(null);
               executerAnnulation();
             },
-            onCancel: () => setConfirmModal2(null)
+            onCancel: () => setConfirmModal(null)
           });
         };
-        const r\u00E9importerDossierDepuisArchives = (doc) => chargerDossierExistant(doc);
+        const r\u00E9importerDossierDepuisArchives = (doc, origineLot) => chargerDossierExistant(doc, origineLot);
         const supprimerDossierArchive = (id) => {
           const dossier = verifications.find((v) => v.id === id);
-          setConfirmModal2({
+          setConfirmModal({
             titre: "Supprimer d\xE9finitivement ce dossier ?",
             message: `${dossier ? `Patient : ${dossier.nomPatient}
 ` : ""}Cette action est irr\xE9versible \u2014 le dossier et son historique de facturation seront perdus pour de bon.`,
             confirmLabel: "\u{1F5D1}\uFE0F Supprimer d\xE9finitivement",
             danger: true,
             onConfirm: async () => {
-              setConfirmModal2(null);
+              setConfirmModal(null);
               enregistrerAudit("suppression_archive", { dossierId: id, nomPatient: (dossier == null ? void 0 : dossier.nomPatient) || null, totalGlobal: (dossier == null ? void 0 : dossier.totalGlobal) || null });
               try {
                 await chf.deleteEpisode(id);
@@ -5524,7 +6160,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
                 showToast("Erreur suppression: " + e.message, "error");
               }
             },
-            onCancel: () => setConfirmModal2(null)
+            onCancel: () => setConfirmModal(null)
           });
         };
         const executerSauvegardeGlobaleJSON = async () => {
@@ -5589,10 +6225,11 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
           reader.readAsText(file);
         };
         const injecterLigneAuCalculateur = (item, cat, qte) => {
+          const prixEffectif = tarifChoisi === "nouveau" && item.nouveauPrix != null && item.nouveauPrix !== "" ? parseFloat(item.nouveauPrix) : item.prix;
           setLignesCalcul((prev) => {
             const index = prev.findIndex((l) => l.itemId === item.id && l.type === cat);
             if (index !== -1) return prev.map((l, idx) => idx === index ? { ...l, qte: l.qte + qte } : l);
-            return [...prev, { id: "l-" + Math.random().toString(36).slice(2, 6), itemId: item.id, type: cat, sub: cat === "med" ? "" : item.sub || "", nom: item.nom, qte, prix: item.prix }];
+            return [...prev, { id: "l-" + Math.random().toString(36).slice(2, 6), itemId: item.id, type: cat, sub: cat === "med" ? "" : item.sub || "", nom: item.nom, qte, prix: prixEffectif }];
           });
           setPaiementEffectue(false);
         };
@@ -5632,6 +6269,25 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
           });
           return v;
         }, [lignesCalcul, totalGeneralExeat, totalChirSpec]);
+        const coutsParService = useMemo(() => {
+          const v = {};
+          CATEGORIES_LISTE.forEach((c) => v[c.key] = 0);
+          let incomplet = false;
+          lignesCalcul.forEach((l) => {
+            const item = (l.type === "med" ? medicaments : actes).find((x) => x.id === l.itemId);
+            if (!item || item.cout == null) {
+              incomplet = true;
+              return;
+            }
+            const m = l.qte * item.cout;
+            if (l.type === "med") v.med += m;
+            else if (l.type === "acte") {
+              if (v[l.sub] !== void 0) v[l.sub] += m;
+              else v.chirurgie += m;
+            }
+          });
+          return { valeurs: v, incomplet: incomplet || totalGeneralExeat > 0 || totalChirSpec > 0 };
+        }, [lignesCalcul, medicaments, actes, totalGeneralExeat, totalChirSpec]);
         const grandTotalGlobalFiche = useMemo(() => Object.values(totalsParService).reduce((a, b) => a + b, 0), [totalsParService]);
         const totalDossierGourdes = useMemo(() => fichesDossier.reduce((s, f) => s + f.totalGlobal, 0), [fichesDossier]);
         const cumulCategoriesDossierActif = useMemo(() => {
@@ -5672,6 +6328,19 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             showToast("Fiche supprim\xE9e \u2014 stock remis \xE0 jour", "success");
           }
         };
+        const marquerProblemeFiche = (idF) => {
+          const fiche = fichesDossier.find((f) => f.id === idF);
+          if (!fiche) return;
+          if (fiche.probleme) {
+            setFichesDossier((prev) => prev.map((f) => f.id === idF ? { ...f, probleme: false, noteProbleme: "" } : f));
+            showToast("Marquage retir\xE9", "success");
+            return;
+          }
+          const saisie = window.prompt(`Quel est le probl\xE8me avec la Fiche N\xB0${fiche.numeroFiche} ?`, "");
+          if (saisie === null) return;
+          setFichesDossier((prev) => prev.map((f) => f.id === idF ? { ...f, probleme: true, noteProbleme: saisie.trim() } : f));
+          showToast("Fiche marqu\xE9e \xE0 v\xE9rifier", "success");
+        };
         const changerTypeOngPourDossier = async (idCible, nouveauType, nouvelOng) => {
           if (nouveauType === "ONG" && !nouvelOng) {
             showToast("S\xE9lectionne une ONG.", "error");
@@ -5701,16 +6370,16 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
           };
           const dossierActuel = verifications.find((v) => v.id === idCible);
           if ((dossierActuel == null ? void 0 : dossierActuel.numeroLot) != null) {
-            setConfirmModal2({
+            setConfirmModal({
               titre: "\u26A0\uFE0F Ce dossier fait partie d'un lot d\xE9j\xE0 envoy\xE9",
               message: `Changer son partenaire le retirera du Lot ${dossierActuel.numeroLot} de ${dossierActuel.ongPartenaire}. Il faudra ensuite le rattacher \xE0 un nouveau lot s\xE9par\xE9ment (avec le nouveau partenaire). Continuer ?`,
               confirmLabel: "Oui, changer et retirer du lot",
               danger: true,
               onConfirm: () => {
-                setConfirmModal2(null);
+                setConfirmModal(null);
                 executerChangement();
               },
-              onCancel: () => setConfirmModal2(null)
+              onCancel: () => setConfirmModal(null)
             });
             return;
           }
@@ -5797,7 +6466,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             onFermer: () => setAchatExpressOuvert(false),
             onDossierCree: (episode) => setVerifications((prev) => [episode, ...prev])
           }
-        ), dossierActif && !modePreValidation && /* @__PURE__ */ React.createElement("div", { className: "fixed top-28 right-4 z-40 bg-[#1E2A24] text-white px-4 py-2 rounded-xl shadow-2xl border border-emerald-500/30 flex flex-col items-end" }, /* @__PURE__ */ React.createElement("span", { className: "text-[9px] uppercase tracking-wider text-[#9FB8A8] font-bold" }, "Dossier ", nomPatient), /* @__PURE__ */ React.createElement("span", { className: "text-sm font-mono font-black" }, formatGourdes(totalDossierGourdes + grandTotalGlobalFiche), " Gdes"), /* @__PURE__ */ React.createElement("span", { className: "text-[10px] font-mono text-emerald-400" }, formatDH(totalDossierGourdes + grandTotalGlobalFiche), " DH")), /* @__PURE__ */ React.createElement("div", { className: "fixed bottom-6 right-6 z-50 flex flex-col gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => window.scrollTo({ top: 0, behavior: "smooth" }), className: "floating-btn p-3 bg-[#1E2A24] text-[#F7F5F0] rounded-full shadow-lg" }, /* @__PURE__ */ React.createElement(ArrowUp, { size: 18 })), /* @__PURE__ */ React.createElement("button", { onClick: () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }), className: "floating-btn p-3 bg-[#1E2A24] text-[#F7F5F0] rounded-full shadow-lg" }, /* @__PURE__ */ React.createElement(ArrowDown, { size: 18 }))), /* @__PURE__ */ React.createElement("header", { className: "border-b border-[#D8D2C2] bg-[#1E2A24] text-[#F7F5F0] p-4" }, /* @__PURE__ */ React.createElement("div", { className: "max-w-3xl mx-auto flex justify-between items-baseline mb-2" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: "text-[10px] uppercase tracking-widest text-[#9FB8A8]" }, "Centre Hospitalier de Fontaine"), /* @__PURE__ */ React.createElement("h1", { className: "text-xl font-bold tracking-tight" }, "CHF \u2014 Syst\xE8me Hospitalier")), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 text-[10px] font-mono items-center flex-wrap" }, /* @__PURE__ */ React.createElement("span", { className: "bg-blue-600 text-white px-2 py-1 rounded-full" }, userDisplayName, " (", userRole, ")"), (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement("button", { onClick: () => setAchatExpressOuvert(true), className: "bg-amber-500 hover:bg-amber-600 px-2 py-1 rounded font-bold" }, "\u26A1 Express"), /* @__PURE__ */ React.createElement("button", { onClick: () => setModeSimulation(!modeSimulation), className: `px-2 py-1 rounded text-xs font-bold ${modeSimulation ? "bg-emerald-600" : "bg-blue-600"}` }, modeSimulation ? "\u{1F9EE} Simulation" : "\u{1F9EE} Simu"), /* @__PURE__ */ React.createElement("button", { onClick: executerSauvegardeGlobaleJSON, className: `px-2 py-1 rounded relative ${needsBackupWarning ? "bg-red-600 animate-pulse" : "bg-gray-700"}` }, "\u{1F4E5} Backup ", needsBackupWarning && /* @__PURE__ */ React.createElement("span", { className: "absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full animate-ping" })), /* @__PURE__ */ React.createElement("label", { className: "bg-gray-700 px-2 py-1 rounded cursor-pointer" }, "\u{1F4E4} Restore ", /* @__PURE__ */ React.createElement("input", { type: "file", onChange: executerRestaurationGlobaleJSON, className: "hidden", accept: ".json" })), /* @__PURE__ */ React.createElement("span", { className: "bg-purple-600 px-2 py-1 rounded-full" }, verifications.length, " Archiv\xE9s"), /* @__PURE__ */ React.createElement("button", { onClick: onQuitter, className: "bg-red-900/80 px-2 py-1 rounded" }, "Quitter"))), /* @__PURE__ */ React.createElement("div", { className: "max-w-3xl mx-auto flex flex-wrap gap-2 text-xs mt-3" }, /* @__PURE__ */ React.createElement("button", { onClick: () => {
+        ), dossierActif && !modePreValidation && /* @__PURE__ */ React.createElement("div", { className: "fixed top-28 right-4 z-40 bg-[#1E2A24] text-white px-4 py-2 rounded-xl shadow-2xl border border-emerald-500/30 flex flex-col items-end" }, /* @__PURE__ */ React.createElement("span", { className: "text-[9px] uppercase tracking-wider text-[#9FB8A8] font-bold" }, "Dossier ", nomPatient), /* @__PURE__ */ React.createElement("span", { className: "text-sm font-mono font-black" }, formatGourdes(totalDossierGourdes + grandTotalGlobalFiche), " Gdes"), /* @__PURE__ */ React.createElement("span", { className: "text-[10px] font-mono text-emerald-400" }, formatDH(totalDossierGourdes + grandTotalGlobalFiche), " DH")), /* @__PURE__ */ React.createElement("div", { className: "fixed bottom-6 right-6 z-50 flex flex-col gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => window.scrollTo({ top: 0, behavior: "smooth" }), className: "floating-btn p-3 bg-[#1E2A24] text-[#F7F5F0] rounded-full shadow-lg" }, /* @__PURE__ */ React.createElement(ArrowUp, { size: 18 })), /* @__PURE__ */ React.createElement("button", { onClick: () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }), className: "floating-btn p-3 bg-[#1E2A24] text-[#F7F5F0] rounded-full shadow-lg" }, /* @__PURE__ */ React.createElement(ArrowDown, { size: 18 }))), /* @__PURE__ */ React.createElement("header", { className: "border-b border-[#D8D2C2] bg-[#1E2A24] text-[#F7F5F0] p-4" }, /* @__PURE__ */ React.createElement("div", { className: "max-w-6xl mx-auto flex justify-between items-baseline mb-2 px-2" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: "text-[10px] uppercase tracking-widest text-[#9FB8A8]" }, "Centre Hospitalier de Fontaine"), /* @__PURE__ */ React.createElement("h1", { className: "text-xl font-bold tracking-tight" }, "CHF \u2014 Syst\xE8me Hospitalier")), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 text-[10px] font-mono items-center flex-wrap" }, /* @__PURE__ */ React.createElement("span", { className: "bg-blue-600 text-white px-2 py-1 rounded-full" }, userDisplayName, " (", userRole, ")"), (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement("button", { onClick: () => setAchatExpressOuvert(true), className: "bg-amber-500 hover:bg-amber-600 px-2 py-1 rounded font-bold" }, "\u26A1 Express"), /* @__PURE__ */ React.createElement("button", { onClick: () => setModeSimulation(!modeSimulation), className: `px-2 py-1 rounded text-xs font-bold ${modeSimulation ? "bg-emerald-600" : "bg-blue-600"}` }, modeSimulation ? "\u{1F9EE} Simulation" : "\u{1F9EE} Simu"), /* @__PURE__ */ React.createElement("button", { onClick: executerSauvegardeGlobaleJSON, className: `px-2 py-1 rounded relative ${needsBackupWarning ? "bg-red-600 animate-pulse" : "bg-gray-700"}` }, "\u{1F4E5} Backup ", needsBackupWarning && /* @__PURE__ */ React.createElement("span", { className: "absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full animate-ping" })), /* @__PURE__ */ React.createElement("label", { className: "bg-gray-700 px-2 py-1 rounded cursor-pointer" }, "\u{1F4E4} Restore ", /* @__PURE__ */ React.createElement("input", { type: "file", onChange: executerRestaurationGlobaleJSON, className: "hidden", accept: ".json" })), /* @__PURE__ */ React.createElement("span", { className: "bg-purple-600 px-2 py-1 rounded-full" }, verifications.length, " Archiv\xE9s"), /* @__PURE__ */ React.createElement("button", { onClick: onQuitter, className: "bg-red-900/80 px-2 py-1 rounded" }, "Quitter"))), /* @__PURE__ */ React.createElement("div", { className: "max-w-6xl mx-auto flex flex-wrap gap-2 text-xs mt-3 px-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => {
           setOnglet("accueil");
           setModePreValidation(false);
         }, className: `px-4 py-2 font-medium border-b-2 ${onglet === "accueil" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F3DB}\uFE0F Accueil"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("calcul"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "calcul" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "Calcul Facture"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
@@ -5806,7 +6475,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
         }, className: `px-4 py-2 font-medium border-b-2 ${onglet === "verifie" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4C1} Archives"), (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement("button", { onClick: () => {
           setOnglet("analyse");
           setModePreValidation(false);
-        }, className: `px-4 py-2 font-medium border-b-2 ${onglet === "analyse" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4CA} Pilotage CHF"), (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("meds"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "meds" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "Tarifs Pharma"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("actes"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "actes" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "Tarifs Actes"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("stock"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "stock" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4E6} Stock"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("ong"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "ong" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F91D} Partenaires")), userRole === "administrateur" && /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("users"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "users" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F465} Utilisateurs"), (userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("dashboard_direction"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "dashboard_direction" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4CA} Direction"), (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("dashboard_caisse"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "dashboard_caisse" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4B5} Caisse"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("demandes"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "demandes" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4E8} Demandes")))), /* @__PURE__ */ React.createElement("main", { className: "flex-1 max-w-3xl w-full mx-auto p-4 pb-24" }, onglet === "accueil" && /* @__PURE__ */ React.createElement(
+        }, className: `px-4 py-2 font-medium border-b-2 ${onglet === "analyse" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4CA} Pilotage CHF"), (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("meds"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "meds" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "Tarifs Pharma"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("actes"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "actes" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "Tarifs Actes"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("stock"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "stock" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4E6} Stock"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("ong"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "ong" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F91D} Partenaires")), userRole === "administrateur" && /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("users"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "users" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F465} Utilisateurs"), (userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("dashboard_direction"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "dashboard_direction" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4CA} Direction"), (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("dashboard_caisse"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "dashboard_caisse" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4B5} Caisse"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("demandes"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "demandes" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4E8} Demandes")))), /* @__PURE__ */ React.createElement("main", { className: "flex-1 max-w-6xl w-full mx-auto p-4 pb-24" }, onglet === "accueil" && /* @__PURE__ */ React.createElement(
           AccueilPanel,
           {
             verifications,
@@ -5814,21 +6483,23 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             medicaments,
             userRole,
             userDisplayName,
+            showToast,
             onNaviguer: (cible) => {
               setOnglet(cible);
               setModePreValidation(false);
             },
             onOuvrirAchatExpress: () => setAchatExpressOuvert(true)
           }
-        ), onglet === "dashboard_direction" && (userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(DashboardDirectionPanel, { verifications, paiements, medicaments }), onglet === "dashboard_caisse" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(DashboardCaissePanel, { verifications, paiements, userDisplayName, listeOng: listeOngNoms, showToast }), onglet === "calcul" && modePreValidation && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-6 rounded-xl border border-emerald-400 shadow-xl space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "text-center border-b pb-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-emerald-800 font-bold uppercase text-[11px]" }, "Contr\xF4le final"), /* @__PURE__ */ React.createElement("h3", { className: "text-lg font-black" }, "\u{1F4CB} Totaux analytiques"), /* @__PURE__ */ React.createElement("p", { className: "text-xs text-gray-500" }, nomPatient, " | ", selectedOng)), /* @__PURE__ */ React.createElement("div", { className: "bg-gray-50 p-4 rounded-xl border shadow-inner space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 font-bold font-mono text-xs border-b pb-2 mb-2" }, /* @__PURE__ */ React.createElement("span", null, "CAT\xC9GORIE"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "Gdes"), /* @__PURE__ */ React.createElement("span", { className: "text-right text-emerald-800" }, "DH")), CATEGORIES_LISTE.map((cat) => {
+        ), onglet === "dashboard_direction" && (userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(DashboardDirectionPanel, { verifications, paiements, medicaments, actes }), onglet === "dashboard_caisse" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(DashboardCaissePanel, { verifications, paiements, userDisplayName, listeOng: listeOngNoms, showToast }), onglet === "calcul" && modePreValidation && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-6 rounded-xl border border-emerald-400 shadow-xl space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "text-center border-b pb-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-emerald-800 font-bold uppercase text-[11px]" }, "Contr\xF4le final"), /* @__PURE__ */ React.createElement("h3", { className: "text-lg font-black" }, "\u{1F4CB} Totaux analytiques"), /* @__PURE__ */ React.createElement("p", { className: "text-xs text-gray-500" }, nomPatient, " | ", selectedOng)), /* @__PURE__ */ React.createElement("div", { className: "bg-gray-50 p-4 rounded-xl border shadow-inner space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 font-bold font-mono text-xs border-b pb-2 mb-2" }, /* @__PURE__ */ React.createElement("span", null, "CAT\xC9GORIE"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "Gdes"), /* @__PURE__ */ React.createElement("span", { className: "text-right text-emerald-800" }, "DH")), CATEGORIES_LISTE.map((cat) => {
           const m = cumulCategoriesDossierActif[cat.key];
           if (m === 0) return null;
           return /* @__PURE__ */ React.createElement("div", { key: cat.key, className: "grid grid-cols-3 font-mono text-[12px] py-1 border-b border-dashed" }, /* @__PURE__ */ React.createElement("span", null, cat.label), /* @__PURE__ */ React.createElement("span", { className: "text-right font-bold" }, formatGourdes(m)), /* @__PURE__ */ React.createElement("span", { className: "text-right font-bold text-emerald-800" }, formatDH(m)));
-        }), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 font-mono font-black text-sm pt-3 mt-2 border-t-2" }, /* @__PURE__ */ React.createElement("span", null, "TOTAL"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, formatGourdes(totalDossierGourdes)), /* @__PURE__ */ React.createElement("span", { className: "text-right text-emerald-800" }, formatDH(totalDossierGourdes)))), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-3" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setModePreValidation(false), className: "bg-gray-100 hover:bg-gray-200 rounded-xl py-3 text-xs font-bold" }, "Retour"), /* @__PURE__ */ React.createElement("button", { onClick: finaliserEtArchiverDossierOfficiel, className: "bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl py-3 text-xs font-black" }, "\u{1F7E2} Archiver"))), onglet === "calcul" && !modePreValidation && (modeSimulation ? /* @__PURE__ */ React.createElement(Simulateur, { medicaments, actes }) : /* @__PURE__ */ React.createElement(
+        }), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 font-mono font-black text-sm pt-3 mt-2 border-t-2" }, /* @__PURE__ */ React.createElement("span", null, "TOTAL"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, formatGourdes(totalDossierGourdes)), /* @__PURE__ */ React.createElement("span", { className: "text-right text-emerald-800" }, formatDH(totalDossierGourdes)))), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-3" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setModePreValidation(false), className: "bg-gray-100 hover:bg-gray-200 rounded-xl py-3 text-xs font-bold" }, "Retour"), /* @__PURE__ */ React.createElement("button", { onClick: finaliserEtArchiverDossierOfficiel, className: "bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl py-3 text-xs font-black" }, "\u{1F7E2} Archiver"))), onglet === "calcul" && !modePreValidation && (modeSimulation ? /* @__PURE__ */ React.createElement(Simulateur, { medicaments, actes, showToast }) : /* @__PURE__ */ React.createElement(
           CalculateurPanel,
           {
             medicaments,
             actes,
+            setActes,
             lignes: lignesCalcul,
             setLignes: setLignesCalcul,
             dossierActif,
@@ -5839,9 +6510,14 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             onCloturerDossier: declencherPreValidationDossier,
             fichesDossier,
             onSupprimerFicheDossier: supprimerFicheDossier,
+            onMarquerProblemeFiche: marquerProblemeFiche,
             idFicheEnCoursDEdition,
             onEditerFiche: editerFiche,
             numeroFicheCourante,
+            dateFiche,
+            setDateFiche,
+            prescritPar,
+            setPrescritPar,
             dateEntree1,
             setDateEntree1,
             dateSortie1,
@@ -5867,11 +6543,14 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             prixChirSpec,
             setPrixChirSpec,
             totalsParService,
+            coutsParService,
             grandTotal: grandTotalGlobalFiche,
             totalDossierGourdes,
             onEnregistrerFiche: enregistrerNouvelleFiche,
             onViderFicheActive: viderLeCalculateurFicheUniquement,
             injecterLigne: injecterLigneAuCalculateur,
+            tarifChoisi,
+            setTarifChoisi,
             modeSimulation,
             userRole,
             userDisplayName,
@@ -5894,7 +6573,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             onChangerNomPatient: changerNomPatient,
             listeOng: listeOngNoms
           }
-        )), onglet === "verifie" && /* @__PURE__ */ React.createElement(HistoriqueVerifPanel, { verifications, setVerifications, onChargerPourModif: r\u00E9importerDossierDepuisArchives, onSupprimer: supprimerDossierArchive, filtreInitialNom: filtreArchivesInitialNom, clearFiltreInitialNom: () => setFiltreArchivesInitialNom(""), userRole, showToast, onChangerTypeOng: changerTypeOngPourDossier, listeOng: listeOngNoms }), onglet === "analyse" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(AnalyticsPanel, { verifications }), onglet === "meds" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GrilleEditionPanel, { titre: "de la Pharmacie", items: medicaments, setItems: setMedicaments, collectionName: "medicaments", showToast }), onglet === "actes" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GrilleEditionPanel, { titre: "des Actes", items: actes, setItems: setActes, collectionName: "actes", showToast }), onglet === "stock" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GestionStockPanel, { items: medicaments, setItems: setMedicaments, showToast }), onglet === "ong" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GestionOngPanel, { listeOngDocs, showToast }), onglet === "users" && userRole === "administrateur" && /* @__PURE__ */ React.createElement(GestionUtilisateursPanel, { showToast }), onglet === "demandes" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(DemandesPanel, { userRole, showToast })));
+        )), onglet === "verifie" && /* @__PURE__ */ React.createElement(HistoriqueVerifPanel, { verifications, setVerifications, onChargerPourModif: r\u00E9importerDossierDepuisArchives, onSupprimer: supprimerDossierArchive, filtreInitialNom: filtreArchivesInitialNom, clearFiltreInitialNom: () => setFiltreArchivesInitialNom(""), userRole, showToast, onChangerTypeOng: changerTypeOngPourDossier, listeOng: listeOngNoms, listeOngDocs, confirmModal, setConfirmModal, lotInitialFocus: lotAFocuserAuRetour, clearLotInitialFocus: () => setLotAFocuserAuRetour(null) }), onglet === "analyse" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(AnalyticsPanel, { verifications }), onglet === "meds" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GrilleEditionPanel, { titre: "de la Pharmacie", items: medicaments, setItems: setMedicaments, collectionName: "medicaments", showToast }), onglet === "actes" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GrilleEditionPanel, { titre: "des Actes", items: actes, setItems: setActes, collectionName: "actes", showToast }), onglet === "stock" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GestionStockPanel, { items: medicaments, setItems: setMedicaments, showToast }), onglet === "ong" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GestionOngPanel, { listeOngDocs, showToast }), onglet === "users" && userRole === "administrateur" && /* @__PURE__ */ React.createElement(GestionUtilisateursPanel, { showToast }), onglet === "demandes" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(DemandesPanel, { userRole, showToast })));
       }
       function ApplicationRoot() {
         var _a;
@@ -5902,6 +6581,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
         const [chargementAuth, setChargementAuth] = useState(true);
         const [userRole, setUserRole] = useState(null);
         const [userDisplayName, setUserDisplayName] = useState("");
+        const [roleParDefaut, setRoleParDefaut] = useState(false);
         useEffect(() => {
           const unsubscribe = auth.onAuthStateChanged(async (user) => {
             setChargementAuth(false);
@@ -5913,6 +6593,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
                 if (doc.exists) {
                   const data = doc.data();
                   setUserRole(data.role || "auditeur");
+                  setRoleParDefaut(!data.role);
                   setUserDisplayName(data.displayName || user.email || "Utilisateur");
                 } else {
                   await db.collection("users").doc(user.uid).set({
@@ -5924,10 +6605,12 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
                     createdAt: firebase2.firestore.FieldValue.serverTimestamp()
                   });
                   setUserRole("auditeur");
+                  setRoleParDefaut(true);
                 }
               } catch (error) {
                 console.error("Erreur r\xE9cup\xE9ration r\xF4le:", error);
                 setUserRole("auditeur");
+                setRoleParDefaut(true);
               }
             } else {
               setAuthentifie(false);
@@ -5938,7 +6621,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
         }, []);
         if (chargementAuth) return /* @__PURE__ */ React.createElement("div", { className: "min-h-screen w-full flex items-center justify-center bg-[#1E2A24]" }, /* @__PURE__ */ React.createElement("div", { className: "text-white text-sm" }, "Chargement..."));
         if (!authentifie) return /* @__PURE__ */ React.createElement(LoginScreen, { onLogin: () => setAuthentifie(true) });
-        return /* @__PURE__ */ React.createElement(AppHospitaliere, { onQuitter: () => auth.signOut(), userRole, userDisplayName, userEmail: (_a = auth.currentUser) == null ? void 0 : _a.email });
+        return /* @__PURE__ */ React.createElement(AppHospitaliere, { onQuitter: () => auth.signOut(), userRole, userDisplayName, userEmail: (_a = auth.currentUser) == null ? void 0 : _a.email, roleParDefaut });
       }
       module.exports = { AppHospitaliere, ApplicationRoot };
       if (typeof document !== "undefined" && document.getElementById("root")) {
