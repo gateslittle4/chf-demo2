@@ -2425,6 +2425,21 @@
       var { formatGourdes } = require_helpers();
       var { Check, X, Pencil, Trash2 } = require_icons();
       function GrilleEditionPanel({ titre, items, setItems, collectionName, showToast }) {
+        const exporterJSON = () => {
+          const texte = JSON.stringify(items, null, 2);
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(texte).then(() => showToast(`${items.length} article(s) copi\xE9(s) dans le presse-papier`, "success")).catch(() => showToast("Copie impossible \u2014 utilise le t\xE9l\xE9chargement \xE0 la place", "error"));
+          }
+        };
+        const telechargerJSON = () => {
+          const blob = new Blob([JSON.stringify(items, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `catalogue-${collectionName}-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+        };
         const [filtre, setFiltre] = useState("");
         const [idEdit, setIdEdit] = useState(null);
         const [prixEdit, setPrixEdit] = useState("");
@@ -2587,7 +2602,7 @@
             setSalaires((prev) => ({ ...prev, [c.key]: e.target.value }));
             setSalairesModifies(true);
           }, placeholder: "0", className: "border border-orange-200 rounded-lg p-1.5 font-mono text-right outline-none" }));
-        })), salairesModifies && /* @__PURE__ */ React.createElement("button", { onClick: enregistrerSalaires, className: "bg-orange-700 text-white font-bold px-3 py-1.5 rounded" }, "\u{1F4BE} Enregistrer les salaires")), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm space-y-2" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-gray-800" }, "\u2795 Ajouter un ", titre), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-2" }, /* @__PURE__ */ React.createElement("input", { type: "text", value: nouveauNom, onChange: (e) => setNouveauNom(e.target.value), placeholder: "Nom...", className: "border rounded-lg p-1.5 flex-1 min-w-[120px] outline-none" }), /* @__PURE__ */ React.createElement("input", { type: "number", step: "0.01", value: nouveauPrix, onChange: (e) => setNouveauPrix(e.target.value), placeholder: "Prix (Gourdes)", className: "border rounded-lg p-1.5 w-24 font-mono outline-none" }), /* @__PURE__ */ React.createElement("input", { type: "number", step: "0.01", value: nouveauCout, onChange: (e) => setNouveauCout(e.target.value), placeholder: "Co\xFBt (achat+m.o.)", className: "border border-orange-300 rounded-lg p-1.5 w-28 font-mono outline-none" }), collectionName === "medicaments" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("input", { type: "number", step: "1", value: quantiteStock, onChange: (e) => setQuantiteStock(e.target.value), placeholder: "Stock", className: "border rounded-lg p-1.5 w-16 font-mono outline-none" }), /* @__PURE__ */ React.createElement("input", { type: "number", step: "1", value: seuilAlerte, onChange: (e) => setSeuilAlerte(e.target.value), placeholder: "Seuil", className: "border rounded-lg p-1.5 w-16 font-mono outline-none" })), collectionName !== "medicaments" && /* @__PURE__ */ React.createElement("select", { value: nouvelleSousCategorie, onChange: (e) => setNouvelleSousCategorie(e.target.value), className: "border rounded-lg p-1.5 bg-white outline-none" }, categoriesActes.map((c) => /* @__PURE__ */ React.createElement("option", { key: c.key, value: c.key }, c.label))), /* @__PURE__ */ React.createElement("button", { onClick: ajouterElement, className: "bg-emerald-700 text-white px-3 py-1.5 rounded font-bold" }, "Ajouter"))), nombreEnAttente > 0 && /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between gap-2 bg-indigo-50 border border-indigo-300 rounded-xl p-3" }, /* @__PURE__ */ React.createElement("span", { className: "text-indigo-800 font-bold" }, "\u{1F553} ", nombreEnAttente, " nouveau(x) prix en attente (visibles seulement dans le Simulateur pour l'instant)"), /* @__PURE__ */ React.createElement("button", { onClick: appliquerNouveauxPrix, className: "bg-indigo-700 text-white font-bold px-3 py-1.5 rounded whitespace-nowrap" }, "\u{1F504} Appliquer tous les nouveaux prix")), collectionName !== "medicaments" && /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between gap-2 bg-blue-50 border border-blue-300 rounded-xl p-3" }, /* @__PURE__ */ React.createElement("span", { className: "text-blue-800 font-bold" }, '\u{1F4CB} Trier "Laboratoire" comme sur le bon papier'), /* @__PURE__ */ React.createElement("button", { onClick: appliquerOrdreLabo, className: "bg-blue-700 text-white font-bold px-3 py-1.5 rounded whitespace-nowrap" }, "Appliquer l'ordre")), /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ React.createElement("input", { type: "text", value: filtre, onChange: (e) => setFiltre(e.target.value), placeholder: "Filtrer...", className: "w-full border rounded-lg p-2" }), /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl border overflow-hidden max-h-96 overflow-y-auto divide-y" }, correspondances.map((i) => {
+        })), salairesModifies && /* @__PURE__ */ React.createElement("button", { onClick: enregistrerSalaires, className: "bg-orange-700 text-white font-bold px-3 py-1.5 rounded" }, "\u{1F4BE} Enregistrer les salaires")), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm space-y-2" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-gray-800" }, "\u2795 Ajouter un ", titre), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-2" }, /* @__PURE__ */ React.createElement("input", { type: "text", value: nouveauNom, onChange: (e) => setNouveauNom(e.target.value), placeholder: "Nom...", className: "border rounded-lg p-1.5 flex-1 min-w-[120px] outline-none" }), /* @__PURE__ */ React.createElement("input", { type: "number", step: "0.01", value: nouveauPrix, onChange: (e) => setNouveauPrix(e.target.value), placeholder: "Prix (Gourdes)", className: "border rounded-lg p-1.5 w-24 font-mono outline-none" }), /* @__PURE__ */ React.createElement("input", { type: "number", step: "0.01", value: nouveauCout, onChange: (e) => setNouveauCout(e.target.value), placeholder: "Co\xFBt (achat+m.o.)", className: "border border-orange-300 rounded-lg p-1.5 w-28 font-mono outline-none" }), collectionName === "medicaments" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("input", { type: "number", step: "1", value: quantiteStock, onChange: (e) => setQuantiteStock(e.target.value), placeholder: "Stock", className: "border rounded-lg p-1.5 w-16 font-mono outline-none" }), /* @__PURE__ */ React.createElement("input", { type: "number", step: "1", value: seuilAlerte, onChange: (e) => setSeuilAlerte(e.target.value), placeholder: "Seuil", className: "border rounded-lg p-1.5 w-16 font-mono outline-none" })), collectionName !== "medicaments" && /* @__PURE__ */ React.createElement("select", { value: nouvelleSousCategorie, onChange: (e) => setNouvelleSousCategorie(e.target.value), className: "border rounded-lg p-1.5 bg-white outline-none" }, categoriesActes.map((c) => /* @__PURE__ */ React.createElement("option", { key: c.key, value: c.key }, c.label))), /* @__PURE__ */ React.createElement("button", { onClick: ajouterElement, className: "bg-emerald-700 text-white px-3 py-1.5 rounded font-bold" }, "Ajouter"))), nombreEnAttente > 0 && /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between gap-2 bg-indigo-50 border border-indigo-300 rounded-xl p-3" }, /* @__PURE__ */ React.createElement("span", { className: "text-indigo-800 font-bold" }, "\u{1F553} ", nombreEnAttente, " nouveau(x) prix en attente (visibles seulement dans le Simulateur pour l'instant)"), /* @__PURE__ */ React.createElement("button", { onClick: appliquerNouveauxPrix, className: "bg-indigo-700 text-white font-bold px-3 py-1.5 rounded whitespace-nowrap" }, "\u{1F504} Appliquer tous les nouveaux prix")), collectionName !== "medicaments" && /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between gap-2 bg-blue-50 border border-blue-300 rounded-xl p-3" }, /* @__PURE__ */ React.createElement("span", { className: "text-blue-800 font-bold" }, '\u{1F4CB} Trier "Laboratoire" comme sur le bon papier'), /* @__PURE__ */ React.createElement("button", { onClick: appliquerOrdreLabo, className: "bg-blue-700 text-white font-bold px-3 py-1.5 rounded whitespace-nowrap" }, "Appliquer l'ordre")), /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between gap-2 bg-gray-50 border rounded-xl p-3" }, /* @__PURE__ */ React.createElement("span", { className: "text-gray-700 font-bold" }, "\u{1F4E4} Exporter ce catalogue (", items.length, " articles)"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: exporterJSON, className: "bg-gray-700 text-white font-bold px-3 py-1.5 rounded whitespace-nowrap" }, "\u{1F4CB} Copier"), /* @__PURE__ */ React.createElement("button", { onClick: telechargerJSON, className: "border border-gray-400 text-gray-700 font-bold px-3 py-1.5 rounded whitespace-nowrap" }, "\u2B07\uFE0F T\xE9l\xE9charger"))), /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ React.createElement("input", { type: "text", value: filtre, onChange: (e) => setFiltre(e.target.value), placeholder: "Filtrer...", className: "w-full border rounded-lg p-2" }), /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl border overflow-hidden max-h-96 overflow-y-auto divide-y" }, correspondances.map((i) => {
           var _a;
           return /* @__PURE__ */ React.createElement("div", { key: i.id, className: "p-3 flex justify-between items-center hover:bg-gray-50" }, idEdit === i.id ? /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 w-full justify-between items-center flex-wrap" }, /* @__PURE__ */ React.createElement("input", { type: "text", value: nomEdit, onChange: (e) => setNomEdit(e.target.value), className: "border rounded p-1 flex-1" }), collectionName !== "medicaments" && /* @__PURE__ */ React.createElement("select", { value: sousCategorieEdit, onChange: (e) => setSousCategorieEdit(e.target.value), className: "border rounded p-1 bg-white text-xs" }, categoriesActes.map((c) => /* @__PURE__ */ React.createElement("option", { key: c.key, value: c.key }, c.label))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-0.5" }, /* @__PURE__ */ React.createElement("label", { className: "text-[8px] text-gray-400 uppercase font-bold" }, "Prix actuel"), /* @__PURE__ */ React.createElement("input", { type: "number", value: prixEdit, onChange: (e) => setPrixEdit(e.target.value), className: "w-20 border rounded p-1 text-right font-mono" })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-0.5" }, /* @__PURE__ */ React.createElement("label", { className: "text-[8px] text-orange-500 uppercase font-bold" }, "Co\xFBt (achat+m.o.)"), /* @__PURE__ */ React.createElement("input", { type: "number", value: coutEdit, onChange: (e) => setCoutEdit(e.target.value), placeholder: "\u2014", className: "w-24 border border-orange-300 rounded p-1 text-right font-mono" })), /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-0.5" }, /* @__PURE__ */ React.createElement("label", { className: "text-[8px] text-indigo-500 uppercase font-bold" }, "Nv. prix (\xE0 venir)"), /* @__PURE__ */ React.createElement("input", { type: "number", value: nouveauPrixEdit, onChange: (e) => setNouveauPrixEdit(e.target.value), placeholder: "\u2014", className: "w-20 border border-indigo-300 rounded p-1 text-right font-mono" })), /* @__PURE__ */ React.createElement("button", { onClick: async () => {
             const p = parseFloat(prixEdit);
@@ -3915,6 +3930,54 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
         const [nouvelOngEdit, setNouvelOngEdit] = useState("");
         const [editNomOuvert, setEditNomOuvert] = useState(false);
         const [nouveauNomEdit, setNouveauNomEdit] = useState("");
+        const [fileImport, setFileImport] = useState(() => {
+          try {
+            return JSON.parse(localStorage.getItem("chf-file-import") || "[]");
+          } catch (e) {
+            return [];
+          }
+        });
+        useEffect(() => {
+          localStorage.setItem("chf-file-import", JSON.stringify(fileImport));
+        }, [fileImport]);
+        const [fileOuverte, setFileOuverte] = useState(false);
+        const [collageJson, setCollageJson] = useState("");
+        const [idEntreeChargee, setIdEntreeChargee] = useState(null);
+        const trouverDansCatalogue = (nom, type) => {
+          const source = type === "med" ? medicaments : actes;
+          const cible = (nom || "").trim().toLowerCase();
+          return source.find((i) => i.nom.trim().toLowerCase() === cible);
+        };
+        const chargerEntreeFile = (entree) => {
+          const p = entree.patient || {};
+          if (!dossierActif) {
+            setInputNom(p.nom || "");
+            setInputOng(p.ong || "");
+            setInputTypePatient(p.typePatient || "ONG");
+          }
+          const introuvables = [];
+          (entree.lignes || []).forEach((l) => {
+            const item = trouverDansCatalogue(l.nom, l.type);
+            if (item) injecterLigne(item, l.type, l.qte || 1);
+            else introuvables.push(l.nom);
+          });
+          if (introuvables.length > 0) showToast(`Introuvable(s) dans le catalogue : ${introuvables.join(", ")}`, "error");
+          setIdEntreeChargee(entree._id);
+          setFileOuverte(false);
+        };
+        const ajouterAuCollage = () => {
+          try {
+            const parsed = JSON.parse(collageJson);
+            const entrees = Array.isArray(parsed) ? parsed : [parsed];
+            const avecId = entrees.map((e) => ({ ...e, _id: "fi-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6) }));
+            setFileImport((prev) => [...prev, ...avecId]);
+            setCollageJson("");
+            showToast(`${avecId.length} fiche(s) ajout\xE9e(s) \xE0 la file`, "success");
+          } catch (e) {
+            showToast("JSON invalide : " + e.message, "error");
+          }
+        };
+        const retirerDeLaFile = (id) => setFileImport((prev) => prev.filter((e) => e._id !== id));
         const refZone = useRef(null);
         const inputRechercheRef = useRef(null);
         const holdDelaiRef = useRef(null);
@@ -4485,10 +4548,26 @@ Mode de paiement : ${libellesMode[modePaiement] || modePaiement}`,
             rawState: { lignesCalcul: [...lignes], dateEntree1, dateSortie1, typeLit1, multiPeriode, dateEntree2, dateSortie2, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
           };
           onEnregistrerFiche(fiche);
+          if (idEntreeChargee) {
+            retirerDeLaFile(idEntreeChargee);
+            setIdEntreeChargee(null);
+          }
           setPaiementEffectue(true);
           showToast(idFicheEnCoursDEdition ? "Fiche mise \xE0 jour" : "Fiche enregistr\xE9e", "success");
         };
-        return /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, confirmModal && /* @__PURE__ */ React.createElement(ConfirmModal, { ...confirmModal }), dossierActif && /* @__PURE__ */ React.createElement(
+        return /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, confirmModal && /* @__PURE__ */ React.createElement(ConfirmModal, { ...confirmModal }), /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl border shadow-sm p-3 text-xs" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setFileOuverte((o) => !o), className: "w-full flex justify-between items-center font-bold text-gray-700" }, /* @__PURE__ */ React.createElement("span", null, "\u{1F4E5} File d'import ", fileImport.length > 0 && /* @__PURE__ */ React.createElement("span", { className: "ml-1 bg-orange-600 text-white rounded-full px-2 py-0.5 text-[10px]" }, fileImport.length, " en attente")), /* @__PURE__ */ React.createElement("span", null, fileOuverte ? "\u25B2" : "\u25BC")), fileOuverte && /* @__PURE__ */ React.createElement("div", { className: "mt-3 space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "space-y-1" }, fileImport.map((e) => {
+          var _a, _b;
+          return /* @__PURE__ */ React.createElement("div", { key: e._id, className: "flex justify-between items-center bg-gray-50 border rounded-lg p-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => chargerEntreeFile(e), className: "text-left flex-1 font-medium text-gray-800" }, ((_a = e.patient) == null ? void 0 : _a.nom) || "(sans nom)", " ", ((_b = e.patient) == null ? void 0 : _b.ong) ? `\u2014 ${e.patient.ong}` : ""), /* @__PURE__ */ React.createElement("button", { onClick: () => retirerDeLaFile(e._id), className: "text-gray-300 hover:text-red-600 ml-2" }, /* @__PURE__ */ React.createElement(X, { size: 12 })));
+        }), fileImport.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "text-gray-400 italic" }, "File vide.")), /* @__PURE__ */ React.createElement(
+          "textarea",
+          {
+            value: collageJson,
+            onChange: (e) => setCollageJson(e.target.value),
+            rows: 3,
+            placeholder: "Coller un JSON (une fiche ou un tableau de fiches)",
+            className: "w-full border rounded-lg p-2 font-mono text-[11px]"
+          }
+        ), /* @__PURE__ */ React.createElement("button", { onClick: ajouterAuCollage, disabled: !collageJson.trim(), className: "w-full bg-[#1E2A24] text-white rounded-lg py-1.5 disabled:opacity-40" }, "Ajouter \xE0 la file"))), dossierActif && /* @__PURE__ */ React.createElement(
           "button",
           {
             onClick: enregistrerFicheActive,

@@ -9,6 +9,23 @@ const { formatGourdes } = require('../utils/helpers');
 const { Check, X, Pencil, Trash2 } = require('../utils/icons');
 
 function GrilleEditionPanel({ titre, items, setItems, collectionName, showToast }) {
+  const exporterJSON = () => {
+    const texte = JSON.stringify(items, null, 2);
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(texte)
+        .then(() => showToast(`${items.length} article(s) copié(s) dans le presse-papier`, "success"))
+        .catch(() => showToast("Copie impossible — utilise le téléchargement à la place", "error"));
+    }
+  };
+  const telechargerJSON = () => {
+    const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `catalogue-${collectionName}-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
   const [filtre, setFiltre] = useState("");
   const [idEdit, setIdEdit] = useState(null);
   const [prixEdit, setPrixEdit] = useState("");
@@ -169,6 +186,14 @@ function GrilleEditionPanel({ titre, items, setItems, collectionName, showToast 
           <button onClick={appliquerOrdreLabo} className="bg-blue-700 text-white font-bold px-3 py-1.5 rounded whitespace-nowrap">Appliquer l'ordre</button>
         </div>
       )}
+
+      <div className="flex items-center justify-between gap-2 bg-gray-50 border rounded-xl p-3">
+        <span className="text-gray-700 font-bold">📤 Exporter ce catalogue ({items.length} articles)</span>
+        <div className="flex gap-2">
+          <button onClick={exporterJSON} className="bg-gray-700 text-white font-bold px-3 py-1.5 rounded whitespace-nowrap">📋 Copier</button>
+          <button onClick={telechargerJSON} className="border border-gray-400 text-gray-700 font-bold px-3 py-1.5 rounded whitespace-nowrap">⬇️ Télécharger</button>
+        </div>
+      </div>
 
       <div className="space-y-2">
         <input type="text" value={filtre} onChange={e=>setFiltre(e.target.value)} placeholder="Filtrer..." className="w-full border rounded-lg p-2" />

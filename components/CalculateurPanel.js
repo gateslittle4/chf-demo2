@@ -77,6 +77,53 @@ function CalculateurPanel({
   const [editNomOuvert, setEditNomOuvert] = useState(false);
   const [nouveauNomEdit, setNouveauNomEdit] = useState("");
 
+  // --- File d'attente de fiches à importer (digitalisation papier) ---
+  const [fileImport, setFileImport] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('chf-file-import') || '[]'); } catch { return []; }
+  });
+  useEffect(() => { localStorage.setItem('chf-file-import', JSON.stringify(fileImport)); }, [fileImport]);
+  const [fileOuverte, setFileOuverte] = useState(false);
+  const [collageJson, setCollageJson] = useState("");
+  const [idEntreeChargee, setIdEntreeChargee] = useState(null); // entrée de la file en cours d'import, retirée après sauvegarde
+
+  const trouverDansCatalogue = (nom, type) => {
+    const source = type === 'med' ? medicaments : actes;
+    const cible = (nom || '').trim().toLowerCase();
+    return source.find(i => i.nom.trim().toLowerCase() === cible);
+  };
+
+  const chargerEntreeFile = (entree) => {
+    const p = entree.patient || {};
+    if (!dossierActif) {
+      setInputNom(p.nom || "");
+      setInputOng(p.ong || "");
+      setInputTypePatient(p.typePatient || "ONG");
+    }
+    const introuvables = [];
+    (entree.lignes || []).forEach(l => {
+      const item = trouverDansCatalogue(l.nom, l.type);
+      if (item) injecterLigne(item, l.type, l.qte || 1);
+      else introuvables.push(l.nom);
+    });
+    if (introuvables.length > 0) showToast(`Introuvable(s) dans le catalogue : ${introuvables.join(', ')}`, "error");
+    setIdEntreeChargee(entree._id);
+    setFileOuverte(false);
+  };
+
+  const ajouterAuCollage = () => {
+    try {
+      const parsed = JSON.parse(collageJson);
+      const entrees = Array.isArray(parsed) ? parsed : [parsed];
+      const avecId = entrees.map(e => ({ ...e, _id: "fi-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6) }));
+      setFileImport(prev => [...prev, ...avecId]);
+      setCollageJson("");
+      showToast(`${avecId.length} fiche(s) ajoutée(s) à la file`, "success");
+    } catch (e) {
+      showToast("JSON invalide : " + e.message, "error");
+    }
+  };
+  const retirerDeLaFile = (id) => setFileImport(prev => prev.filter(e => e._id !== id));
+
   const refZone = useRef(null);
   const inputRechercheRef = useRef(null);
 
@@ -519,6 +566,7 @@ function CalculateurPanel({
     };
     onEnregistrerFiche(fiche);
     // Le parent (AppHospitaliere) gère la mise à jour ou l'ajout et vide le calculateur
+    if (idEntreeChargee) { retirerDeLaFile(idEntreeChargee); setIdEntreeChargee(null); }
     setPaiementEffectue(true);
     showToast(idFicheEnCoursDEdition ? "Fiche mise à jour" : "Fiche enregistrée", "success");
   };
@@ -526,6 +574,33 @@ function CalculateurPanel({
   return (
     <div className="space-y-4">
       {confirmModal && <ConfirmModal {...confirmModal} />}
+
+      {/* File d'attente de fiches à importer (digitalisation papier) */}
+      <div className="bg-white rounded-xl border shadow-sm p-3 text-xs">
+        <button onClick={() => setFileOuverte(o => !o)} className="w-full flex justify-between items-center font-bold text-gray-700">
+          <span>📥 File d'import {fileImport.length > 0 && <span className="ml-1 bg-orange-600 text-white rounded-full px-2 py-0.5 text-[10px]">{fileImport.length} en attente</span>}</span>
+          <span>{fileOuverte ? '▲' : '▼'}</span>
+        </button>
+        {fileOuverte && (
+          <div className="mt-3 space-y-2">
+            <div className="space-y-1">
+              {fileImport.map(e => (
+                <div key={e._id} className="flex justify-between items-center bg-gray-50 border rounded-lg p-2">
+                  <button onClick={() => chargerEntreeFile(e)} className="text-left flex-1 font-medium text-gray-800">
+                    {e.patient?.nom || '(sans nom)'} {e.patient?.ong ? `— ${e.patient.ong}` : ''}
+                  </button>
+                  <button onClick={() => retirerDeLaFile(e._id)} className="text-gray-300 hover:text-red-600 ml-2"><X size={12}/></button>
+                </div>
+              ))}
+              {fileImport.length === 0 && <p className="text-gray-400 italic">File vide.</p>}
+            </div>
+            <textarea value={collageJson} onChange={e => setCollageJson(e.target.value)} rows={3} placeholder='Coller un JSON (une fiche ou un tableau de fiches)'
+              className="w-full border rounded-lg p-2 font-mono text-[11px]" />
+            <button onClick={ajouterAuCollage} disabled={!collageJson.trim()} className="w-full bg-[#1E2A24] text-white rounded-lg py-1.5 disabled:opacity-40">Ajouter à la file</button>
+          </div>
+        )}
+      </div>
+
       {dossierActif && (
         <button onClick={enregistrerFicheActive} disabled={!peutArchiver}
           className="fixed right-2 z-50 bg-emerald-700 active:bg-emerald-800 hover:bg-emerald-800 text-white rounded-full shadow-2xl disabled:opacity-40 flex flex-col items-center justify-center gap-0.5 w-16 h-16"
