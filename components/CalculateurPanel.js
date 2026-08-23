@@ -473,7 +473,7 @@ function CalculateurPanel({
         ongPartenaire: modePaiement === "ong" ? ongPartenaireFiche : "",
         exoneration: modePaiement === "exoneration" ? { pourcentage: parseFloat(pourcentageExoneration), montantExonere: montantExonere, motif: motifExoneration, autorisePar: auth.currentUser.displayName } : null,
         statutPaiement: modePaiement === "credit" ? "partiellement_paye" : "paye",
-        montantPaye: modePaiement === "cash" ? parseFloat(montantVerse) : modePaiement === "credit" ? 0 : montantRestantApresDepots,
+        montantPaye: modePaiement === "credit" ? 0 : montantRestantApresDepots,
         solde: modePaiement === "credit" ? montantRestantApresDepots : 0,
         exeat: dateEntree1 && dateSortie1 ? {
           dateEntree: dateEntree1, dateSortie: dateSortie1, nbJours: j1, typeLit: typeLit1,
