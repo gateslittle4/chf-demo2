@@ -9,6 +9,29 @@ const { LOGO_CHF_BASE64 } = require('../utils/logoChf');
 const NOM_COMPLET_ONG = { "MSF-H": "MSF-HOLLANDE", "MSF-F": "MSF-FRANCE" }; // affiché en entier dans les rapports Excel — complète ici si d'autres partenaires sont abrégés
 const nomCompletOng = (nom) => NOM_COMPLET_ONG[nom] || nom;
 
+// Regroupement mère/bébé (utilisé pour la liste d'un lot à l'écran ET l'export Excel) : un dossier
+// nommé "Bb <nom de la mère>" (ou "Bébé <nom>") est trié juste après le dossier de sa mère, même
+// si sa propre date d'entrée diffère — il hérite de la date de la mère pour le tri. Si aucun dossier
+// de mère correspondant n'est trouvé dans la même liste, le dossier du bébé est marqué
+// estBebeSansMere=true, pour repérer qu'il faut peut-être ouvrir une fiche d'urgence pour ce bébé.
+const extraireNomMere = (nom) => { const m = (nom || '').trim().match(/^(?:bb|beb[ée])\.?\s+(.+)$/i); return m ? m[1].trim().toLowerCase() : null; };
+const cleFamilleDossier = (nom) => extraireNomMere(nom) || (nom || '').trim().toLowerCase();
+const trierAvecRegroupementMereBebe = (dossiers) => {
+  const dateMereParCle = {};
+  dossiers.forEach(v => { if (!extraireNomMere(v.nomPatient)) dateMereParCle[cleFamilleDossier(v.nomPatient)] = v.dateEntreePourTri; });
+  const dateEffective = (v) => { const nomMere = extraireNomMere(v.nomPatient); return (nomMere && dateMereParCle[nomMere]) ? dateMereParCle[nomMere] : v.dateEntreePourTri; };
+  return [...dossiers].sort((a, b) => {
+    const diff = new Date(dateEffective(a)) - new Date(dateEffective(b));
+    if (diff !== 0) return diff;
+    const cleA = cleFamilleDossier(a.nomPatient), cleB = cleFamilleDossier(b.nomPatient);
+    if (cleA !== cleB) return cleA.localeCompare(cleB);
+    return (extraireNomMere(a.nomPatient) ? 1 : 0) - (extraireNomMere(b.nomPatient) ? 1 : 0);
+  }).map(v => {
+    const nomMere = extraireNomMere(v.nomPatient);
+    return { ...v, estBebeSansMere: !!nomMere && dateMereParCle[nomMere] === undefined };
+  });
+};
+
 // Lignes du formulaire papier CHF (reproduction fidèle de la fiche d'admission physique) — ordre et
 // libellés calqués sur le papier. "Certificat" n'a pas d'équivalent dans le catalogue de l'app
 // (aucune catégorie ne correspond) : sa case reste donc toujours vide, comme les champs Âge/Sexe/
@@ -127,7 +150,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     });
     return Object.keys(parNumero).map(n => Number(n)).sort((a, b) => b - a).map(n => ({
       numero: n,
-      dossiers: [...parNumero[n]].sort((a, b) => (a.dateEntreePourTri || '9999-12-31').localeCompare(b.dateEntreePourTri || '9999-12-31')),
+      dossiers: trierAvecRegroupementMereBebe(parNumero[n]),
       total: parNumero[n].reduce((s, v) => s + (v.totalGlobal || 0), 0)
     }));
   }, [verifications, lotOngSelectionne]);
@@ -183,7 +206,8 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     celluleTotal: { font: { bold: true }, alignment: { horizontal: "right" }, numFmt: "\"HTG \"#,##0", border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } },
     grandTotalHtg: { font: { bold: true }, alignment: { horizontal: "right" }, numFmt: "\"HTG \"#,##0", border: { top: { style: "medium" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } },
     grandTotalNombre: { font: { bold: true }, alignment: { horizontal: "right" }, numFmt: "#,##0", border: { top: { style: "medium" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } },
-    celluleFinaleGras: { font: { bold: true, size: 11 }, fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFD0D0D0" } }, alignment: { horizontal: "right" }, numFmt: "\"HTG \"#,##0", border: { top: { style: "medium" }, bottom: { style: "double" }, left: { style: "thin" }, right: { style: "thin" } } }
+    celluleFinaleGras: { font: { bold: true, size: 11 }, fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFD0D0D0" } }, alignment: { horizontal: "right" }, numFmt: "\"HTG \"#,##0", border: { top: { style: "medium" }, bottom: { style: "double" }, left: { style: "thin" }, right: { style: "thin" } } },
+    alerteBebeSansMere: { fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFE0B2" } } } // bébé sans dossier de mère dans ce lot — à vérifier avant envoi
   };
 
   // Applique un style nommé (EXCEL_STYLES.xxx) à une cellule ExcelJS
@@ -208,24 +232,17 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
 
   const genererFichierExcelPourLot = async (ongCible, idsDossiers, numeroLot) => {
     try {
-      let listeDossiersONG = verifications.filter(v => idsDossiers.includes(v.id));
       // Regroupement mère/bébé : un dossier nommé "Bb <nom de la mère>" est trié juste après le
       // dossier de sa mère (même date effective, ordre alphabétique de la "famille" sinon), même si
       // le bébé n'a pas sa propre date d'hébergement (il hérite alors de celle de sa mère pour le tri).
-      const extraireNomMere = (nom) => { const m = (nom || '').trim().match(/^(?:bb|beb[ée])\.?\s+(.+)$/i); return m ? m[1].trim().toLowerCase() : null; };
-      const cleFamille = (nom) => extraireNomMere(nom) || (nom || '').trim().toLowerCase();
-      const dateMereParCle = {};
-      listeDossiersONG.forEach(v => { if (!extraireNomMere(v.nomPatient)) dateMereParCle[cleFamille(v.nomPatient)] = v.dateEntreePourTri; });
-      const dateEffective = (v) => { const nomMere = extraireNomMere(v.nomPatient); return (nomMere && dateMereParCle[nomMere]) ? dateMereParCle[nomMere] : v.dateEntreePourTri; };
-      listeDossiersONG = listeDossiersONG.sort((a, b) => {
-        const diff = new Date(dateEffective(a)) - new Date(dateEffective(b));
-        if (diff !== 0) return diff;
-        const cleA = cleFamille(a.nomPatient), cleB = cleFamille(b.nomPatient);
-        if (cleA !== cleB) return cleA.localeCompare(cleB);
-        return (extraireNomMere(a.nomPatient) ? 1 : 0) - (extraireNomMere(b.nomPatient) ? 1 : 0);
-      });
+      // estBebeSansMere signale un bébé dont la mère n'est pas dans ce lot (surligné dans le fichier).
+      let listeDossiersONG = trierAvecRegroupementMereBebe(verifications.filter(v => idsDossiers.includes(v.id)));
 
       if (listeDossiersONG.length === 0) { showToast(`Aucun dossier trouvé pour ${ongCible}`, "error"); return; }
+      const nomsBebesSansMere = listeDossiersONG.filter(v => v.estBebeSansMere).map(v => v.nomPatient);
+      if (nomsBebesSansMere.length > 0) {
+        showToast(`⚠️ Bébé(s) sans dossier de mère dans ce lot (vérifie s'il faut une fiche d'urgence) : ${nomsBebesSansMere.join(', ')}`, "info");
+      }
 
       // Étape B : détection dynamique des colonnes réellement utilisées (rien d'inventé, rien d'oublié)
       const clesVues = new Set(['service', 'hospit', 'labo', 'med']);
@@ -299,6 +316,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
         });
 
         appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.celluleStandard); ws.getCell(r, 1).value = formaterNomPropre(doc.nomPatient);
+        if (doc.estBebeSansMere) appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.alerteBebeSansMere);
         appliquerStyle(ws.getCell(r, 2), EXCEL_STYLES.celluleStandard); ws.getCell(r, 2).value = doc.periodeSejourString || doc.dateHeure || "—";
         colonnesExport.forEach((c, i) => {
           totalsParColonne[c.key] += totalsPatient[c.key] || 0;
@@ -658,7 +676,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                   <div key={v.id} className="flex justify-between items-start py-2 text-xs font-mono gap-2">
                     <div className="flex-1 min-w-0">
                       <span className={`inline-block w-16 mr-3 ${v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? 'text-gray-500' : 'text-red-500'}`}>{v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? v.dateEntreePourTri.split('-').reverse().join('/') : 'sans exeat'}</span>
-                      {v.nomPatient} <span className="text-gray-400">— {formatGourdes(v.totalGlobal||0)} Gdes <span className="text-indigo-400">({formatDH(v.totalGlobal||0)} DH)</span></span>
+                      {v.nomPatient} {v.estBebeSansMere && <span title="Bébé sans dossier de mère dans ce lot — vérifie s'il faut ouvrir une fiche d'urgence pour ce bébé" className="text-red-600">🚨</span>} <span className="text-gray-400">— {formatGourdes(v.totalGlobal||0)} Gdes <span className="text-indigo-400">({formatDH(v.totalGlobal||0)} DH)</span></span>
                       <div className="flex flex-wrap gap-1 mt-1 pl-16">
                         {ventilationDossier(v).map(x => (
                           <span key={x.label} className="bg-indigo-50 text-indigo-700 border border-indigo-100 rounded px-1.5 py-0.5 text-[10px] whitespace-nowrap">{x.label}: {formatDH(x.montant)} DH</span>
