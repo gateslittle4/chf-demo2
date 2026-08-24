@@ -70,7 +70,6 @@
           window.addEventListener("offline", () => {
             this.isOnline = false;
           });
-          setInterval(() => this.syncPending(), 3e4);
         }
         async request(endpoint, method = "GET", data = null, meta = {}) {
           const options = { method, headers: { "Content-Type": "application/json" } };
@@ -108,25 +107,13 @@
         countPending() {
           return this.pendingQueue.length;
         }
-        // Détail lisible des opérations en attente (quoi + quand), pour que la personne sache ce qui
-        // n'est pas encore enregistré, plutôt qu'un simple nombre sans explication.
-        getPendingDetails() {
-          const libelle = (op) => {
-            if (op.endpoint.startsWith("/episodes")) return op.method === "POST" ? "Nouveau dossier" : "Modification d'un dossier";
-            if (op.endpoint.startsWith("/paiements")) return "Paiement";
-            if (op.endpoint.startsWith("/catalog/medicaments")) return "Mise \xE0 jour de la pharmacie";
-            if (op.endpoint.startsWith("/catalog/actes")) return "Mise \xE0 jour des actes";
-            return op.endpoint;
-          };
-          return this.pendingQueue.map((op) => ({ texte: libelle(op), quand: new Date(op.timestamp).toLocaleString("fr-FR") }));
-        }
         // Retire de la file une création jamais synchronisée (ex: dossier ouvert hors-ligne puis annulé avant le retour d'internet)
         removePendingByLocalId(localId) {
           this.pendingQueue = this.pendingQueue.filter((op) => op.localId !== localId);
           localStorage.setItem("pending_ops", JSON.stringify(this.pendingQueue));
         }
         async syncPending() {
-          if (this.pendingQueue.length === 0) return;
+          if (!navigator.onLine || this.pendingQueue.length === 0) return;
           console.log(`\u{1F504} Sync de ${this.pendingQueue.length} op\xE9rations...`);
           const queue = [...this.pendingQueue];
           this.pendingQueue = [];
@@ -185,11 +172,8 @@
           contientErreurs: "contient_erreurs",
           verrouilleFacture: "verrouille_facture",
           dateSuspension: "date_suspension",
-          noteSuspension: "note_suspension",
           updatedAt: "updated_at",
-          serviceChoisi: "service_choisi",
-          numeroLot: "numero_lot",
-          moisReport: "mois_report"
+          serviceChoisi: "service_choisi"
         };
         const result = {};
         for (const [k, v] of Object.entries(data)) result[map[k] || k] = v;
@@ -211,11 +195,8 @@
           contient_erreurs: "contientErreurs",
           verrouille_facture: "verrouilleFacture",
           date_suspension: "dateSuspension",
-          note_suspension: "noteSuspension",
           updated_at: "updatedAt",
-          service_choisi: "serviceChoisi",
-          numero_lot: "numeroLot",
-          mois_report: "moisReport"
+          service_choisi: "serviceChoisi"
         };
         const result = {};
         for (const [k, v] of Object.entries(data)) result[map[k] || k] = v;
@@ -2871,7 +2852,7 @@
           const topDetail = Object.entries(detailParType).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([nom, qte]) => ({ nom, qte }));
           const sonographiesAujourdhui = Object.entries(sonoAujourdhui).sort((a, b) => b[1] - a[1]).map(([nom, qte]) => ({ nom, qte }));
           const totalFacture = dossiers.reduce((s, v) => s + (v.totalGlobal || 0), 0);
-          const totalPaye = dossiers.reduce((s, v) => s + (v.montantPaye || 0), 0);
+          const totalPaye = transactions.reduce((s, p) => s + (p.montant || 0), 0);
           const recouvrement = totalFacture > 0 ? totalPaye / totalFacture * 100 : 0;
           setStats({ caMois, caJourCash, caJourOng, occupation, topActes, topDetail, sonographiesAujourdhui, recouvrement, patientsJour });
         };
@@ -2998,6 +2979,52 @@
       var { LOGO_CHF_BASE64 } = require_logoChf();
       var NOM_COMPLET_ONG = { "MSF-H": "MSF-HOLLANDE", "MSF-F": "MSF-FRANCE" };
       var nomCompletOng = (nom) => NOM_COMPLET_ONG[nom] || nom;
+      var LIGNES_FORMULAIRE_CHF = [
+        { key: "service", label: "Services" },
+        { key: "hospit", label: "Lit Hospit." },
+        { key: "labo", label: "Laboratoire" },
+        { key: "med", label: "M\xE9dicaments" },
+        { key: "nebulisation", label: "N\xE9bulisation" },
+        { key: "oxygene", label: "Oxyg\xE8ne" },
+        { key: "curetage", label: "Curetage" },
+        { key: "accouchement", label: "Accouchement" },
+        { key: "suture", label: "Suture" },
+        { key: "drainage", label: "Drainage" },
+        { key: "certificat", label: "Certificat" },
+        { key: "pansement", label: "Pansement" },
+        { key: "cesarienne", label: "C\xE9sarienne" },
+        { key: "ecg", label: "ECG" },
+        { key: "pap", label: "PAP" },
+        { key: "sono", label: "Sonographie" },
+        { key: "chirurgie", label: "Chirurgie" }
+      ];
+      var NB_COLONNES_MONTANT_FORMULAIRE = 8;
+      var cumulPourFormulaireCHF = (dossier) => {
+        const totaux = {};
+        LIGNES_FORMULAIRE_CHF.forEach((l) => totaux[l.key] = 0);
+        (dossier.fiches || []).forEach((f) => {
+          Object.entries(f.breakdown || {}).forEach(([cle, montant]) => {
+            if (totaux[cle] !== void 0) totaux[cle] += montant || 0;
+          });
+        });
+        return totaux;
+      };
+      var periodesSejourDossier = (dossier) => {
+        const dates = [];
+        (dossier.fiches || []).forEach((f) => {
+          var _a, _b, _c;
+          if ((_a = f.rawState) == null ? void 0 : _a.dateEntree1) dates.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
+          if (((_b = f.rawState) == null ? void 0 : _b.multiPeriode) && ((_c = f.rawState) == null ? void 0 : _c.dateEntree2)) dates.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
+        });
+        return dates;
+      };
+      var dateAdmissionFormulaireCHF = (dossier) => {
+        const periodes = periodesSejourDossier(dossier);
+        if (periodes.length < 2) return dossier.dateHeure || "";
+        return periodes.map(
+          (d) => d.in === d.out ? d.in.split("-").reverse().slice(0, 2).join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`
+        ).join(" et ");
+      };
       function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, userRole, showToast, onChangerTypeOng, listeOng, listeOngDocs, confirmModal, setConfirmModal, lotInitialFocus, clearLotInitialFocus }) {
         var _a;
         const [focusedVerif, setFocusedVerif] = useState(null);
@@ -3457,6 +3484,72 @@
           win.focus();
           setTimeout(() => win.print(), 500);
         };
+        const imprimerFormulaireCHF = (dossier) => {
+          const cumul = cumulPourFormulaireCHF(dossier);
+          const totalFormulaire = Object.values(cumul).reduce((a, b) => a + b, 0);
+          const totalReelDossier = dossier.totalGlobal || 0;
+          const ecartCategoriesHorsFormulaire = Math.round((totalReelDossier - totalFormulaire) * 100) / 100;
+          const personneResponsable = dossier.typePatient === "ONG" ? dossier.ongPartenaire || "N/R" : "Priv\xE9 (patient/famille)";
+          if (ecartCategoriesHorsFormulaire !== 0) {
+            showToast(`\u26A0\uFE0F Ce formulaire ne couvre pas toutes les cat\xE9gories factur\xE9es \xE0 ${dossier.nomPatient} : ${formatGourdes(Math.abs(ecartCategoriesHorsFormulaire))} Gdes de plus dans le dossier complet (ex. Radiographie / Visite) \u2014 v\xE9rifie l'onglet Dossiers pour le d\xE9tail.`, "info");
+          }
+          const celluleMontant = (montant, estColonneRemplie) => estColonneRemplie && montant > 0 ? `<span class="montant">$${formatGourdes(montant)}</span>` : `<span class="dollar">$</span>`;
+          const ligneTableau = (label, montant) => `<tr><td class="lbl">${echapperHTML(label)}</td>${Array.from({ length: NB_COLONNES_MONTANT_FORMULAIRE }, (_, i) => `<td class="mnt">${celluleMontant(montant, i === 0 || i === NB_COLONNES_MONTANT_FORMULAIRE - 1)}</td>`).join("")}</tr>`;
+          const lignesHTML = LIGNES_FORMULAIRE_CHF.map((l) => ligneTableau(l.label, cumul[l.key])).join("");
+          const ligneGrandTotal = `<tr class="grand-total"><td class="lbl">GRAND TOTAL</td>${Array.from({ length: NB_COLONNES_MONTANT_FORMULAIRE }, (_, i) => `<td class="mnt">${celluleMontant(totalFormulaire, i === 0 || i === NB_COLONNES_MONTANT_FORMULAIRE - 1)}</td>`).join("")}</tr>`;
+          const champ = (label, valeur, large) => `<span class="champ${large ? " large" : ""}"><span class="lbl-champ">${echapperHTML(label)}</span><span class="val-champ">${valeur ? echapperHTML(valeur) : "&nbsp;"}</span></span>`;
+          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Formulaire CHF - ${echapperHTML(dossier.nomPatient)}</title><style>
+      @page{size:A4;margin:12mm 16mm;}
+      body{font-family:'Times New Roman',Georgia,serif;color:#000;font-size:13px;}
+      .entete{display:flex;align-items:center;justify-content:center;gap:14px;border-bottom:2.5px solid #000;padding-bottom:8px;margin-bottom:18px;position:relative;}
+      .entete img{width:64px;height:64px;object-fit:contain;position:absolute;left:0;top:2px;}
+      .entete-texte{text-align:center;}
+      .entete-texte h1{font-size:26px;margin:0;letter-spacing:0.5px;font-weight:bold;}
+      .entete-texte p{margin:2px 0;font-size:12px;}
+      .entete-texte p.email{font-size:10px;color:#999;}
+      .champs{margin-bottom:16px;font-size:14px;}
+      .ligne-champs{display:flex;flex-wrap:wrap;gap:0 30px;margin-bottom:10px;}
+      .champ{display:inline-flex;align-items:baseline;gap:6px;}
+      .champ.large{flex:1;}
+      .lbl-champ{font-weight:bold;white-space:nowrap;}
+      .val-champ{border-bottom:1px dotted #000;min-width:150px;flex:1;display:inline-block;padding:0 2px;}
+      .champ.large .val-champ{min-width:300px;}
+      table{width:100%;border-collapse:collapse;margin-top:6px;table-layout:fixed;}
+      th,td{border:1px solid #000;color:#000;}
+      td.lbl{text-align:left;width:16%;font-weight:bold;font-size:12px;padding:10px 6px;}
+      td.mnt{text-align:center;width:${(84 / NB_COLONNES_MONTANT_FORMULAIRE).toFixed(1)}%;padding:10px 2px;height:30px;}
+      .dollar{color:#555;font-size:13px;}
+      .montant{font-weight:bold;font-size:11px;white-space:nowrap;}
+      tr.grand-total td.lbl{font-size:13px;}
+      </style></head><body>
+      <div class="entete">
+        <img src="${LOGO_CHF_BASE64}" alt="Logo CHF" />
+        <div class="entete-texte">
+          <h1>CENTRE HOSPITALIER DE FONTAINE</h1>
+          <p>#13, Fontaine Duvivier, Cit\xE9 Soleil, HAITI</p>
+          <p>Tels: (+509) 3647-0563 / (+509) 4609-4893 / (+509) 4654-2552</p>
+          <p class="email">chfcentrehospitalierdefontaine@gmail.com</p>
+        </div>
+      </div>
+      <div class="champs">
+        <div class="ligne-champs">${champ("Nom", dossier.nomPatient)}${champ("Pr\xE9nom", "", true)}</div>
+        <div class="ligne-champs">${champ("Age", "")}${champ("Sexe", "")}${champ("Statut Matrimonial", "", true)}</div>
+        <div class="ligne-champs">${champ("Date D'admission", dateAdmissionFormulaireCHF(dossier), true)}</div>
+        <div class="ligne-champs">${champ("Personne Responsable", personneResponsable, true)}</div>
+        <div class="ligne-champs">${champ("Phone", dossier.telephone, true)}</div>
+      </div>
+      <table><tbody>${lignesHTML}${ligneGrandTotal}</tbody></table>
+      </body></html>`;
+          const win = window.open("", "_blank", "width=850,height=1100");
+          if (!win) {
+            showToast("Impression bloqu\xE9e par le navigateur. R\xE9essaie en cliquant sur Imprimer \u2014 si \xE7a ne marche toujours pas, demande \xE0 quelqu'un de v\xE9rifier les r\xE9glages.", "error");
+            return;
+          }
+          win.document.write(contenu);
+          win.document.close();
+          win.focus();
+          setTimeout(() => win.print(), 500);
+        };
         const imprimerArchive = (dossier) => {
           var _a2;
           const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Dossier ${echapperHTML(dossier.nomPatient)}</title><style>body{font-family:sans-serif;padding:20px;color:#000;} .entete{text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:14px;} .entete h1{font-size:22px;margin:4px 0;} .entete p{margin:2px 0;font-size:12px;} h1.titre{font-size:18px;margin-top:10px;} table{width:100%;border-collapse:collapse;margin-top:10px;} th,td{border:1px solid #ccc;padding:6px;text-align:left;font-size:12px;} .total{font-weight:bold;font-size:16px;margin-top:10px;} .info-patient{font-size:12px;margin:4px 0;} .meta-fiche{font-size:10px;color:#555;margin-top:4px;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p><p>${(/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR")} ${(/* @__PURE__ */ new Date()).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p></div><h1 class="titre">Dossier patient</h1><p class="info-patient"><strong>Nom :</strong> ${echapperHTML(dossier.nomPatient)} &nbsp;|&nbsp; <strong>N\xB0 Dossier :</strong> ${echapperHTML(dossier.numDossier || "N/R")}</p><p class="info-patient"><strong>Partenaire / Type :</strong> ${dossier.typePatient === "ONG" ? echapperHTML(dossier.ongPartenaire || "N/R") : "Priv\xE9"} (${dossier.typePatient === "ONG" ? "Partenaire" : "Priv\xE9"})</p><p class="info-patient"><strong>T\xE9l\xE9phone :</strong> ${echapperHTML(dossier.telephone || "N/R")}</p><p class="info-patient"><strong>Date d'ouverture :</strong> ${echapperHTML(dossier.dateHeure)}</p><p><strong>Total :</strong> ${formatGourdes(dossier.totalGlobal)} Gdes (${formatDH(dossier.totalGlobal)} DH)</p><h3>Fiches :</h3>${(_a2 = dossier.fiches) == null ? void 0 : _a2.map((f) => `<div style="border:1px solid #ddd;margin:10px 0;padding:10px;"><p><strong>Fiche N\xB0${f.numeroFiche}</strong> - Total : ${formatGourdes(f.totalGlobal)} Gdes</p><table><thead><tr><th>Cat\xE9gorie</th><th>Montant</th></tr></thead><tbody>${Object.entries(f.breakdown || {}).map(([key, val]) => {
@@ -3549,8 +3642,8 @@ Pour une nouvelle visite de ${v.nomPatient}, utilise plut\xF4t "Rechercher un pa
 
 Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             onChargerPourModif(v);
-          }, className: "text-amber-700 p-1 bg-amber-50 rounded", title: "Modifier / corriger" }, /* @__PURE__ */ React.createElement(Pencil, { size: 13 })), peutSupprimer && /* @__PURE__ */ React.createElement("button", { onClick: () => onSupprimer(v.id), disabled: v.verrouilleFacture, className: "text-gray-300 hover:text-red-600 p-1 disabled:opacity-20" }, /* @__PURE__ */ React.createElement(Trash2, { size: 13 })), /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerArchive(v), className: "text-gray-600 p-1 bg-gray-50 rounded", title: "Imprimer" }, /* @__PURE__ */ React.createElement(Printer, { size: 13 })), isSuspendu && peutRouvrir && /* @__PURE__ */ React.createElement("button", { onClick: () => rouvrirDossierSuspendu(v), className: "text-emerald-600 p-1 bg-emerald-50 rounded", title: "Rouvrir" }, /* @__PURE__ */ React.createElement(FolderOpen, { size: 13 }))));
-        })))), dossiersFiltres.length > nombreAffiche && /* @__PURE__ */ React.createElement("div", { className: "flex justify-center pt-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setNombreAffiche((n) => n + 100), className: "bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-1.5 rounded-lg text-xs font-bold" }, "Charger plus (", dossiersFiltres.length - nombreAffiche, " restants)"))), focusedVerif && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border border-blue-200 shadow-md space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-center border-b pb-1" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-blue-900 text-xs uppercase" }, "\u{1F50D} ", focusedVerif.nomPatient), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerArchive(focusedVerif), className: "bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Imprimer dossier"), /* @__PURE__ */ React.createElement("button", { onClick: () => setFocusedVerif(null) }, /* @__PURE__ */ React.createElement(X, { size: 14 })))), focusedVerif.numeroLot != null && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 text-xs bg-indigo-50 border border-indigo-200 rounded-lg p-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-indigo-800" }, "\u{1F4E6} Ce dossier fait partie du ", /* @__PURE__ */ React.createElement("strong", null, "Lot ", focusedVerif.numeroLot), " de ", focusedVerif.ongPartenaire, '. Une correction reste possible via "Modifier/corriger" \u2014 pense \xE0 r\xE9imprimer le lot ensuite pour que le partenaire re\xE7oive la version \xE0 jour.')), onChangerTypeOng && peutModifier && (!editTypeArchiveOuvert ? /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 text-xs bg-gray-50 border rounded-lg p-2" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-purple-700" }, focusedVerif.ongPartenaire || "Priv\xE9", " - ", focusedVerif.typePatient === "ONG" ? "Partenaire" : "Priv\xE9"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+          }, className: "text-amber-700 p-1 bg-amber-50 rounded", title: "Modifier / corriger" }, /* @__PURE__ */ React.createElement(Pencil, { size: 13 })), peutSupprimer && /* @__PURE__ */ React.createElement("button", { onClick: () => onSupprimer(v.id), disabled: v.verrouilleFacture, className: "text-gray-300 hover:text-red-600 p-1 disabled:opacity-20" }, /* @__PURE__ */ React.createElement(Trash2, { size: 13 })), /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerArchive(v), className: "text-gray-600 p-1 bg-gray-50 rounded", title: "Imprimer" }, /* @__PURE__ */ React.createElement(Printer, { size: 13 })), /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerFormulaireCHF(v), className: "text-indigo-700 p-1 bg-indigo-50 rounded", title: "Imprimer le formulaire papier CHF" }, /* @__PURE__ */ React.createElement(Printer, { size: 13 })), isSuspendu && peutRouvrir && /* @__PURE__ */ React.createElement("button", { onClick: () => rouvrirDossierSuspendu(v), className: "text-emerald-600 p-1 bg-emerald-50 rounded", title: "Rouvrir" }, /* @__PURE__ */ React.createElement(FolderOpen, { size: 13 }))));
+        })))), dossiersFiltres.length > nombreAffiche && /* @__PURE__ */ React.createElement("div", { className: "flex justify-center pt-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setNombreAffiche((n) => n + 100), className: "bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-1.5 rounded-lg text-xs font-bold" }, "Charger plus (", dossiersFiltres.length - nombreAffiche, " restants)"))), focusedVerif && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border border-blue-200 shadow-md space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-center border-b pb-1" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-blue-900 text-xs uppercase" }, "\u{1F50D} ", focusedVerif.nomPatient), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerArchive(focusedVerif), className: "bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Imprimer dossier"), /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerFormulaireCHF(focusedVerif), className: "bg-indigo-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Formulaire papier CHF"), /* @__PURE__ */ React.createElement("button", { onClick: () => setFocusedVerif(null) }, /* @__PURE__ */ React.createElement(X, { size: 14 })))), focusedVerif.numeroLot != null && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 text-xs bg-indigo-50 border border-indigo-200 rounded-lg p-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-indigo-800" }, "\u{1F4E6} Ce dossier fait partie du ", /* @__PURE__ */ React.createElement("strong", null, "Lot ", focusedVerif.numeroLot), " de ", focusedVerif.ongPartenaire, '. Une correction reste possible via "Modifier/corriger" \u2014 pense \xE0 r\xE9imprimer le lot ensuite pour que le partenaire re\xE7oive la version \xE0 jour.')), onChangerTypeOng && peutModifier && (!editTypeArchiveOuvert ? /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 text-xs bg-gray-50 border rounded-lg p-2" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-purple-700" }, focusedVerif.ongPartenaire || "Priv\xE9", " - ", focusedVerif.typePatient === "ONG" ? "Partenaire" : "Priv\xE9"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
           setNouveauTypeArchive(focusedVerif.typePatient || "ONG");
           setNouvelOngArchive(focusedVerif.ongPartenaire || "");
           setEditTypeArchiveOuvert(true);
@@ -4426,7 +4519,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
               ongPartenaire: modePaiement === "ong" ? ongPartenaireFiche : "",
               exoneration: modePaiement === "exoneration" ? { pourcentage: parseFloat(pourcentageExoneration), montantExonere, motif: motifExoneration, autorisePar: auth.currentUser.displayName } : null,
               statutPaiement: modePaiement === "credit" ? "partiellement_paye" : "paye",
-              montantPaye: modePaiement === "cash" ? parseFloat(montantVerse) : modePaiement === "credit" ? 0 : montantRestantApresDepots,
+              montantPaye: modePaiement === "credit" ? 0 : montantRestantApresDepots,
               solde: modePaiement === "credit" ? montantRestantApresDepots : 0,
               exeat: dateEntree1 && dateSortie1 ? {
                 dateEntree: dateEntree1,
@@ -4856,7 +4949,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
             breakdown,
             totalGlobal: totalPanier,
             modePaiement: "cash",
-            montantPaye: verse,
+            montantPaye: totalPanier,
             solde: 0,
             dateCreation: (/* @__PURE__ */ new Date()).toISOString(),
             creePar: ((_a = auth.currentUser) == null ? void 0 : _a.displayName) || "inconnu",
@@ -4874,7 +4967,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
             dateHeure: (/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR"),
             totalGlobal: totalPanier,
             fiches: [fiche],
-            montantPaye: verse,
+            montantPaye: totalPanier,
             solde: 0
           };
           try {
@@ -5408,8 +5501,8 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
       var AccueilPanel = require_AccueilPanel();
       var AnalyticsPanel = require_AnalyticsPanel();
       var GestionOngPanel = require_GestionOng();
-      function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, roleParDefaut }) {
-        const [onglet, setOnglet] = useState(() => localStorage.getItem("chf-dernier-onglet") || "accueil");
+      function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
+        const [onglet, setOnglet] = useState("accueil");
         const [medicaments, setMedicaments] = useState([]);
         const [actes, setActes] = useState([]);
         const [verifications, setVerifications] = useState([]);
@@ -5418,8 +5511,6 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
         const [ongTargets, setOngTargets] = useState({ "MSF-H": 0, "MSF-F": 0, "ALIMA": 0, "AVSI": 0, "GRID MISSION": 0, "WAY TO HEALTH": 0, "TEAM TASSY": 0 });
         const [listeOngDocs, setListeOngDocs] = useState([]);
         const [dossierActif, setDossierActif] = useState(false);
-        const [origineLotEdition, setOrigineLotEdition] = useState(null);
-        const [lotAFocuserAuRetour, setLotAFocuserAuRetour] = useState(null);
         const [nomPatient, setNomPatient] = useState("");
         const [selectedOng, setSelectedOng] = useState("");
         const [typePatient, setTypePatient] = useState("ONG");
@@ -5430,8 +5521,6 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
         const [idFicheEnCoursDEdition, setIdFicheEnCoursDEdition] = useState(null);
         const [modePreValidation, setModePreValidation] = useState(false);
         const [lignesCalcul, setLignesCalcul] = useState([]);
-        const [dateFiche, setDateFiche] = useState(() => (/* @__PURE__ */ new Date()).toISOString().split("T")[0]);
-        const [prescritPar, setPrescritPar] = useState("");
         const [dateEntree1, setDateEntree1] = useState("");
         const [dateSortie1, setDateSortie1] = useState("");
         const [typeLit1, setTypeLit1] = useState("normal");
@@ -5440,7 +5529,6 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
         const [dateSortie2, setDateSortie2] = useState("");
         const [typeLit2, setTypeLit2] = useState("normal");
         const [hasChirSpec, setHasChirSpec] = useState(false);
-        const [tarifChoisi, setTarifChoisi] = useState("actuel");
         const [nomChirSpec, setNomChirSpec] = useState("");
         const [prixChirSpec, setPrixChirSpec] = useState("");
         const [filtreArchivesInitialNom, setFiltreArchivesInitialNom] = useState("");
@@ -5461,14 +5549,6 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           }, 4e3);
         };
         const removeToast = (id) => setToasts((prev) => prev.filter((t) => t.id !== id));
-        useEffect(() => {
-          if (roleParDefaut) {
-            showToast("\u26A0\uFE0F Ton r\xF4le habituel n'a pas pu \xEAtre retrouv\xE9 \u2014 connect\xE9 en Auditeur (lecture seule) par d\xE9faut. Si ce n'est pas normal, pr\xE9viens un administrateur.", "error");
-          }
-        }, [roleParDefaut]);
-        useEffect(() => {
-          localStorage.setItem("chf-dernier-onglet", onglet);
-        }, [onglet]);
         const lowStockItems = useMemo(() => medicaments.filter((m) => (m.quantite || 0) <= (m.seuilAlerte || 5)), [medicaments]);
         useEffect(() => {
           const loadData = async () => {
@@ -5508,7 +5588,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           loadData();
           const interval = setInterval(() => {
             if (!document.hidden) loadData();
-          }, 18e4);
+          }, 45e3);
           return () => clearInterval(interval);
         }, []);
         useEffect(() => {
@@ -5519,7 +5599,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           const unsubscribe = db.collection("ong_partenaires").orderBy("nom").onSnapshot((snapshot) => {
             if (snapshot.empty) {
               const batch = db.batch();
-              LISTE_ONG.forEach((nom) => batch.set(db.collection("ong_partenaires").doc(nom.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")), { nom, dateAjout: firebase2.firestore.FieldValue.serverTimestamp() }));
+              LISTE_ONG.forEach((nom) => batch.set(db.collection("ong_partenaires").doc(), { nom, dateAjout: firebase2.firestore.FieldValue.serverTimestamp() }));
               batch.commit().catch((e) => console.warn("Amor\xE7age ong_partenaires:", e));
               return;
             }
@@ -5597,8 +5677,6 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
         const viderLeCalculateurFicheUniquement = () => {
           setLignesCalcul([]);
           setIdFicheEnCoursDEdition(null);
-          setDateFiche((/* @__PURE__ */ new Date()).toISOString().split("T")[0]);
-          setPrescritPar("");
           setDateEntree1("");
           setDateSortie1("");
           setTypeLit1("normal");
@@ -5610,17 +5688,14 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           setNomChirSpec("");
           setPrixChirSpec("");
           setPaiementEffectue(false);
-          setTarifChoisi("actuel");
         };
-        const editerFiche = (idFiche, silencieux) => {
+        const editerFiche = (idFiche) => {
           const fiche = fichesDossier.find((f) => f.id === idFiche);
           if (!fiche) {
             showToast("Fiche introuvable.", "error");
             return;
           }
           const raw = fiche.rawState || {};
-          setDateFiche(fiche.dateCreation ? fiche.dateCreation.split("T")[0] : (/* @__PURE__ */ new Date()).toISOString().split("T")[0]);
-          setPrescritPar(fiche.prescritPar || "");
           setLignesCalcul(raw.lignesCalcul || []);
           setDateEntree1(raw.dateEntree1 || "");
           setDateSortie1(raw.dateSortie1 || "");
@@ -5634,21 +5709,12 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           setPrixChirSpec(raw.prixChirSpec || "");
           setIdFicheEnCoursDEdition(idFiche);
           setPaiementEffectue(false);
-          if (!silencieux) showToast(`\xC9dition de la fiche N\xB0${fiche.numeroFiche}`, "info");
+          showToast(`\xC9dition de la fiche N\xB0${fiche.numeroFiche}`, "info");
         };
         const enregistrerFicheModifiee = (nouvelleFiche) => {
-          const fichesMisesAJour = fichesDossier.map((f) => f.id === nouvelleFiche.id ? nouvelleFiche : f);
-          setFichesDossier(fichesMisesAJour);
-          const triees = [...fichesMisesAJour].sort((a, b) => a.numeroFiche - b.numeroFiche);
-          const idx = triees.findIndex((f) => f.id === nouvelleFiche.id);
-          const suivante = idx !== -1 ? triees[idx + 1] : null;
-          if (suivante) {
-            editerFiche(suivante.id, true);
-            showToast(`Fiche mise \xE0 jour \u2014 Fiche N\xB0${suivante.numeroFiche} charg\xE9e`, "success");
-          } else {
-            viderLeCalculateurFicheUniquement();
-            showToast("Fiche mise \xE0 jour", "success");
-          }
+          setFichesDossier((prev) => prev.map((f) => f.id === nouvelleFiche.id ? nouvelleFiche : f));
+          viderLeCalculateurFicheUniquement();
+          showToast("Fiche mise \xE0 jour", "success");
         };
         const enregistrerNouvelleFiche = (fiche) => {
           if (idFicheEnCoursDEdition) {
@@ -5660,7 +5726,6 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           }
         };
         const initialiserNouveauDossier = async (nom, ong, numDossier, type, naissance, tel, serviceChoisi) => {
-          setOrigineLotEdition(null);
           const propreNom = formaterNomPropre(nom);
           if (!propreNom || !ong && type === "ONG") {
             showToast("Veuillez remplir tous les champs.", "error");
@@ -5712,8 +5777,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           if (idFinal === localId) return;
           showToast(`Dossier de ${propreNom} ouvert`, "success");
         };
-        const chargerDossierExistant = (patientDoc, origineLot) => {
-          setOrigineLotEdition(origineLot || null);
+        const chargerDossierExistant = (patientDoc) => {
           setDossierId(patientDoc.id);
           setDossierUpdatedAtOuverture(patientDoc.updatedAt || null);
           setNomPatient(patientDoc.nomPatient);
@@ -5777,13 +5841,11 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           });
         };
         const executerArchivage = async () => {
-          var _a;
           const somme = fichesDossier.reduce((s, f) => s + f.totalGlobal, 0);
-          const verrouilleFactureExistante = ((_a = verifications.find((v) => v.id === dossierId)) == null ? void 0 : _a.verrouilleFacture) || false;
           const datesTrouvees = [];
           fichesDossier.forEach((f) => {
-            var _a2, _b, _c;
-            if ((_a2 = f.rawState) == null ? void 0 : _a2.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
+            var _a, _b, _c;
+            if ((_a = f.rawState) == null ? void 0 : _a.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
             if (((_b = f.rawState) == null ? void 0 : _b.multiPeriode) && ((_c = f.rawState) == null ? void 0 : _c.dateEntree2)) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
           });
           let sejourTexte = "\u2014";
@@ -5801,7 +5863,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
             totalGlobal: somme,
             totalSaisiePapierDH: 0,
             contientErreurs: false,
-            verrouilleFacture: verrouilleFactureExistante,
+            verrouilleFacture: false,
             fiches: [...fichesDossier],
             status: "archived",
             timestamp: Date.now()
@@ -5826,11 +5888,6 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
             viderLeCalculateurFicheUniquement();
             setDossierId(null);
             localStorage.removeItem(LOG_DOSSIER_BROUILLON_KEY);
-            if (origineLotEdition) {
-              setOnglet("verifie");
-              setLotAFocuserAuRetour(origineLotEdition);
-              setOrigineLotEdition(null);
-            }
             showToast("Dossier archiv\xE9 !", "success");
           } catch (error) {
             if (!error.isOfflineQueue) {
@@ -5849,11 +5906,6 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
             viderLeCalculateurFicheUniquement();
             setDossierId(null);
             localStorage.removeItem(LOG_DOSSIER_BROUILLON_KEY);
-            if (origineLotEdition) {
-              setOnglet("verifie");
-              setLotAFocuserAuRetour(origineLotEdition);
-              setOrigineLotEdition(null);
-            }
             showToast("\u{1F4F4} Dossier archiv\xE9 hors ligne \u2014 sera synchronis\xE9 au retour d'internet", "info");
           }
         };
@@ -5897,7 +5949,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
           }
           demanderConfirmation();
         };
-        const executerSuspension = async (fichesAUtiliser, note) => {
+        const executerSuspension = async (fichesAUtiliser) => {
           const listeFiches = fichesAUtiliser || fichesDossier;
           const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
           const datesTrouvees = [];
@@ -5920,18 +5972,16 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             dateEntreePourTri: datesTrouvees.length > 0 ? datesTrouvees[0].in : "9999-12-31",
             totalGlobal: somme,
             totalSaisiePapierDH: 0,
-            contientErreurs: !!note,
+            contientErreurs: false,
             verrouilleFacture: false,
             fiches: [...listeFiches],
             // ⬅️ CONSERVE LES FICHES
             status: "suspendu",
             dateSuspension: (/* @__PURE__ */ new Date()).toISOString(),
-            noteSuspension: note || "",
             timestamp: Date.now()
           };
           try {
-            const { noteSuspension: _omisePourApi, ...dossierSuspenduPourApi } = dossierSuspendu;
-            await chf.updateEpisode(dossierId, toEpisodeApi(dossierSuspenduPourApi));
+            await chf.updateEpisode(dossierId, toEpisodeApi(dossierSuspendu));
             const updatedItems = verifications.map((v) => v.id === dossierId ? { ...v, ...dossierSuspendu } : v);
             setVerifications(updatedItems);
             showToast(`Dossier suspendu avec ${listeFiches.length} fiche(s)`, "success");
@@ -5945,7 +5995,6 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             showToast("\u{1F4F4} Dossier suspendu hors ligne \u2014 sera synchronis\xE9 au retour d'internet", "info");
           }
           setDossierActif(false);
-          setOrigineLotEdition(null);
           setNomPatient("");
           setSelectedOng("");
           setNumDossierPatient("");
@@ -5962,21 +6011,16 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             return;
           }
           avecFicheEnCoursAjoutee((fichesFinales) => {
-            const demanderConfirmation = () => {
-              const note = (window.prompt(`Note sur le probl\xE8me \xE0 ne pas oublier pour le dossier de ${nomPatient} (optionnel \u2014 ex: quelle fiche, quel souci) :`, "") || "").trim();
-              setConfirmModal({
-                titre: "Suspendre ce dossier ?",
-                message: `Le dossier de ${nomPatient} sera mis en pause. Il pourra \xEAtre rouvert plus tard depuis les Archives.${note ? `
-
-\u{1F4DD} Note : ${note}` : ""}`,
-                confirmLabel: "\u23F8\uFE0F Suspendre",
-                onConfirm: () => {
-                  setConfirmModal(null);
-                  executerSuspension(fichesFinales, note);
-                },
-                onCancel: () => setConfirmModal(null)
-              });
-            };
+            const demanderConfirmation = () => setConfirmModal({
+              titre: "Suspendre ce dossier ?",
+              message: `Le dossier de ${nomPatient} sera mis en pause. Il pourra \xEAtre rouvert plus tard depuis les Archives.`,
+              confirmLabel: "\u23F8\uFE0F Suspendre",
+              onConfirm: () => {
+                setConfirmModal(null);
+                executerSuspension(fichesFinales);
+              },
+              onCancel: () => setConfirmModal(null)
+            });
             (async () => {
               if (await verifierConflit()) {
                 setConfirmModal({
@@ -6046,7 +6090,6 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             showToast("\u{1F4F4} Report enregistr\xE9 hors ligne \u2014 sera synchronis\xE9 au retour d'internet", "info");
           }
           setDossierActif(false);
-          setOrigineLotEdition(null);
           setNomPatient("");
           setSelectedOng("");
           setNumDossierPatient("");
@@ -6110,7 +6153,6 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             showToast("\u{1F4F4} Dossier annul\xE9 hors ligne", "info");
           }
           setDossierActif(false);
-          setOrigineLotEdition(null);
           setNomPatient("");
           setSelectedOng("");
           setNumDossierPatient("");
@@ -6139,7 +6181,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             onCancel: () => setConfirmModal(null)
           });
         };
-        const r\u00E9importerDossierDepuisArchives = (doc, origineLot) => chargerDossierExistant(doc, origineLot);
+        const r\u00E9importerDossierDepuisArchives = (doc) => chargerDossierExistant(doc);
         const supprimerDossierArchive = (id) => {
           const dossier = verifications.find((v) => v.id === id);
           setConfirmModal({
@@ -6225,11 +6267,10 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
           reader.readAsText(file);
         };
         const injecterLigneAuCalculateur = (item, cat, qte) => {
-          const prixEffectif = tarifChoisi === "nouveau" && item.nouveauPrix != null && item.nouveauPrix !== "" ? parseFloat(item.nouveauPrix) : item.prix;
           setLignesCalcul((prev) => {
             const index = prev.findIndex((l) => l.itemId === item.id && l.type === cat);
             if (index !== -1) return prev.map((l, idx) => idx === index ? { ...l, qte: l.qte + qte } : l);
-            return [...prev, { id: "l-" + Math.random().toString(36).slice(2, 6), itemId: item.id, type: cat, sub: cat === "med" ? "" : item.sub || "", nom: item.nom, qte, prix: prixEffectif }];
+            return [...prev, { id: "l-" + Math.random().toString(36).slice(2, 6), itemId: item.id, type: cat, sub: cat === "med" ? "" : item.sub || "", nom: item.nom, qte, prix: item.prix }];
           });
           setPaiementEffectue(false);
         };
@@ -6269,25 +6310,6 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
           });
           return v;
         }, [lignesCalcul, totalGeneralExeat, totalChirSpec]);
-        const coutsParService = useMemo(() => {
-          const v = {};
-          CATEGORIES_LISTE.forEach((c) => v[c.key] = 0);
-          let incomplet = false;
-          lignesCalcul.forEach((l) => {
-            const item = (l.type === "med" ? medicaments : actes).find((x) => x.id === l.itemId);
-            if (!item || item.cout == null) {
-              incomplet = true;
-              return;
-            }
-            const m = l.qte * item.cout;
-            if (l.type === "med") v.med += m;
-            else if (l.type === "acte") {
-              if (v[l.sub] !== void 0) v[l.sub] += m;
-              else v.chirurgie += m;
-            }
-          });
-          return { valeurs: v, incomplet: incomplet || totalGeneralExeat > 0 || totalChirSpec > 0 };
-        }, [lignesCalcul, medicaments, actes, totalGeneralExeat, totalChirSpec]);
         const grandTotalGlobalFiche = useMemo(() => Object.values(totalsParService).reduce((a, b) => a + b, 0), [totalsParService]);
         const totalDossierGourdes = useMemo(() => fichesDossier.reduce((s, f) => s + f.totalGlobal, 0), [fichesDossier]);
         const cumulCategoriesDossierActif = useMemo(() => {
@@ -6327,19 +6349,6 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             if (fiche) restituerStock([fiche]);
             showToast("Fiche supprim\xE9e \u2014 stock remis \xE0 jour", "success");
           }
-        };
-        const marquerProblemeFiche = (idF) => {
-          const fiche = fichesDossier.find((f) => f.id === idF);
-          if (!fiche) return;
-          if (fiche.probleme) {
-            setFichesDossier((prev) => prev.map((f) => f.id === idF ? { ...f, probleme: false, noteProbleme: "" } : f));
-            showToast("Marquage retir\xE9", "success");
-            return;
-          }
-          const saisie = window.prompt(`Quel est le probl\xE8me avec la Fiche N\xB0${fiche.numeroFiche} ?`, "");
-          if (saisie === null) return;
-          setFichesDossier((prev) => prev.map((f) => f.id === idF ? { ...f, probleme: true, noteProbleme: saisie.trim() } : f));
-          showToast("Fiche marqu\xE9e \xE0 v\xE9rifier", "success");
         };
         const changerTypeOngPourDossier = async (idCible, nouveauType, nouvelOng) => {
           if (nouveauType === "ONG" && !nouvelOng) {
@@ -6466,7 +6475,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             onFermer: () => setAchatExpressOuvert(false),
             onDossierCree: (episode) => setVerifications((prev) => [episode, ...prev])
           }
-        ), dossierActif && !modePreValidation && /* @__PURE__ */ React.createElement("div", { className: "fixed top-28 right-4 z-40 bg-[#1E2A24] text-white px-4 py-2 rounded-xl shadow-2xl border border-emerald-500/30 flex flex-col items-end" }, /* @__PURE__ */ React.createElement("span", { className: "text-[9px] uppercase tracking-wider text-[#9FB8A8] font-bold" }, "Dossier ", nomPatient), /* @__PURE__ */ React.createElement("span", { className: "text-sm font-mono font-black" }, formatGourdes(totalDossierGourdes + grandTotalGlobalFiche), " Gdes"), /* @__PURE__ */ React.createElement("span", { className: "text-[10px] font-mono text-emerald-400" }, formatDH(totalDossierGourdes + grandTotalGlobalFiche), " DH")), /* @__PURE__ */ React.createElement("div", { className: "fixed bottom-6 right-6 z-50 flex flex-col gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => window.scrollTo({ top: 0, behavior: "smooth" }), className: "floating-btn p-3 bg-[#1E2A24] text-[#F7F5F0] rounded-full shadow-lg" }, /* @__PURE__ */ React.createElement(ArrowUp, { size: 18 })), /* @__PURE__ */ React.createElement("button", { onClick: () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }), className: "floating-btn p-3 bg-[#1E2A24] text-[#F7F5F0] rounded-full shadow-lg" }, /* @__PURE__ */ React.createElement(ArrowDown, { size: 18 }))), /* @__PURE__ */ React.createElement("header", { className: "border-b border-[#D8D2C2] bg-[#1E2A24] text-[#F7F5F0] p-4" }, /* @__PURE__ */ React.createElement("div", { className: "max-w-6xl mx-auto flex justify-between items-baseline mb-2 px-2" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: "text-[10px] uppercase tracking-widest text-[#9FB8A8]" }, "Centre Hospitalier de Fontaine"), /* @__PURE__ */ React.createElement("h1", { className: "text-xl font-bold tracking-tight" }, "CHF \u2014 Syst\xE8me Hospitalier")), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 text-[10px] font-mono items-center flex-wrap" }, /* @__PURE__ */ React.createElement("span", { className: "bg-blue-600 text-white px-2 py-1 rounded-full" }, userDisplayName, " (", userRole, ")"), (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement("button", { onClick: () => setAchatExpressOuvert(true), className: "bg-amber-500 hover:bg-amber-600 px-2 py-1 rounded font-bold" }, "\u26A1 Express"), /* @__PURE__ */ React.createElement("button", { onClick: () => setModeSimulation(!modeSimulation), className: `px-2 py-1 rounded text-xs font-bold ${modeSimulation ? "bg-emerald-600" : "bg-blue-600"}` }, modeSimulation ? "\u{1F9EE} Simulation" : "\u{1F9EE} Simu"), /* @__PURE__ */ React.createElement("button", { onClick: executerSauvegardeGlobaleJSON, className: `px-2 py-1 rounded relative ${needsBackupWarning ? "bg-red-600 animate-pulse" : "bg-gray-700"}` }, "\u{1F4E5} Backup ", needsBackupWarning && /* @__PURE__ */ React.createElement("span", { className: "absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full animate-ping" })), /* @__PURE__ */ React.createElement("label", { className: "bg-gray-700 px-2 py-1 rounded cursor-pointer" }, "\u{1F4E4} Restore ", /* @__PURE__ */ React.createElement("input", { type: "file", onChange: executerRestaurationGlobaleJSON, className: "hidden", accept: ".json" })), /* @__PURE__ */ React.createElement("span", { className: "bg-purple-600 px-2 py-1 rounded-full" }, verifications.length, " Archiv\xE9s"), /* @__PURE__ */ React.createElement("button", { onClick: onQuitter, className: "bg-red-900/80 px-2 py-1 rounded" }, "Quitter"))), /* @__PURE__ */ React.createElement("div", { className: "max-w-6xl mx-auto flex flex-wrap gap-2 text-xs mt-3 px-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => {
+        ), dossierActif && !modePreValidation && /* @__PURE__ */ React.createElement("div", { className: "fixed top-28 right-4 z-40 bg-[#1E2A24] text-white px-4 py-2 rounded-xl shadow-2xl border border-emerald-500/30 flex flex-col items-end" }, /* @__PURE__ */ React.createElement("span", { className: "text-[9px] uppercase tracking-wider text-[#9FB8A8] font-bold" }, "Dossier ", nomPatient), /* @__PURE__ */ React.createElement("span", { className: "text-sm font-mono font-black" }, formatGourdes(totalDossierGourdes + grandTotalGlobalFiche), " Gdes"), /* @__PURE__ */ React.createElement("span", { className: "text-[10px] font-mono text-emerald-400" }, formatDH(totalDossierGourdes + grandTotalGlobalFiche), " DH")), /* @__PURE__ */ React.createElement("div", { className: "fixed bottom-6 right-6 z-50 flex flex-col gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => window.scrollTo({ top: 0, behavior: "smooth" }), className: "floating-btn p-3 bg-[#1E2A24] text-[#F7F5F0] rounded-full shadow-lg" }, /* @__PURE__ */ React.createElement(ArrowUp, { size: 18 })), /* @__PURE__ */ React.createElement("button", { onClick: () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }), className: "floating-btn p-3 bg-[#1E2A24] text-[#F7F5F0] rounded-full shadow-lg" }, /* @__PURE__ */ React.createElement(ArrowDown, { size: 18 }))), /* @__PURE__ */ React.createElement("header", { className: "border-b border-[#D8D2C2] bg-[#1E2A24] text-[#F7F5F0] p-4" }, /* @__PURE__ */ React.createElement("div", { className: "max-w-3xl mx-auto flex justify-between items-baseline mb-2" }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: "text-[10px] uppercase tracking-widest text-[#9FB8A8]" }, "Centre Hospitalier de Fontaine"), /* @__PURE__ */ React.createElement("h1", { className: "text-xl font-bold tracking-tight" }, "CHF \u2014 Syst\xE8me Hospitalier")), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 text-[10px] font-mono items-center flex-wrap" }, /* @__PURE__ */ React.createElement("span", { className: "bg-blue-600 text-white px-2 py-1 rounded-full" }, userDisplayName, " (", userRole, ")"), (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement("button", { onClick: () => setAchatExpressOuvert(true), className: "bg-amber-500 hover:bg-amber-600 px-2 py-1 rounded font-bold" }, "\u26A1 Express"), /* @__PURE__ */ React.createElement("button", { onClick: () => setModeSimulation(!modeSimulation), className: `px-2 py-1 rounded text-xs font-bold ${modeSimulation ? "bg-emerald-600" : "bg-blue-600"}` }, modeSimulation ? "\u{1F9EE} Simulation" : "\u{1F9EE} Simu"), /* @__PURE__ */ React.createElement("button", { onClick: executerSauvegardeGlobaleJSON, className: `px-2 py-1 rounded relative ${needsBackupWarning ? "bg-red-600 animate-pulse" : "bg-gray-700"}` }, "\u{1F4E5} Backup ", needsBackupWarning && /* @__PURE__ */ React.createElement("span", { className: "absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full animate-ping" })), /* @__PURE__ */ React.createElement("label", { className: "bg-gray-700 px-2 py-1 rounded cursor-pointer" }, "\u{1F4E4} Restore ", /* @__PURE__ */ React.createElement("input", { type: "file", onChange: executerRestaurationGlobaleJSON, className: "hidden", accept: ".json" })), /* @__PURE__ */ React.createElement("span", { className: "bg-purple-600 px-2 py-1 rounded-full" }, verifications.length, " Archiv\xE9s"), /* @__PURE__ */ React.createElement("button", { onClick: onQuitter, className: "bg-red-900/80 px-2 py-1 rounded" }, "Quitter"))), /* @__PURE__ */ React.createElement("div", { className: "max-w-3xl mx-auto flex flex-wrap gap-2 text-xs mt-3" }, /* @__PURE__ */ React.createElement("button", { onClick: () => {
           setOnglet("accueil");
           setModePreValidation(false);
         }, className: `px-4 py-2 font-medium border-b-2 ${onglet === "accueil" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F3DB}\uFE0F Accueil"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("calcul"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "calcul" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "Calcul Facture"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
@@ -6475,7 +6484,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
         }, className: `px-4 py-2 font-medium border-b-2 ${onglet === "verifie" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4C1} Archives"), (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement("button", { onClick: () => {
           setOnglet("analyse");
           setModePreValidation(false);
-        }, className: `px-4 py-2 font-medium border-b-2 ${onglet === "analyse" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4CA} Pilotage CHF"), (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("meds"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "meds" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "Tarifs Pharma"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("actes"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "actes" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "Tarifs Actes"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("stock"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "stock" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4E6} Stock"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("ong"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "ong" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F91D} Partenaires")), userRole === "administrateur" && /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("users"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "users" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F465} Utilisateurs"), (userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("dashboard_direction"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "dashboard_direction" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4CA} Direction"), (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("dashboard_caisse"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "dashboard_caisse" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4B5} Caisse"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("demandes"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "demandes" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4E8} Demandes")))), /* @__PURE__ */ React.createElement("main", { className: "flex-1 max-w-6xl w-full mx-auto p-4 pb-24" }, onglet === "accueil" && /* @__PURE__ */ React.createElement(
+        }, className: `px-4 py-2 font-medium border-b-2 ${onglet === "analyse" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4CA} Pilotage CHF"), (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("meds"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "meds" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "Tarifs Pharma"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("actes"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "actes" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "Tarifs Actes"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("stock"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "stock" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4E6} Stock"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("ong"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "ong" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F91D} Partenaires")), userRole === "administrateur" && /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("users"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "users" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F465} Utilisateurs"), (userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("dashboard_direction"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "dashboard_direction" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4CA} Direction"), (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("dashboard_caisse"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "dashboard_caisse" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4B5} Caisse"), /* @__PURE__ */ React.createElement("button", { onClick: () => setOnglet("demandes"), className: `px-4 py-2 font-medium border-b-2 ${onglet === "demandes" ? "border-white text-white" : "text-[#9FB8A8]"}` }, "\u{1F4E8} Demandes")))), /* @__PURE__ */ React.createElement("main", { className: "flex-1 max-w-3xl w-full mx-auto p-4 pb-24" }, onglet === "accueil" && /* @__PURE__ */ React.createElement(
           AccueilPanel,
           {
             verifications,
@@ -6483,23 +6492,21 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             medicaments,
             userRole,
             userDisplayName,
-            showToast,
             onNaviguer: (cible) => {
               setOnglet(cible);
               setModePreValidation(false);
             },
             onOuvrirAchatExpress: () => setAchatExpressOuvert(true)
           }
-        ), onglet === "dashboard_direction" && (userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(DashboardDirectionPanel, { verifications, paiements, medicaments, actes }), onglet === "dashboard_caisse" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(DashboardCaissePanel, { verifications, paiements, userDisplayName, listeOng: listeOngNoms, showToast }), onglet === "calcul" && modePreValidation && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-6 rounded-xl border border-emerald-400 shadow-xl space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "text-center border-b pb-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-emerald-800 font-bold uppercase text-[11px]" }, "Contr\xF4le final"), /* @__PURE__ */ React.createElement("h3", { className: "text-lg font-black" }, "\u{1F4CB} Totaux analytiques"), /* @__PURE__ */ React.createElement("p", { className: "text-xs text-gray-500" }, nomPatient, " | ", selectedOng)), /* @__PURE__ */ React.createElement("div", { className: "bg-gray-50 p-4 rounded-xl border shadow-inner space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 font-bold font-mono text-xs border-b pb-2 mb-2" }, /* @__PURE__ */ React.createElement("span", null, "CAT\xC9GORIE"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "Gdes"), /* @__PURE__ */ React.createElement("span", { className: "text-right text-emerald-800" }, "DH")), CATEGORIES_LISTE.map((cat) => {
+        ), onglet === "dashboard_direction" && (userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(DashboardDirectionPanel, { verifications, paiements, medicaments }), onglet === "dashboard_caisse" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(DashboardCaissePanel, { verifications, paiements, userDisplayName, listeOng: listeOngNoms, showToast }), onglet === "calcul" && modePreValidation && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-6 rounded-xl border border-emerald-400 shadow-xl space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "text-center border-b pb-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-emerald-800 font-bold uppercase text-[11px]" }, "Contr\xF4le final"), /* @__PURE__ */ React.createElement("h3", { className: "text-lg font-black" }, "\u{1F4CB} Totaux analytiques"), /* @__PURE__ */ React.createElement("p", { className: "text-xs text-gray-500" }, nomPatient, " | ", selectedOng)), /* @__PURE__ */ React.createElement("div", { className: "bg-gray-50 p-4 rounded-xl border shadow-inner space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 font-bold font-mono text-xs border-b pb-2 mb-2" }, /* @__PURE__ */ React.createElement("span", null, "CAT\xC9GORIE"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "Gdes"), /* @__PURE__ */ React.createElement("span", { className: "text-right text-emerald-800" }, "DH")), CATEGORIES_LISTE.map((cat) => {
           const m = cumulCategoriesDossierActif[cat.key];
           if (m === 0) return null;
           return /* @__PURE__ */ React.createElement("div", { key: cat.key, className: "grid grid-cols-3 font-mono text-[12px] py-1 border-b border-dashed" }, /* @__PURE__ */ React.createElement("span", null, cat.label), /* @__PURE__ */ React.createElement("span", { className: "text-right font-bold" }, formatGourdes(m)), /* @__PURE__ */ React.createElement("span", { className: "text-right font-bold text-emerald-800" }, formatDH(m)));
-        }), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 font-mono font-black text-sm pt-3 mt-2 border-t-2" }, /* @__PURE__ */ React.createElement("span", null, "TOTAL"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, formatGourdes(totalDossierGourdes)), /* @__PURE__ */ React.createElement("span", { className: "text-right text-emerald-800" }, formatDH(totalDossierGourdes)))), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-3" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setModePreValidation(false), className: "bg-gray-100 hover:bg-gray-200 rounded-xl py-3 text-xs font-bold" }, "Retour"), /* @__PURE__ */ React.createElement("button", { onClick: finaliserEtArchiverDossierOfficiel, className: "bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl py-3 text-xs font-black" }, "\u{1F7E2} Archiver"))), onglet === "calcul" && !modePreValidation && (modeSimulation ? /* @__PURE__ */ React.createElement(Simulateur, { medicaments, actes, showToast }) : /* @__PURE__ */ React.createElement(
+        }), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 font-mono font-black text-sm pt-3 mt-2 border-t-2" }, /* @__PURE__ */ React.createElement("span", null, "TOTAL"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, formatGourdes(totalDossierGourdes)), /* @__PURE__ */ React.createElement("span", { className: "text-right text-emerald-800" }, formatDH(totalDossierGourdes)))), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 gap-3" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setModePreValidation(false), className: "bg-gray-100 hover:bg-gray-200 rounded-xl py-3 text-xs font-bold" }, "Retour"), /* @__PURE__ */ React.createElement("button", { onClick: finaliserEtArchiverDossierOfficiel, className: "bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl py-3 text-xs font-black" }, "\u{1F7E2} Archiver"))), onglet === "calcul" && !modePreValidation && (modeSimulation ? /* @__PURE__ */ React.createElement(Simulateur, { medicaments, actes }) : /* @__PURE__ */ React.createElement(
           CalculateurPanel,
           {
             medicaments,
             actes,
-            setActes,
             lignes: lignesCalcul,
             setLignes: setLignesCalcul,
             dossierActif,
@@ -6510,14 +6517,9 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             onCloturerDossier: declencherPreValidationDossier,
             fichesDossier,
             onSupprimerFicheDossier: supprimerFicheDossier,
-            onMarquerProblemeFiche: marquerProblemeFiche,
             idFicheEnCoursDEdition,
             onEditerFiche: editerFiche,
             numeroFicheCourante,
-            dateFiche,
-            setDateFiche,
-            prescritPar,
-            setPrescritPar,
             dateEntree1,
             setDateEntree1,
             dateSortie1,
@@ -6543,14 +6545,11 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             prixChirSpec,
             setPrixChirSpec,
             totalsParService,
-            coutsParService,
             grandTotal: grandTotalGlobalFiche,
             totalDossierGourdes,
             onEnregistrerFiche: enregistrerNouvelleFiche,
             onViderFicheActive: viderLeCalculateurFicheUniquement,
             injecterLigne: injecterLigneAuCalculateur,
-            tarifChoisi,
-            setTarifChoisi,
             modeSimulation,
             userRole,
             userDisplayName,
@@ -6573,7 +6572,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             onChangerNomPatient: changerNomPatient,
             listeOng: listeOngNoms
           }
-        )), onglet === "verifie" && /* @__PURE__ */ React.createElement(HistoriqueVerifPanel, { verifications, setVerifications, onChargerPourModif: r\u00E9importerDossierDepuisArchives, onSupprimer: supprimerDossierArchive, filtreInitialNom: filtreArchivesInitialNom, clearFiltreInitialNom: () => setFiltreArchivesInitialNom(""), userRole, showToast, onChangerTypeOng: changerTypeOngPourDossier, listeOng: listeOngNoms, listeOngDocs, confirmModal, setConfirmModal, lotInitialFocus: lotAFocuserAuRetour, clearLotInitialFocus: () => setLotAFocuserAuRetour(null) }), onglet === "analyse" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(AnalyticsPanel, { verifications }), onglet === "meds" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GrilleEditionPanel, { titre: "de la Pharmacie", items: medicaments, setItems: setMedicaments, collectionName: "medicaments", showToast }), onglet === "actes" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GrilleEditionPanel, { titre: "des Actes", items: actes, setItems: setActes, collectionName: "actes", showToast }), onglet === "stock" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GestionStockPanel, { items: medicaments, setItems: setMedicaments, showToast }), onglet === "ong" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GestionOngPanel, { listeOngDocs, showToast }), onglet === "users" && userRole === "administrateur" && /* @__PURE__ */ React.createElement(GestionUtilisateursPanel, { showToast }), onglet === "demandes" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(DemandesPanel, { userRole, showToast })));
+        )), onglet === "verifie" && /* @__PURE__ */ React.createElement(HistoriqueVerifPanel, { verifications, setVerifications, onChargerPourModif: r\u00E9importerDossierDepuisArchives, onSupprimer: supprimerDossierArchive, filtreInitialNom: filtreArchivesInitialNom, clearFiltreInitialNom: () => setFiltreArchivesInitialNom(""), userRole, showToast, onChangerTypeOng: changerTypeOngPourDossier, listeOng: listeOngNoms }), onglet === "analyse" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(AnalyticsPanel, { verifications }), onglet === "meds" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GrilleEditionPanel, { titre: "de la Pharmacie", items: medicaments, setItems: setMedicaments, collectionName: "medicaments", showToast }), onglet === "actes" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GrilleEditionPanel, { titre: "des Actes", items: actes, setItems: setActes, collectionName: "actes", showToast }), onglet === "stock" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GestionStockPanel, { items: medicaments, setItems: setMedicaments, showToast }), onglet === "ong" && (userRole === "administrateur" || userRole === "direction") && /* @__PURE__ */ React.createElement(GestionOngPanel, { listeOngDocs, showToast }), onglet === "users" && userRole === "administrateur" && /* @__PURE__ */ React.createElement(GestionUtilisateursPanel, { showToast }), onglet === "demandes" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(DemandesPanel, { userRole, showToast })));
       }
       function ApplicationRoot() {
         var _a;
@@ -6581,7 +6580,6 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
         const [chargementAuth, setChargementAuth] = useState(true);
         const [userRole, setUserRole] = useState(null);
         const [userDisplayName, setUserDisplayName] = useState("");
-        const [roleParDefaut, setRoleParDefaut] = useState(false);
         useEffect(() => {
           const unsubscribe = auth.onAuthStateChanged(async (user) => {
             setChargementAuth(false);
@@ -6593,7 +6591,6 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
                 if (doc.exists) {
                   const data = doc.data();
                   setUserRole(data.role || "auditeur");
-                  setRoleParDefaut(!data.role);
                   setUserDisplayName(data.displayName || user.email || "Utilisateur");
                 } else {
                   await db.collection("users").doc(user.uid).set({
@@ -6605,12 +6602,10 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
                     createdAt: firebase2.firestore.FieldValue.serverTimestamp()
                   });
                   setUserRole("auditeur");
-                  setRoleParDefaut(true);
                 }
               } catch (error) {
                 console.error("Erreur r\xE9cup\xE9ration r\xF4le:", error);
                 setUserRole("auditeur");
-                setRoleParDefaut(true);
               }
             } else {
               setAuthentifie(false);
@@ -6621,7 +6616,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
         }, []);
         if (chargementAuth) return /* @__PURE__ */ React.createElement("div", { className: "min-h-screen w-full flex items-center justify-center bg-[#1E2A24]" }, /* @__PURE__ */ React.createElement("div", { className: "text-white text-sm" }, "Chargement..."));
         if (!authentifie) return /* @__PURE__ */ React.createElement(LoginScreen, { onLogin: () => setAuthentifie(true) });
-        return /* @__PURE__ */ React.createElement(AppHospitaliere, { onQuitter: () => auth.signOut(), userRole, userDisplayName, userEmail: (_a = auth.currentUser) == null ? void 0 : _a.email, roleParDefaut });
+        return /* @__PURE__ */ React.createElement(AppHospitaliere, { onQuitter: () => auth.signOut(), userRole, userDisplayName, userEmail: (_a = auth.currentUser) == null ? void 0 : _a.email });
       }
       module.exports = { AppHospitaliere, ApplicationRoot };
       if (typeof document !== "undefined" && document.getElementById("root")) {

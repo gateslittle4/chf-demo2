@@ -9,6 +9,65 @@ const { LOGO_CHF_BASE64 } = require('../utils/logoChf');
 const NOM_COMPLET_ONG = { "MSF-H": "MSF-HOLLANDE", "MSF-F": "MSF-FRANCE" }; // affiché en entier dans les rapports Excel — complète ici si d'autres partenaires sont abrégés
 const nomCompletOng = (nom) => NOM_COMPLET_ONG[nom] || nom;
 
+// Lignes du formulaire papier CHF (reproduction fidèle de la fiche d'admission physique) — ordre et
+// libellés calqués sur le papier. "Certificat" n'a pas d'équivalent dans le catalogue de l'app
+// (aucune catégorie ne correspond) : sa case reste donc toujours vide, comme les champs Âge/Sexe/
+// Statut Matrimonial de l'en-tête, à remplir à la main.
+const LIGNES_FORMULAIRE_CHF = [
+  { key: 'service', label: 'Services' },
+  { key: 'hospit', label: 'Lit Hospit.' },
+  { key: 'labo', label: 'Laboratoire' },
+  { key: 'med', label: 'Médicaments' },
+  { key: 'nebulisation', label: 'Nébulisation' },
+  { key: 'oxygene', label: 'Oxygène' },
+  { key: 'curetage', label: 'Curetage' },
+  { key: 'accouchement', label: 'Accouchement' },
+  { key: 'suture', label: 'Suture' },
+  { key: 'drainage', label: 'Drainage' },
+  { key: 'certificat', label: 'Certificat' },
+  { key: 'pansement', label: 'Pansement' },
+  { key: 'cesarienne', label: 'Césarienne' },
+  { key: 'ecg', label: 'ECG' },
+  { key: 'pap', label: 'PAP' },
+  { key: 'sono', label: 'Sonographie' },
+  { key: 'chirurgie', label: 'Chirurgie' },
+];
+const NB_COLONNES_MONTANT_FORMULAIRE = 8; // largeur du tableau papier reproduite à l'identique
+
+// Cumule le breakdown de toutes les fiches du dossier, par clé de LIGNES_FORMULAIRE_CHF
+// (même logique que ventilationDossier, mais gardant les clés à 0 et sans filtrage)
+const cumulPourFormulaireCHF = (dossier) => {
+  const totaux = {};
+  LIGNES_FORMULAIRE_CHF.forEach(l => totaux[l.key] = 0);
+  (dossier.fiches || []).forEach(f => {
+    Object.entries(f.breakdown || {}).forEach(([cle, montant]) => { if (totaux[cle] !== undefined) totaux[cle] += (montant || 0); });
+  });
+  return totaux;
+};
+
+// Toutes les périodes d'hébergement du dossier (une par fiche ayant une période 1, + une de plus si
+// la fiche a une 2e période) — pour gérer le cas d'un patient admis/hospitalisé à plusieurs reprises.
+const periodesSejourDossier = (dossier) => {
+  const dates = [];
+  (dossier.fiches || []).forEach(f => {
+    if (f.rawState?.dateEntree1) dates.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
+    if (f.rawState?.multiPeriode && f.rawState?.dateEntree2) dates.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
+  });
+  return dates;
+};
+
+// "Date D'admission" du formulaire : la date d'ouverture du dossier si une seule période (ou aucune,
+// ex. simple achat/consultation) ; sinon la liste complète des périodes, comme fait déjà ailleurs dans
+// l'app pour periodeSejourString (ex : "du 10/08 au 15/08 et du 16/08 au 20/08").
+const dateAdmissionFormulaireCHF = (dossier) => {
+  const periodes = periodesSejourDossier(dossier);
+  if (periodes.length < 2) return dossier.dateHeure || '';
+  return periodes.map(d => d.in === d.out
+    ? d.in.split('-').reverse().slice(0, 2).join('/')
+    : `du ${d.in.split('-').reverse().slice(0, 2).join('/')} au ${d.out.split('-').reverse().slice(0, 2).join('/')}`
+  ).join(' et ');
+};
+
 function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, userRole, showToast, onChangerTypeOng, listeOng, listeOngDocs, confirmModal, setConfirmModal, lotInitialFocus, clearLotInitialFocus }) {
   const [focusedVerif, setFocusedVerif] = useState(null);
   const [ficheAValider, setFicheAValider] = useState(null); // id du dossier dont on affiche les boutons ✅/✖ pour valider le marquage ⚠️
@@ -419,6 +478,76 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 500);
   };
 
+  // Reproduction fidèle du formulaire papier d'admission du CHF (logo, en-tête, grille "Services /
+  // Lit Hospit. / Laboratoire..." avec colonnes $) — chaque case vide affiche "$" comme sur le papier ;
+  // première et dernière colonne affichent le montant de la catégorie, GRAND TOTAL pareil.
+  // "Personne Responsable" = le partenaire qui prend en charge le patient.
+  const imprimerFormulaireCHF = (dossier) => {
+    const cumul = cumulPourFormulaireCHF(dossier);
+    const totalFormulaire = Object.values(cumul).reduce((a, b) => a + b, 0);
+    const totalReelDossier = dossier.totalGlobal || 0;
+    const ecartCategoriesHorsFormulaire = Math.round((totalReelDossier - totalFormulaire) * 100) / 100;
+    const personneResponsable = dossier.typePatient === 'ONG' ? (dossier.ongPartenaire || 'N/R') : 'Privé (patient/famille)';
+    if (ecartCategoriesHorsFormulaire !== 0) {
+      showToast(`⚠️ Ce formulaire ne couvre pas toutes les catégories facturées à ${dossier.nomPatient} : ${formatGourdes(Math.abs(ecartCategoriesHorsFormulaire))} Gdes de plus dans le dossier complet (ex. Radiographie / Visite) — vérifie l'onglet Dossiers pour le détail.`, "info");
+    }
+
+    // Cellule : "$" seul si pas de montant à cet endroit, sinon le montant précédé de "$" (comme le papier)
+    const celluleMontant = (montant, estColonneRemplie) => (estColonneRemplie && montant > 0) ? `<span class="montant">$${formatGourdes(montant)}</span>` : `<span class="dollar">$</span>`;
+    const ligneTableau = (label, montant) => `<tr><td class="lbl">${echapperHTML(label)}</td>${Array.from({ length: NB_COLONNES_MONTANT_FORMULAIRE }, (_, i) => `<td class="mnt">${celluleMontant(montant, i === 0 || i === NB_COLONNES_MONTANT_FORMULAIRE - 1)}</td>`).join('')}</tr>`;
+
+    const lignesHTML = LIGNES_FORMULAIRE_CHF.map(l => ligneTableau(l.label, cumul[l.key])).join('');
+    const ligneGrandTotal = `<tr class="grand-total"><td class="lbl">GRAND TOTAL</td>${Array.from({ length: NB_COLONNES_MONTANT_FORMULAIRE }, (_, i) => `<td class="mnt">${celluleMontant(totalFormulaire, i === 0 || i === NB_COLONNES_MONTANT_FORMULAIRE - 1)}</td>`).join('')}</tr>`;
+
+    const champ = (label, valeur, large) => `<span class="champ${large ? ' large' : ''}"><span class="lbl-champ">${echapperHTML(label)}</span><span class="val-champ">${valeur ? echapperHTML(valeur) : '&nbsp;'}</span></span>`;
+
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Formulaire CHF - ${echapperHTML(dossier.nomPatient)}</title><style>
+      @page{size:A4;margin:12mm 16mm;}
+      body{font-family:'Times New Roman',Georgia,serif;color:#000;font-size:13px;}
+      .entete{display:flex;align-items:center;justify-content:center;gap:14px;border-bottom:2.5px solid #000;padding-bottom:8px;margin-bottom:18px;position:relative;}
+      .entete img{width:64px;height:64px;object-fit:contain;position:absolute;left:0;top:2px;}
+      .entete-texte{text-align:center;}
+      .entete-texte h1{font-size:26px;margin:0;letter-spacing:0.5px;font-weight:bold;}
+      .entete-texte p{margin:2px 0;font-size:12px;}
+      .entete-texte p.email{font-size:10px;color:#999;}
+      .champs{margin-bottom:16px;font-size:14px;}
+      .ligne-champs{display:flex;flex-wrap:wrap;gap:0 30px;margin-bottom:10px;}
+      .champ{display:inline-flex;align-items:baseline;gap:6px;}
+      .champ.large{flex:1;}
+      .lbl-champ{font-weight:bold;white-space:nowrap;}
+      .val-champ{border-bottom:1px dotted #000;min-width:150px;flex:1;display:inline-block;padding:0 2px;}
+      .champ.large .val-champ{min-width:300px;}
+      table{width:100%;border-collapse:collapse;margin-top:6px;table-layout:fixed;}
+      th,td{border:1px solid #000;color:#000;}
+      td.lbl{text-align:left;width:16%;font-weight:bold;font-size:12px;padding:10px 6px;}
+      td.mnt{text-align:center;width:${(84 / NB_COLONNES_MONTANT_FORMULAIRE).toFixed(1)}%;padding:10px 2px;height:30px;}
+      .dollar{color:#555;font-size:13px;}
+      .montant{font-weight:bold;font-size:11px;white-space:nowrap;}
+      tr.grand-total td.lbl{font-size:13px;}
+      </style></head><body>
+      <div class="entete">
+        <img src="${LOGO_CHF_BASE64}" alt="Logo CHF" />
+        <div class="entete-texte">
+          <h1>CENTRE HOSPITALIER DE FONTAINE</h1>
+          <p>#13, Fontaine Duvivier, Cité Soleil, HAITI</p>
+          <p>Tels: (+509) 3647-0563 / (+509) 4609-4893 / (+509) 4654-2552</p>
+          <p class="email">chfcentrehospitalierdefontaine@gmail.com</p>
+        </div>
+      </div>
+      <div class="champs">
+        <div class="ligne-champs">${champ('Nom', dossier.nomPatient)}${champ('Prénom', '', true)}</div>
+        <div class="ligne-champs">${champ('Age', '')}${champ('Sexe', '')}${champ('Statut Matrimonial', '', true)}</div>
+        <div class="ligne-champs">${champ("Date D'admission", dateAdmissionFormulaireCHF(dossier), true)}</div>
+        <div class="ligne-champs">${champ('Personne Responsable', personneResponsable, true)}</div>
+        <div class="ligne-champs">${champ('Phone', dossier.telephone, true)}</div>
+      </div>
+      <table><tbody>${lignesHTML}${ligneGrandTotal}</tbody></table>
+      </body></html>`;
+    const win = window.open('', '_blank', 'width=850,height=1100');
+    if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
+    win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 500);
+  };
+
   const imprimerArchive = (dossier) => {
     const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Dossier ${echapperHTML(dossier.nomPatient)}</title><style>body{font-family:sans-serif;padding:20px;color:#000;} .entete{text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:14px;} .entete h1{font-size:22px;margin:4px 0;} .entete p{margin:2px 0;font-size:12px;} h1.titre{font-size:18px;margin-top:10px;} table{width:100%;border-collapse:collapse;margin-top:10px;} th,td{border:1px solid #ccc;padding:6px;text-align:left;font-size:12px;} .total{font-weight:bold;font-size:16px;margin-top:10px;} .info-patient{font-size:12px;margin:4px 0;} .meta-fiche{font-size:10px;color:#555;margin-top:4px;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p><p>${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</p></div><h1 class="titre">Dossier patient</h1><p class="info-patient"><strong>Nom :</strong> ${echapperHTML(dossier.nomPatient)} &nbsp;|&nbsp; <strong>N° Dossier :</strong> ${echapperHTML(dossier.numDossier || 'N/R')}</p><p class="info-patient"><strong>Partenaire / Type :</strong> ${dossier.typePatient === 'ONG' ? echapperHTML(dossier.ongPartenaire || 'N/R') : 'Privé'} (${dossier.typePatient === 'ONG' ? 'Partenaire' : 'Privé'})</p><p class="info-patient"><strong>Téléphone :</strong> ${echapperHTML(dossier.telephone || 'N/R')}</p><p class="info-patient"><strong>Date d'ouverture :</strong> ${echapperHTML(dossier.dateHeure)}</p><p><strong>Total :</strong> ${formatGourdes(dossier.totalGlobal)} Gdes (${formatDH(dossier.totalGlobal)} DH)</p><h3>Fiches :</h3>${dossier.fiches?.map(f => `<div style="border:1px solid #ddd;margin:10px 0;padding:10px;"><p><strong>Fiche N°${f.numeroFiche}</strong> - Total : ${formatGourdes(f.totalGlobal)} Gdes</p><table><thead><tr><th>Catégorie</th><th>Montant</th></tr></thead><tbody>${Object.entries(f.breakdown || {}).map(([key, val]) => { if (val === 0) return ''; const cat = CATEGORIES_LISTE.find(c => c.key === key); return `<tr><td>${echapperHTML(cat ? cat.label : key)}</td><td>${formatGourdes(val)}</td></tr>`; }).join('')}</tbody></table><p class="meta-fiche">Mode de paiement : ${echapperHTML((f.modePaiement || 'cash').toUpperCase())} &nbsp;|&nbsp; Encaissé par : ${echapperHTML(f.creePar || 'inconnu')} &nbsp;|&nbsp; ${f.dateCreation ? new Date(f.dateCreation).toLocaleString('fr-FR') : ''}</p></div>`).join('')}<p class="total">Total général : ${formatGourdes(dossier.totalGlobal)} Gdes (${formatDH(dossier.totalGlobal)} DH)</p></body></html>`;
     const win = window.open('', '_blank', 'width=800,height=600');
@@ -598,6 +727,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                       }} className="text-amber-700 p-1 bg-amber-50 rounded" title="Modifier / corriger"><Pencil size={13}/></button>}
                       {peutSupprimer && <button onClick={()=>onSupprimer(v.id)} disabled={v.verrouilleFacture} className="text-gray-300 hover:text-red-600 p-1 disabled:opacity-20"><Trash2 size={13}/></button>}
                       <button onClick={()=>imprimerArchive(v)} className="text-gray-600 p-1 bg-gray-50 rounded" title="Imprimer"><Printer size={13}/></button>
+                      <button onClick={()=>imprimerFormulaireCHF(v)} className="text-indigo-700 p-1 bg-indigo-50 rounded" title="Imprimer le formulaire papier CHF"><Printer size={13}/></button>
                       {isSuspendu && peutRouvrir && <button onClick={()=>rouvrirDossierSuspendu(v)} className="text-emerald-600 p-1 bg-emerald-50 rounded" title="Rouvrir"><FolderOpen size={13}/></button>}
                     </td>
                   </tr>
@@ -618,7 +748,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
 
       {focusedVerif && (
         <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-md space-y-4">
-          <div className="flex justify-between items-center border-b pb-1"><h3 className="font-bold text-blue-900 text-xs uppercase">🔍 {focusedVerif.nomPatient}</h3><div className="flex gap-2"><button onClick={() => imprimerArchive(focusedVerif)} className="bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1"><Printer size={12}/> Imprimer dossier</button><button onClick={() => setFocusedVerif(null)}><X size={14}/></button></div></div>
+          <div className="flex justify-between items-center border-b pb-1"><h3 className="font-bold text-blue-900 text-xs uppercase">🔍 {focusedVerif.nomPatient}</h3><div className="flex gap-2"><button onClick={() => imprimerArchive(focusedVerif)} className="bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1"><Printer size={12}/> Imprimer dossier</button><button onClick={() => imprimerFormulaireCHF(focusedVerif)} className="bg-indigo-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1"><Printer size={12}/> Formulaire papier CHF</button><button onClick={() => setFocusedVerif(null)}><X size={14}/></button></div></div>
           {focusedVerif.numeroLot != null && (
             <div className="flex items-center gap-2 text-xs bg-indigo-50 border border-indigo-200 rounded-lg p-2">
               <span className="text-indigo-800">📦 Ce dossier fait partie du <strong>Lot {focusedVerif.numeroLot}</strong> de {focusedVerif.ongPartenaire}. Une correction reste possible via "Modifier/corriger" — pense à réimprimer le lot ensuite pour que le partenaire reçoive la version à jour.</span>

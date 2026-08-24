@@ -58,7 +58,9 @@ function DashboardDirectionPanel({ verifications, paiements, medicaments }) {
     const topDetail = Object.entries(detailParType).sort((a,b) => b[1] - a[1]).slice(0,8).map(([nom, qte]) => ({ nom, qte }));
     const sonographiesAujourdhui = Object.entries(sonoAujourdhui).sort((a,b) => b[1] - a[1]).map(([nom, qte]) => ({ nom, qte }));
     const totalFacture = dossiers.reduce((s, v) => s + (v.totalGlobal || 0), 0);
-    const totalPaye = dossiers.reduce((s, v) => s + (v.montantPaye || 0), 0);
+    // Le champ montantPaye des dossiers n'est pas fiable (jamais mis à jour lors du parcours normal
+    // de facturation) — on se base sur les paiements réellement encaissés (collection paiements).
+    const totalPaye = transactions.reduce((s, p) => s + (p.montant || 0), 0);
     const recouvrement = totalFacture > 0 ? (totalPaye / totalFacture) * 100 : 0;
     setStats({ caMois, caJourCash, caJourOng, occupation, topActes, topDetail, sonographiesAujourdhui, recouvrement, patientsJour });
   };

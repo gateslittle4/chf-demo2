@@ -93,7 +93,7 @@ function AchatExpress({ medicaments, actes, setMedicaments, userRole, showToast,
       breakdown,
       totalGlobal: totalPanier,
       modePaiement: "cash",
-      montantPaye: verse,
+      montantPaye: totalPanier,
       solde: 0,
       dateCreation: new Date().toISOString(),
       creePar: auth.currentUser?.displayName || 'inconnu',
@@ -104,7 +104,7 @@ function AchatExpress({ medicaments, actes, setMedicaments, userRole, showToast,
       nomPatient: nomFinal, ongPartenaire: "", typePatient: "PRIVE",
       numDossier: "", dateNaissance: "", telephone: "",
       status: 'archived', timestamp: Date.now(), dateHeure: new Date().toLocaleDateString("fr-FR"),
-      totalGlobal: totalPanier, fiches: [fiche], montantPaye: verse, solde: 0
+      totalGlobal: totalPanier, fiches: [fiche], montantPaye: totalPanier, solde: 0
     };
 
     try {
