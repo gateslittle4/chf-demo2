@@ -45,6 +45,29 @@ const cumulPourFormulaireCHF = (dossier) => {
   return totaux;
 };
 
+// Toutes les périodes d'hébergement du dossier (une par fiche ayant une période 1, + une de plus si
+// la fiche a une 2e période) — pour gérer le cas d'un patient admis/hospitalisé à plusieurs reprises.
+const periodesSejourDossier = (dossier) => {
+  const dates = [];
+  (dossier.fiches || []).forEach(f => {
+    if (f.rawState?.dateEntree1) dates.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
+    if (f.rawState?.multiPeriode && f.rawState?.dateEntree2) dates.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
+  });
+  return dates;
+};
+
+// "Date D'admission" du formulaire : la date d'ouverture du dossier si une seule période (ou aucune,
+// ex. simple achat/consultation) ; sinon la liste complète des périodes, comme fait déjà ailleurs dans
+// l'app pour periodeSejourString (ex : "du 10/08 au 15/08 et du 16/08 au 20/08").
+const dateAdmissionFormulaireCHF = (dossier) => {
+  const periodes = periodesSejourDossier(dossier);
+  if (periodes.length < 2) return dossier.dateHeure || '';
+  return periodes.map(d => d.in === d.out
+    ? d.in.split('-').reverse().slice(0, 2).join('/')
+    : `du ${d.in.split('-').reverse().slice(0, 2).join('/')} au ${d.out.split('-').reverse().slice(0, 2).join('/')}`
+  ).join(' et ');
+};
+
 function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, userRole, showToast, onChangerTypeOng, listeOng, listeOngDocs, confirmModal, setConfirmModal, lotInitialFocus, clearLotInitialFocus }) {
   const [focusedVerif, setFocusedVerif] = useState(null);
   const [ficheAValider, setFicheAValider] = useState(null); // id du dossier dont on affiche les boutons ✅/✖ pour valider le marquage ⚠️
@@ -514,7 +537,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       <div class="champs">
         <div class="ligne-champs">${champ('Nom', dossier.nomPatient)}${champ('Prénom', '', true)}</div>
         <div class="ligne-champs">${champ('Age', '')}${champ('Sexe', '')}${champ('Statut Matrimonial', '', true)}</div>
-        <div class="ligne-champs">${champ("Date D'admission", dossier.dateHeure, true)}</div>
+        <div class="ligne-champs">${champ("Date D'admission", dateAdmissionFormulaireCHF(dossier), true)}</div>
         <div class="ligne-champs">${champ('Personne Responsable', personneResponsable, true)}</div>
         <div class="ligne-champs">${champ('Phone', dossier.telephone, true)}</div>
       </div>

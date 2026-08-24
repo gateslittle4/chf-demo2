@@ -3009,6 +3009,22 @@
         });
         return totaux;
       };
+      var periodesSejourDossier = (dossier) => {
+        const dates = [];
+        (dossier.fiches || []).forEach((f) => {
+          var _a, _b, _c;
+          if ((_a = f.rawState) == null ? void 0 : _a.dateEntree1) dates.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
+          if (((_b = f.rawState) == null ? void 0 : _b.multiPeriode) && ((_c = f.rawState) == null ? void 0 : _c.dateEntree2)) dates.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
+        });
+        return dates;
+      };
+      var dateAdmissionFormulaireCHF = (dossier) => {
+        const periodes = periodesSejourDossier(dossier);
+        if (periodes.length < 2) return dossier.dateHeure || "";
+        return periodes.map(
+          (d) => d.in === d.out ? d.in.split("-").reverse().slice(0, 2).join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`
+        ).join(" et ");
+      };
       function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, userRole, showToast, onChangerTypeOng, listeOng, listeOngDocs, confirmModal, setConfirmModal, lotInitialFocus, clearLotInitialFocus }) {
         var _a;
         const [focusedVerif, setFocusedVerif] = useState(null);
@@ -3518,7 +3534,7 @@
       <div class="champs">
         <div class="ligne-champs">${champ("Nom", dossier.nomPatient)}${champ("Pr\xE9nom", "", true)}</div>
         <div class="ligne-champs">${champ("Age", "")}${champ("Sexe", "")}${champ("Statut Matrimonial", "", true)}</div>
-        <div class="ligne-champs">${champ("Date D'admission", dossier.dateHeure, true)}</div>
+        <div class="ligne-champs">${champ("Date D'admission", dateAdmissionFormulaireCHF(dossier), true)}</div>
         <div class="ligne-champs">${champ("Personne Responsable", personneResponsable, true)}</div>
         <div class="ligne-champs">${champ("Phone", dossier.telephone, true)}</div>
       </div>
