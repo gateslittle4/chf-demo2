@@ -748,10 +748,6 @@ function CalculateurPanel({
           />
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-1.5">
-              <label className="text-[9px] font-bold text-amber-800 uppercase">📅 Date{idFicheEnCoursDEdition ? ' (fiche)' : ' (nouvelle fiche)'}</label>
-              <input type="date" value={dateFiche} onChange={e=>setDateFiche(e.target.value)} className="border rounded p-1.5 text-xs font-mono bg-white" />
-            </div>
-            <div className="flex items-center gap-1.5">
               <label className="text-[9px] font-bold text-amber-800 uppercase">🩺 Prescrit par</label>
               <input type="text" value={prescritPar} onChange={e=>setPrescritPar(e.target.value)} placeholder="Nom du médecin/infirmière" className="border rounded p-1.5 text-xs w-40 bg-white" />
             </div>
