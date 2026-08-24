@@ -455,55 +455,70 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 500);
   };
 
-  // Reproduction du formulaire papier d'admission du CHF (grille "Services / Lit Hospit. / Laboratoire..."
-  // avec colonnes $) — première et dernière colonne remplies avec le total de la catégorie, ligne
-  // GRAND TOTAL calculée pareil. "Personne Responsable" = le partenaire qui prend en charge le patient.
+  // Reproduction fidèle du formulaire papier d'admission du CHF (logo, en-tête, grille "Services /
+  // Lit Hospit. / Laboratoire..." avec colonnes $) — chaque case vide affiche "$" comme sur le papier ;
+  // première et dernière colonne affichent le montant de la catégorie, GRAND TOTAL pareil.
+  // "Personne Responsable" = le partenaire qui prend en charge le patient.
   const imprimerFormulaireCHF = (dossier) => {
     const cumul = cumulPourFormulaireCHF(dossier);
     const totalFormulaire = Object.values(cumul).reduce((a, b) => a + b, 0);
     const totalReelDossier = dossier.totalGlobal || 0;
     const ecartCategoriesHorsFormulaire = Math.round((totalReelDossier - totalFormulaire) * 100) / 100;
     const personneResponsable = dossier.typePatient === 'ONG' ? (dossier.ongPartenaire || 'N/R') : 'Privé (patient/famille)';
+    if (ecartCategoriesHorsFormulaire !== 0) {
+      showToast(`⚠️ Ce formulaire ne couvre pas toutes les catégories facturées à ${dossier.nomPatient} : ${formatGourdes(Math.abs(ecartCategoriesHorsFormulaire))} Gdes de plus dans le dossier complet (ex. Radiographie / Visite) — vérifie l'onglet Dossiers pour le détail.`, "info");
+    }
 
-    const celluleMontant = (montant) => montant > 0 ? formatGourdes(montant) : '';
-    const ligneTableau = (label, montant) => `<tr><td class="lbl">${echapperHTML(label)}</td>${Array.from({ length: NB_COLONNES_MONTANT_FORMULAIRE }, (_, i) => `<td class="mnt">${(i === 0 || i === NB_COLONNES_MONTANT_FORMULAIRE - 1) ? celluleMontant(montant) : ''}</td>`).join('')}</tr>`;
+    // Cellule : "$" seul si pas de montant à cet endroit, sinon le montant précédé de "$" (comme le papier)
+    const celluleMontant = (montant, estColonneRemplie) => (estColonneRemplie && montant > 0) ? `<span class="montant">$${formatGourdes(montant)}</span>` : `<span class="dollar">$</span>`;
+    const ligneTableau = (label, montant) => `<tr><td class="lbl">${echapperHTML(label)}</td>${Array.from({ length: NB_COLONNES_MONTANT_FORMULAIRE }, (_, i) => `<td class="mnt">${celluleMontant(montant, i === 0 || i === NB_COLONNES_MONTANT_FORMULAIRE - 1)}</td>`).join('')}</tr>`;
 
     const lignesHTML = LIGNES_FORMULAIRE_CHF.map(l => ligneTableau(l.label, cumul[l.key])).join('');
-    const ligneGrandTotal = `<tr class="grand-total"><td class="lbl">GRAND TOTAL</td>${Array.from({ length: NB_COLONNES_MONTANT_FORMULAIRE }, (_, i) => `<td class="mnt">${(i === 0 || i === NB_COLONNES_MONTANT_FORMULAIRE - 1) ? formatGourdes(totalFormulaire) : ''}</td>`).join('')}</tr>`;
+    const ligneGrandTotal = `<tr class="grand-total"><td class="lbl">GRAND TOTAL</td>${Array.from({ length: NB_COLONNES_MONTANT_FORMULAIRE }, (_, i) => `<td class="mnt">${celluleMontant(totalFormulaire, i === 0 || i === NB_COLONNES_MONTANT_FORMULAIRE - 1)}</td>`).join('')}</tr>`;
 
-    const champ = (label, valeur) => `<span class="champ"><span class="lbl-champ">${echapperHTML(label)}</span><span class="val-champ">${valeur ? echapperHTML(valeur) : '&nbsp;'}</span></span>`;
+    const champ = (label, valeur, large) => `<span class="champ${large ? ' large' : ''}"><span class="lbl-champ">${echapperHTML(label)}</span><span class="val-champ">${valeur ? echapperHTML(valeur) : '&nbsp;'}</span></span>`;
 
     const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Formulaire CHF - ${echapperHTML(dossier.nomPatient)}</title><style>
-      @page{size:A4;margin:14mm;}
-      body{font-family:'Times New Roman',serif;color:#000;font-size:13px;}
-      .entete{text-align:center;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:14px;}
-      .entete h1{font-size:24px;margin:2px 0;letter-spacing:1px;}
-      .entete p{margin:1px 0;font-size:11px;}
-      .champs{margin-bottom:14px;}
-      .ligne-champs{display:flex;flex-wrap:wrap;gap:0 24px;margin-bottom:8px;}
-      .champ{display:inline-flex;align-items:baseline;gap:4px;}
-      .lbl-champ{font-weight:bold;}
-      .val-champ{border-bottom:1px dotted #000;min-width:110px;display:inline-block;padding:0 2px;}
-      table{width:100%;border-collapse:collapse;margin-top:10px;table-layout:fixed;}
-      th,td{border:1px solid #000;padding:5px;font-size:11px;color:#000;}
-      th.lbl,td.lbl{text-align:left;width:22%;font-weight:bold;}
-      th.mnt,td.mnt{text-align:right;width:${(78 / NB_COLONNES_MONTANT_FORMULAIRE).toFixed(1)}%;}
-      tr.grand-total td{font-weight:bold;border-top:2px solid #000;}
-      .footnote{font-size:10px;color:#555;margin-top:8px;}
-      .signature{margin-top:50px;display:flex;justify-content:space-between;font-size:11px;}
-      .signature div{border-top:1px solid #000;width:200px;text-align:center;padding-top:4px;}
+      @page{size:A4;margin:12mm 16mm;}
+      body{font-family:'Times New Roman',Georgia,serif;color:#000;font-size:13px;}
+      .entete{display:flex;align-items:center;justify-content:center;gap:14px;border-bottom:2.5px solid #000;padding-bottom:8px;margin-bottom:18px;position:relative;}
+      .entete img{width:64px;height:64px;object-fit:contain;position:absolute;left:0;top:2px;}
+      .entete-texte{text-align:center;}
+      .entete-texte h1{font-size:26px;margin:0;letter-spacing:0.5px;font-weight:bold;}
+      .entete-texte p{margin:2px 0;font-size:12px;}
+      .entete-texte p.email{font-size:10px;color:#999;}
+      .champs{margin-bottom:16px;font-size:14px;}
+      .ligne-champs{display:flex;flex-wrap:wrap;gap:0 30px;margin-bottom:10px;}
+      .champ{display:inline-flex;align-items:baseline;gap:6px;}
+      .champ.large{flex:1;}
+      .lbl-champ{font-weight:bold;white-space:nowrap;}
+      .val-champ{border-bottom:1px dotted #000;min-width:150px;flex:1;display:inline-block;padding:0 2px;}
+      .champ.large .val-champ{min-width:300px;}
+      table{width:100%;border-collapse:collapse;margin-top:6px;table-layout:fixed;}
+      th,td{border:1px solid #000;color:#000;}
+      td.lbl{text-align:left;width:16%;font-weight:bold;font-size:12px;padding:10px 6px;}
+      td.mnt{text-align:center;width:${(84 / NB_COLONNES_MONTANT_FORMULAIRE).toFixed(1)}%;padding:10px 2px;height:30px;}
+      .dollar{color:#555;font-size:13px;}
+      .montant{font-weight:bold;font-size:11px;white-space:nowrap;}
+      tr.grand-total td.lbl{font-size:13px;}
       </style></head><body>
-      <div class="entete"><h1>CENTRE HOSPITALIER DE FONTAINE</h1><p>#13, Fontaine Duvivier, Cité Soleil, HAITI</p><p>Tels: (509) 3647-0563 / (509) 4609-4893 / (509) 4654-2552</p></div>
+      <div class="entete">
+        <img src="${LOGO_CHF_BASE64}" alt="Logo CHF" />
+        <div class="entete-texte">
+          <h1>CENTRE HOSPITALIER DE FONTAINE</h1>
+          <p>#13, Fontaine Duvivier, Cité Soleil, HAITI</p>
+          <p>Tels: (+509) 3647-0563 / (+509) 4609-4893 / (+509) 4654-2552</p>
+          <p class="email">chfcentrehospitalierdefontaine@gmail.com</p>
+        </div>
+      </div>
       <div class="champs">
-        <div class="ligne-champs">${champ('Nom', dossier.nomPatient)}${champ('Prénom', '')}</div>
-        <div class="ligne-champs">${champ('Age', '')}${champ('Sexe', '')}${champ('Statut Matrimonial', '')}</div>
-        <div class="ligne-champs">${champ("Date D'admission", dossier.dateHeure)}</div>
-        <div class="ligne-champs">${champ('Personne Responsable', personneResponsable)}</div>
-        <div class="ligne-champs">${champ('Phone', dossier.telephone)}</div>
+        <div class="ligne-champs">${champ('Nom', dossier.nomPatient)}${champ('Prénom', '', true)}</div>
+        <div class="ligne-champs">${champ('Age', '')}${champ('Sexe', '')}${champ('Statut Matrimonial', '', true)}</div>
+        <div class="ligne-champs">${champ("Date D'admission", dossier.dateHeure, true)}</div>
+        <div class="ligne-champs">${champ('Personne Responsable', personneResponsable, true)}</div>
+        <div class="ligne-champs">${champ('Phone', dossier.telephone, true)}</div>
       </div>
       <table><tbody>${lignesHTML}${ligneGrandTotal}</tbody></table>
-      ${ecartCategoriesHorsFormulaire !== 0 ? `<p class="footnote">⚠️ Le total ci-dessus (${formatGourdes(totalFormulaire)} Gdes) ne couvre que les catégories imprimées sur ce formulaire. Le total réel du dossier dans l'application est de ${formatGourdes(totalReelDossier)} Gdes (écart : ${formatGourdes(Math.abs(ecartCategoriesHorsFormulaire))} Gdes provenant de catégories absentes de ce formulaire papier, ex. Radiographie / Visite).</p>` : ''}
-      <div class="signature"><div>Signature Caissier(ère)</div><div>Signature Patient / Responsable</div></div>
       </body></html>`;
     const win = window.open('', '_blank', 'width=850,height=1100');
     if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
