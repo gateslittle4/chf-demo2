@@ -3097,7 +3097,8 @@
               totaux[cle] = (totaux[cle] || 0) + (montant || 0);
             });
           });
-          return CATEGORIES_LISTE.map((cat) => ({ label: cat.label, montant: totaux[cat.key] || 0 })).filter((x) => x.montant > 0);
+          const items = CATEGORIES_LISTE.map((cat) => ({ key: cat.key, label: cat.label, montant: totaux[cat.key] || 0 })).filter((x) => x.montant > 0);
+          return items.sort((a, b) => (a.key === "hospit" ? 1 : 0) - (b.key === "hospit" ? 1 : 0));
         };
         const lotsDuPartenaire = useMemo(() => {
           if (!lotOngSelectionne) return [];

@@ -111,7 +111,9 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     (v.fiches || []).forEach(f => {
       Object.entries(f.breakdown || {}).forEach(([cle, montant]) => { totaux[cle] = (totaux[cle] || 0) + (montant || 0); });
     });
-    return CATEGORIES_LISTE.map(cat => ({ label: cat.label, montant: totaux[cat.key] || 0 })).filter(x => x.montant > 0);
+    const items = CATEGORIES_LISTE.map(cat => ({ key: cat.key, label: cat.label, montant: totaux[cat.key] || 0 })).filter(x => x.montant > 0);
+    // Hébergement doit toujours apparaître en dernier dans cette liste de badges
+    return items.sort((a, b) => (a.key === 'hospit' ? 1 : 0) - (b.key === 'hospit' ? 1 : 0));
   };
 
   const lotsDuPartenaire = useMemo(() => {
