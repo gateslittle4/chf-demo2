@@ -16,15 +16,28 @@ const cumulCategoriesDossier = (v) => {
   return totaux;
 };
 
+// Médicaments de sortie : un dossier qui a un séjour (exeat) devrait avoir au moins 3 médicaments
+// dans la fiche du séjour elle-même, ou dans la fiche juste avant/après (par numéro de fiche) —
+// sinon les médicaments de sortie ont probablement été oubliés.
+const compterMedicaments = (fiche) => (fiche?.rawState?.lignesCalcul || []).filter(l => l.type === 'med').length;
+const medicamentsSortieManquants = (dossier) => {
+  const fiches = [...(dossier.fiches || [])].sort((a, b) => (a.numeroFiche || 0) - (b.numeroFiche || 0));
+  const indexesSejour = fiches.map((f, i) => (f.exeat ? i : -1)).filter(i => i !== -1);
+  if (indexesSejour.length === 0) return false; // pas de séjour dans ce dossier -> alerte non applicable
+  return !indexesSejour.some(i => [fiches[i - 1], fiches[i], fiches[i + 1]].some(f => compterMedicaments(f) >= 3));
+};
+
 // Regroupement mère/bébé (utilisé pour la liste d'un lot à l'écran ET l'export Excel) : un dossier
 // nommé "Bb <nom de la mère>" (ou "Bébé <nom>") est trié juste après le dossier de sa mère, même
 // si sa propre date d'entrée diffère — il hérite de la date de la mère pour le tri.
-// Calcule aussi 3 alertes de contrôle qualité par dossier (affichées à l'écran seulement, jamais
+// Calcule aussi 4 alertes de contrôle qualité par dossier (affichées à l'écran seulement, jamais
 // dans l'export Excel envoyé aux partenaires) :
 //  - estBebeSansMere : bébé dont la mère n'est pas dans la même liste (fiche d'urgence à envisager)
 //  - cesarienneSansSono : dossier avec césarienne/accouchement mais aucune sonographie facturée
 //  - sansAdmission : dossier sans "Admission / Consultation", sauf les bébés dont la mère est trouvée
 //    (ils n'ont normalement pas leur propre ligne d'admission, ils sont rattachés à celle de la mère)
+//  - medicamentsSortieManquants : séjour sans au moins 3 médicaments dans la fiche du séjour ou
+//    une fiche adjacente (avant/après)
 const extraireNomMere = (nom) => { const m = (nom || '').trim().match(/^(?:bb|beb[ée])\.?\s+(.+)$/i); return m ? m[1].trim().toLowerCase() : null; };
 const cleFamilleDossier = (nom) => extraireNomMere(nom) || (nom || '').trim().toLowerCase();
 const trierAvecRegroupementMereBebe = (dossiers) => {
@@ -45,7 +58,8 @@ const trierAvecRegroupementMereBebe = (dossiers) => {
       ...v,
       estBebeSansMere: !!nomMere && dateMereParCle[nomMere] === undefined,
       cesarienneSansSono: ((cumul.cesarienne || 0) > 0 || (cumul.accouchement || 0) > 0) && !((cumul.sono || 0) > 0),
-      sansAdmission: !estBebeAvecMere && !((cumul.service || 0) > 0)
+      sansAdmission: !estBebeAvecMere && !((cumul.service || 0) > 0),
+      medicamentsSortieManquants: medicamentsSortieManquants(v)
     };
   });
 };
@@ -694,6 +708,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                       {v.estBebeSansMere && <span title="Bébé sans dossier de mère dans ce lot — vérifie s'il faut ouvrir une fiche d'urgence pour ce bébé" className="bg-red-100 text-red-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">🚨 Sans mère</span>}
                       {v.cesarienneSansSono && <span title="Césarienne ou accouchement facturé, mais aucune sonographie sur ce dossier — vérifie si elle a été oubliée" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">⚠️ Sono manquante</span>}
                       {v.sansAdmission && <span title="Aucune Admission / Consultation facturée sur ce dossier — vérifie si elle a été oubliée" className="bg-orange-100 text-orange-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">⚠️ Admission manquante</span>}
+                      {v.medicamentsSortieManquants && <span title="Séjour sans au moins 3 médicaments dans la fiche du séjour ou une fiche adjacente — vérifie si les médicaments de sortie ont été oubliés" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">💊 Médicaments sortie manquants</span>}
                       <span className="text-gray-400">— {formatGourdes(v.totalGlobal||0)} Gdes <span className="text-indigo-400">({formatDH(v.totalGlobal||0)} DH)</span></span>
                       <div className="flex flex-wrap gap-1 mt-1 pl-16">
                         {ventilationDossier(v).map(x => (
