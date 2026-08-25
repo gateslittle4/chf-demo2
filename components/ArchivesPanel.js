@@ -9,11 +9,22 @@ const { LOGO_CHF_BASE64 } = require('../utils/logoChf');
 const NOM_COMPLET_ONG = { "MSF-H": "MSF-HOLLANDE", "MSF-F": "MSF-FRANCE" }; // affiché en entier dans les rapports Excel — complète ici si d'autres partenaires sont abrégés
 const nomCompletOng = (nom) => NOM_COMPLET_ONG[nom] || nom;
 
+// Cumule le breakdown de toutes les fiches d'un dossier, toutes catégories confondues (clés brutes)
+const cumulCategoriesDossier = (v) => {
+  const totaux = {};
+  (v.fiches || []).forEach(f => { Object.entries(f.breakdown || {}).forEach(([cle, montant]) => { totaux[cle] = (totaux[cle] || 0) + (montant || 0); }); });
+  return totaux;
+};
+
 // Regroupement mère/bébé (utilisé pour la liste d'un lot à l'écran ET l'export Excel) : un dossier
 // nommé "Bb <nom de la mère>" (ou "Bébé <nom>") est trié juste après le dossier de sa mère, même
-// si sa propre date d'entrée diffère — il hérite de la date de la mère pour le tri. Si aucun dossier
-// de mère correspondant n'est trouvé dans la même liste, le dossier du bébé est marqué
-// estBebeSansMere=true, pour repérer qu'il faut peut-être ouvrir une fiche d'urgence pour ce bébé.
+// si sa propre date d'entrée diffère — il hérite de la date de la mère pour le tri.
+// Calcule aussi 3 alertes de contrôle qualité par dossier (affichées à l'écran seulement, jamais
+// dans l'export Excel envoyé aux partenaires) :
+//  - estBebeSansMere : bébé dont la mère n'est pas dans la même liste (fiche d'urgence à envisager)
+//  - cesarienneSansSono : dossier avec césarienne/accouchement mais aucune sonographie facturée
+//  - sansAdmission : dossier sans "Admission / Consultation", sauf les bébés dont la mère est trouvée
+//    (ils n'ont normalement pas leur propre ligne d'admission, ils sont rattachés à celle de la mère)
 const extraireNomMere = (nom) => { const m = (nom || '').trim().match(/^(?:bb|beb[ée])\.?\s+(.+)$/i); return m ? m[1].trim().toLowerCase() : null; };
 const cleFamilleDossier = (nom) => extraireNomMere(nom) || (nom || '').trim().toLowerCase();
 const trierAvecRegroupementMereBebe = (dossiers) => {
@@ -28,7 +39,14 @@ const trierAvecRegroupementMereBebe = (dossiers) => {
     return (extraireNomMere(a.nomPatient) ? 1 : 0) - (extraireNomMere(b.nomPatient) ? 1 : 0);
   }).map(v => {
     const nomMere = extraireNomMere(v.nomPatient);
-    return { ...v, estBebeSansMere: !!nomMere && dateMereParCle[nomMere] === undefined };
+    const estBebeAvecMere = !!nomMere && dateMereParCle[nomMere] !== undefined;
+    const cumul = cumulCategoriesDossier(v);
+    return {
+      ...v,
+      estBebeSansMere: !!nomMere && dateMereParCle[nomMere] === undefined,
+      cesarienneSansSono: ((cumul.cesarienne || 0) > 0 || (cumul.accouchement || 0) > 0) && !((cumul.sono || 0) > 0),
+      sansAdmission: !estBebeAvecMere && !((cumul.service || 0) > 0)
+    };
   });
 };
 
@@ -130,10 +148,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
   };
 
   const ventilationDossier = (v) => {
-    const totaux = {};
-    (v.fiches || []).forEach(f => {
-      Object.entries(f.breakdown || {}).forEach(([cle, montant]) => { totaux[cle] = (totaux[cle] || 0) + (montant || 0); });
-    });
+    const totaux = cumulCategoriesDossier(v);
     const items = CATEGORIES_LISTE.map(cat => ({ key: cat.key, label: cat.label, montant: totaux[cat.key] || 0 })).filter(x => x.montant > 0);
     // Hébergement doit toujours apparaître en dernier dans cette liste de badges
     return items.sort((a, b) => (a.key === 'hospit' ? 1 : 0) - (b.key === 'hospit' ? 1 : 0));
@@ -206,8 +221,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     celluleTotal: { font: { bold: true }, alignment: { horizontal: "right" }, numFmt: "\"HTG \"#,##0", border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } },
     grandTotalHtg: { font: { bold: true }, alignment: { horizontal: "right" }, numFmt: "\"HTG \"#,##0", border: { top: { style: "medium" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } },
     grandTotalNombre: { font: { bold: true }, alignment: { horizontal: "right" }, numFmt: "#,##0", border: { top: { style: "medium" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } },
-    celluleFinaleGras: { font: { bold: true, size: 11 }, fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFD0D0D0" } }, alignment: { horizontal: "right" }, numFmt: "\"HTG \"#,##0", border: { top: { style: "medium" }, bottom: { style: "double" }, left: { style: "thin" }, right: { style: "thin" } } },
-    alerteBebeSansMere: { fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFE0B2" } } } // bébé sans dossier de mère dans ce lot — à vérifier avant envoi
+    celluleFinaleGras: { font: { bold: true, size: 11 }, fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FFD0D0D0" } }, alignment: { horizontal: "right" }, numFmt: "\"HTG \"#,##0", border: { top: { style: "medium" }, bottom: { style: "double" }, left: { style: "thin" }, right: { style: "thin" } } }
   };
 
   // Applique un style nommé (EXCEL_STYLES.xxx) à une cellule ExcelJS
@@ -235,7 +249,8 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       // Regroupement mère/bébé : un dossier nommé "Bb <nom de la mère>" est trié juste après le
       // dossier de sa mère (même date effective, ordre alphabétique de la "famille" sinon), même si
       // le bébé n'a pas sa propre date d'hébergement (il hérite alors de celle de sa mère pour le tri).
-      // estBebeSansMere signale un bébé dont la mère n'est pas dans ce lot (surligné dans le fichier).
+      // L'alerte "bébé sans mère" reste uniquement dans l'app (toast) — jamais dans le fichier envoyé
+      // au partenaire.
       let listeDossiersONG = trierAvecRegroupementMereBebe(verifications.filter(v => idsDossiers.includes(v.id)));
 
       if (listeDossiersONG.length === 0) { showToast(`Aucun dossier trouvé pour ${ongCible}`, "error"); return; }
@@ -316,7 +331,6 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
         });
 
         appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.celluleStandard); ws.getCell(r, 1).value = formaterNomPropre(doc.nomPatient);
-        if (doc.estBebeSansMere) appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.alerteBebeSansMere);
         appliquerStyle(ws.getCell(r, 2), EXCEL_STYLES.celluleStandard); ws.getCell(r, 2).value = doc.periodeSejourString || doc.dateHeure || "—";
         colonnesExport.forEach((c, i) => {
           totalsParColonne[c.key] += totalsPatient[c.key] || 0;
@@ -676,7 +690,11 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                   <div key={v.id} className="flex justify-between items-start py-2 text-xs font-mono gap-2">
                     <div className="flex-1 min-w-0">
                       <span className={`inline-block w-16 mr-3 ${v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? 'text-gray-500' : 'text-red-500'}`}>{v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? v.dateEntreePourTri.split('-').reverse().join('/') : 'sans exeat'}</span>
-                      {v.nomPatient} {v.estBebeSansMere && <span title="Bébé sans dossier de mère dans ce lot — vérifie s'il faut ouvrir une fiche d'urgence pour ce bébé" className="text-red-600">🚨</span>} <span className="text-gray-400">— {formatGourdes(v.totalGlobal||0)} Gdes <span className="text-indigo-400">({formatDH(v.totalGlobal||0)} DH)</span></span>
+                      {v.nomPatient}{' '}
+                      {v.estBebeSansMere && <span title="Bébé sans dossier de mère dans ce lot — vérifie s'il faut ouvrir une fiche d'urgence pour ce bébé" className="bg-red-100 text-red-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">🚨 Sans mère</span>}
+                      {v.cesarienneSansSono && <span title="Césarienne ou accouchement facturé, mais aucune sonographie sur ce dossier — vérifie si elle a été oubliée" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">⚠️ Sono manquante</span>}
+                      {v.sansAdmission && <span title="Aucune Admission / Consultation facturée sur ce dossier — vérifie si elle a été oubliée" className="bg-orange-100 text-orange-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">⚠️ Admission manquante</span>}
+                      <span className="text-gray-400">— {formatGourdes(v.totalGlobal||0)} Gdes <span className="text-indigo-400">({formatDH(v.totalGlobal||0)} DH)</span></span>
                       <div className="flex flex-wrap gap-1 mt-1 pl-16">
                         {ventilationDossier(v).map(x => (
                           <span key={x.label} className="bg-indigo-50 text-indigo-700 border border-indigo-100 rounded px-1.5 py-0.5 text-[10px] whitespace-nowrap">{x.label}: {formatDH(x.montant)} DH</span>
