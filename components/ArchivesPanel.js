@@ -686,7 +686,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
           {lotFocused && (
             <div className="space-y-2">
               <div className="flex justify-between items-center border-b pb-1">
-                <h3 className="font-black text-gray-700 text-xs uppercase">📦 Lot {lotFocused.numero} — {lotOngSelectionne} — {formatGourdes(lotFocused.total)} Gdes</h3>
+                <h3 className="font-black text-gray-700 text-xs uppercase">📦 Lot {lotFocused.numero} — {lotOngSelectionne} — {lotFocused.dossiers.length} dossier{lotFocused.dossiers.length > 1 ? 's' : ''} — {formatGourdes(lotFocused.total)} Gdes</h3>
                 <div className="flex gap-2">
                   <button onClick={() => reimprimerLot(lotOngSelectionne, lotFocused.numero)} className="bg-purple-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1"><Download size={12}/> Réimprimer ce lot</button>
                   <button onClick={() => setLotFocusedNumero(null)}><X size={14}/></button>
