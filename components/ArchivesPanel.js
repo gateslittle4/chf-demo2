@@ -16,15 +16,19 @@ const cumulCategoriesDossier = (v) => {
   return totaux;
 };
 
-// Médicaments de sortie : un dossier qui a un séjour (exeat) devrait avoir au moins 3 médicaments
-// dans la fiche du séjour elle-même, ou dans la fiche juste avant/après (par numéro de fiche) —
-// sinon les médicaments de sortie ont probablement été oubliés.
-const compterMedicaments = (fiche) => (fiche?.rawState?.lignesCalcul || []).filter(l => l.type === 'med').length;
+// Médicaments de sortie : un dossier qui a un séjour (exeat) devrait avoir au moins 2 médicaments
+// "de sortie" (Ferfolat, Globugen, Tothema, Amox..., Vit C, Paracétamol) dans la fiche du séjour
+// elle-même, ou dans la fiche juste avant/après (par numéro de fiche) — sinon ils ont probablement
+// été oubliés. Comparaison insensible aux accents/majuscules.
+const MEDICAMENTS_SORTIE_MOTSCLES = ['ferfolat', 'globugen', 'tothema', 'amox', 'paracetamol', 'vitamine c', 'vit c'];
+const normaliserTexte = (t) => (t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const estMedicamentSortie = (nomLigne) => { const n = normaliserTexte(nomLigne); return MEDICAMENTS_SORTIE_MOTSCLES.some(mc => n.includes(mc)); };
+const compterMedicamentsSortie = (fiche) => (fiche?.rawState?.lignesCalcul || []).filter(l => l.type === 'med' && estMedicamentSortie(l.nom)).length;
 const medicamentsSortieManquants = (dossier) => {
   const fiches = [...(dossier.fiches || [])].sort((a, b) => (a.numeroFiche || 0) - (b.numeroFiche || 0));
   const indexesSejour = fiches.map((f, i) => (f.exeat ? i : -1)).filter(i => i !== -1);
   if (indexesSejour.length === 0) return false; // pas de séjour dans ce dossier -> alerte non applicable
-  return !indexesSejour.some(i => [fiches[i - 1], fiches[i], fiches[i + 1]].some(f => compterMedicaments(f) >= 3));
+  return !indexesSejour.some(i => [fiches[i - 1], fiches[i], fiches[i + 1]].some(f => compterMedicamentsSortie(f) >= 2));
 };
 
 // Regroupement mère/bébé (utilisé pour la liste d'un lot à l'écran ET l'export Excel) : un dossier
@@ -708,7 +712,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                       {v.estBebeSansMere && <span title="Bébé sans dossier de mère dans ce lot — vérifie s'il faut ouvrir une fiche d'urgence pour ce bébé" className="bg-red-100 text-red-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">🚨 Sans mère</span>}
                       {v.cesarienneSansSono && <span title="Césarienne ou accouchement facturé, mais aucune sonographie sur ce dossier — vérifie si elle a été oubliée" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">⚠️ Sono manquante</span>}
                       {v.sansAdmission && <span title="Aucune Admission / Consultation facturée sur ce dossier — vérifie si elle a été oubliée" className="bg-orange-100 text-orange-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">⚠️ Admission manquante</span>}
-                      {v.medicamentsSortieManquants && <span title="Séjour sans au moins 3 médicaments dans la fiche du séjour ou une fiche adjacente — vérifie si les médicaments de sortie ont été oubliés" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">💊 Médicaments sortie manquants</span>}
+                      {v.medicamentsSortieManquants && <span title="Séjour sans au moins 2 médicaments de sortie (Ferfolat, Globugen, Tothema, Amox..., Vit C, Paracétamol) dans la fiche du séjour ou une fiche adjacente — vérifie si les médicaments de sortie ont été oubliés" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">💊 Médicaments sortie manquants</span>}
                       <span className="text-gray-400">— {formatGourdes(v.totalGlobal||0)} Gdes <span className="text-indigo-400">({formatDH(v.totalGlobal||0)} DH)</span></span>
                       <div className="flex flex-wrap gap-1 mt-1 pl-16">
                         {ventilationDossier(v).map(x => (
