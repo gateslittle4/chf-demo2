@@ -816,9 +816,9 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
 
           {lotFocused && (
             <div className="space-y-2">
-              <div className="flex justify-between items-center border-b pb-1">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 border-b pb-1">
                 <h3 className="font-black text-gray-700 text-xs uppercase">📦 Lot {lotFocused.numero} — {lotOngSelectionne} — {lotFocused.dossiers.length} dossier{lotFocused.dossiers.length > 1 ? 's' : ''} — {formatGourdes(lotFocused.total)} Gdes</h3>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 items-center">
                   <button onClick={() => reimprimerLot(lotOngSelectionne, lotFocused.numero)} className="bg-purple-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1"><Download size={12}/> Réimprimer ce lot</button>
                   <button onClick={() => imprimerFormulaireCHFPourLot(lotFocused.dossiers)} className="bg-indigo-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1" title="Imprime le formulaire papier CHF de chaque dossier de ce lot, un par page"><Printer size={12}/> Formulaires CHF du lot</button>
                   <button onClick={() => setLotFocusedNumero(null)}><X size={14}/></button>
@@ -854,8 +854,8 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                 {dossiersLotAffiches.map(v => (
                   <div key={v.id} className="flex justify-between items-start py-2 text-xs font-mono gap-2">
                     <div className="flex-1 min-w-0">
-                      <span className="inline-block w-20 mr-2 text-gray-400 font-bold" title="N° Dossier">N°{v.numDossier || '—'}</span>
-                      <span className={`inline-block w-16 mr-3 ${v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? 'text-gray-500' : 'text-red-500'}`}>{v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? v.dateEntreePourTri.split('-').reverse().join('/') : 'sans exeat'}</span>
+                      <span className="inline-block sm:w-20 mr-2 sm:mr-2 text-gray-400 font-bold" title="N° Dossier">N°{v.numDossier || '—'}</span>
+                      <span className={`inline-block sm:w-16 mr-2 sm:mr-3 ${v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? 'text-gray-500' : 'text-red-500'}`}>{v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? v.dateEntreePourTri.split('-').reverse().join('/') : 'sans exeat'}</span>
                       {v.nomPatient}{' '}
                       <button onClick={() => toggleDossierComplet(v)} title={v.dossierComplet ? "Dossier marqué complet — cliquer pour annuler" : "Marquer ce dossier comme complet"} className={`inline-flex items-center justify-center w-4 h-4 rounded-full border align-middle mr-1 ${v.dossierComplet ? 'bg-emerald-500 border-emerald-600 text-white' : 'bg-white border-gray-300 text-gray-300 hover:border-emerald-400 hover:text-emerald-400'}`}>
                         <Check size={10}/>
@@ -867,7 +867,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                       {v.sansAdmission && <span title="Aucune Admission / Consultation facturée sur ce dossier — vérifie si elle a été oubliée" className="bg-orange-100 text-orange-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">⚠️ Admission manquante</span>}
                       {v.medicamentsSortieManquants && <span title="Séjour sans au moins 2 médicaments de sortie (Ferfolat, Globugen, Tothema, Amox..., Vit C, Paracétamol) dans la fiche du séjour ou une fiche adjacente — vérifie si les médicaments de sortie ont été oubliés" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">💊 Médicaments sortie manquants</span>}
                       <span className="text-gray-400">— {formatGourdes(v.totalGlobal||0)} Gdes <span className="text-indigo-400">({formatDH(v.totalGlobal||0)} DH)</span></span>
-                      <div className="flex flex-wrap gap-1 mt-1 pl-40">
+                      <div className="flex flex-wrap gap-1 mt-1 pl-2 sm:pl-40">
                         {ventilationDossier(v).map(x => (
                           <span key={x.label} className="bg-indigo-50 text-indigo-700 border border-indigo-100 rounded px-1.5 py-0.5 text-[10px] whitespace-nowrap">{x.label}: {formatDH(x.montant)} DH</span>
                         ))}
@@ -960,7 +960,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
 
       {focusedVerif && (
         <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-md space-y-4">
-          <div className="flex justify-between items-center border-b pb-1"><h3 className="font-bold text-blue-900 text-xs uppercase">🔍 {focusedVerif.nomPatient}</h3><div className="flex gap-2"><button onClick={() => imprimerArchive(focusedVerif)} className="bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1"><Printer size={12}/> Imprimer dossier</button><button onClick={() => imprimerFormulaireCHF(focusedVerif)} className="bg-indigo-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1"><Printer size={12}/> Formulaire papier CHF</button><button onClick={() => setFocusedVerif(null)}><X size={14}/></button></div></div>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 border-b pb-1"><h3 className="font-bold text-blue-900 text-xs uppercase">🔍 {focusedVerif.nomPatient}</h3><div className="flex flex-wrap gap-2 items-center"><button onClick={() => imprimerArchive(focusedVerif)} className="bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1"><Printer size={12}/> Imprimer dossier</button><button onClick={() => imprimerFormulaireCHF(focusedVerif)} className="bg-indigo-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1"><Printer size={12}/> Formulaire papier CHF</button><button onClick={() => setFocusedVerif(null)}><X size={14}/></button></div></div>
           {focusedVerif.numeroLot != null && (
             <div className="flex items-center gap-2 text-xs bg-indigo-50 border border-indigo-200 rounded-lg p-2">
               <span className="text-indigo-800">📦 Ce dossier fait partie du <strong>Lot {focusedVerif.numeroLot}</strong> de {focusedVerif.ongPartenaire}. Une correction reste possible via "Modifier/corriger" — pense à réimprimer le lot ensuite pour que le partenaire reçoive la version à jour.</span>
