@@ -3574,7 +3574,8 @@
           const lignesHTML = LIGNES_FORMULAIRE_CHF.map((l) => ligneTableau(l.label, cumul[l.key])).join("");
           const ligneGrandTotal = `<tr class="grand-total"><td class="lbl">GRAND TOTAL</td>${Array.from({ length: NB_COLONNES_MONTANT_FORMULAIRE }, (_, i) => `<td class="mnt">${celluleMontant(totalFormulaire, i === 0 || i === NB_COLONNES_MONTANT_FORMULAIRE - 1)}</td>`).join("")}</tr>`;
           const champ = (label, valeur, large) => `<span class="champ${large ? " large" : ""}"><span class="lbl-champ">${echapperHTML(label)}</span><span class="val-champ">${valeur ? echapperHTML(valeur) : "&nbsp;"}</span></span>`;
-          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Formulaire CHF - ${echapperHTML(dossier.nomPatient)}</title><style>
+          const nomPatientPropre = formaterNomPropre(dossier.nomPatient);
+          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Formulaire CHF - ${echapperHTML(nomPatientPropre)}</title><style>
       @page{size:A4;margin:8mm 14mm;}
       body{font-family:'Times New Roman',Georgia,serif;color:#000;font-size:11px;}
       .entete{display:flex;align-items:center;justify-content:center;gap:10px;border-bottom:2px solid #000;padding-bottom:5px;margin-bottom:8px;position:relative;}
@@ -3608,7 +3609,7 @@
         </div>
       </div>
       <div class="champs">
-        <div class="ligne-champs">${champ("Nom", dossier.nomPatient)}${champ("Pr\xE9nom", "", true)}</div>
+        <div class="ligne-champs">${champ("Nom", nomPatientPropre)}${champ("Pr\xE9nom", "", true)}</div>
         <div class="ligne-champs">${champ("Age", "")}${champ("Sexe", "")}</div>
         <div class="ligne-champs">${champ("Statut Matrimonial", "", true)}</div>
         <div class="ligne-champs">${champ("Date D'admission", dateAdmissionFormulaireCHF(dossier), true)}</div>
@@ -3988,7 +3989,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
       var { auth, db, enregistrerAudit } = require_firebase();
       var { chf, toPaiementApi } = require_supabase();
       var { CONFIG_LITS } = require_constants();
-      var { formatGourdes, formatDH, echapperHTML } = require_helpers();
+      var { formatGourdes, formatDH, echapperHTML, formaterNomPropre } = require_helpers();
       var { Search, Plus, X, Clock, Check } = require_icons();
       var ConfirmModal = require_ConfirmModal();
       var NouveauDossierForm = require_NouveauDossierForm();
@@ -4409,7 +4410,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
           const ligneHebergement2 = ((_c = fiche.exeat) == null ? void 0 : _c.multiPeriode) && ((_d = fiche.exeat) == null ? void 0 : _d.dateEntree2) ? `<tr><td>S\xE9jour P2 : ${echapperHTML(((_e = CONFIG_LITS[fiche.exeat.typeLit2]) == null ? void 0 : _e.nom) || fiche.exeat.typeLit2)}</td><td class="qte">${fiche.exeat.nbJours2}j</td><td class="prix">${formatGourdes(((_f = CONFIG_LITS[fiche.exeat.typeLit2]) == null ? void 0 : _f.prix) || 0)}</td><td class="sous-total">${formatGourdes(fiche.exeat.totalHebergement2)}</td></tr>` : "";
           const prixChirSpecFiche = ((_g = fiche.rawState) == null ? void 0 : _g.hasChirSpec) ? parseFloat(fiche.rawState.prixChirSpec) || 0 : 0;
           const ligneChir = ((_h = fiche.rawState) == null ? void 0 : _h.hasChirSpec) && ((_i = fiche.rawState) == null ? void 0 : _i.nomChirSpec) ? `<tr><td>Chirurgie: ${echapperHTML(fiche.rawState.nomChirSpec)}</td><td class="qte">1</td><td class="prix">${formatGourdes(prixChirSpecFiche)}</td><td class="sous-total">${formatGourdes(prixChirSpecFiche)}</td></tr>` : "";
-          return `<div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p></div><div style="font-weight:bold;font-size:11px;margin-bottom:6px;">Patient: ${echapperHTML(nomPatient)}</div><div style="font-size:10px;margin-bottom:2px;">${typePatient === "ONG" ? `Partenaire : ${echapperHTML(selectedOng || "N/R")}` : "Priv\xE9"}</div><div style="font-size:10px;margin-bottom:2px;">\u{1F4DE} ${echapperHTML(telephone || "N/R")}</div><table><thead><tr><th>D\xE9signation</th><th class="qte">Qt\xE9</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${ligneHebergement}${ligneHebergement2}${ligneChir}${lignesDetaillees.map((l) => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte * l.prix)}</td></tr>`).join("")}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes (${formatDH(fiche.totalGlobal)} DH)</div><p style="font-size:10px;margin-top:4px;">${fiche.prescritPar ? `Prescrit par : ${echapperHTML(fiche.prescritPar)}` : ""}</p><div class="footer">Merci de votre visite ! Bonne gu\xE9rison !<br/>CHF-${(/* @__PURE__ */ new Date()).getFullYear()}</div>`;
+          return `<div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p></div><div style="font-weight:bold;font-size:11px;margin-bottom:6px;">Patient: ${echapperHTML(formaterNomPropre(nomPatient))}</div><div style="font-size:10px;margin-bottom:2px;">${typePatient === "ONG" ? `Partenaire : ${echapperHTML(selectedOng || "N/R")}` : "Priv\xE9"}</div><div style="font-size:10px;margin-bottom:2px;">\u{1F4DE} ${echapperHTML(telephone || "N/R")}</div><table><thead><tr><th>D\xE9signation</th><th class="qte">Qt\xE9</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${ligneHebergement}${ligneHebergement2}${ligneChir}${lignesDetaillees.map((l) => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte * l.prix)}</td></tr>`).join("")}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes (${formatDH(fiche.totalGlobal)} DH)</div><p style="font-size:10px;margin-top:4px;">${fiche.prescritPar ? `Prescrit par : ${echapperHTML(fiche.prescritPar)}` : ""}</p><div class="footer">Merci de votre visite ! Bonne gu\xE9rison !<br/>CHF-${(/* @__PURE__ */ new Date()).getFullYear()}</div>`;
         };
         const STYLE_TICKET = `@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.page-fiche{page-break-after:always;}`;
         const reimprimerFicheValidee = (fiche) => {
@@ -4430,7 +4431,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             return;
           }
           const corps = fichesDossier.map((f) => `<div class="page-fiche">${genererCorpsTicket(f)}</div>`).join("");
-          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${fichesDossier.length} fiches \u2014 ${echapperHTML(nomPatient)}</title><style>${STYLE_TICKET}</style></head><body>${corps}</body></html>`;
+          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${fichesDossier.length} fiches \u2014 ${echapperHTML(formaterNomPropre(nomPatient))}</title><style>${STYLE_TICKET}</style></head><body>${corps}</body></html>`;
           const win = window.open("", "_blank", "width=500,height=700");
           if (!win) {
             showToast("Impression bloqu\xE9e par le navigateur. R\xE9essaie en cliquant sur Imprimer \u2014 si \xE7a ne marche toujours pas, demande \xE0 quelqu'un de v\xE9rifier les r\xE9glages.", "error");
@@ -4448,7 +4449,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             return;
           }
           const data = {
-            nomPatient: nomPatient || "Patient non renseign\xE9",
+            nomPatient: formaterNomPropre(nomPatient) || "Patient non renseign\xE9",
             selectedOng: selectedOng || "\u2014",
             numDossier: numDossierPatient || "N/R",
             lignes: lignes || [],
@@ -4492,7 +4493,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
           }
           const numeroFicheReelle = idFicheEnCoursDEdition ? ((_a = fichesDossier.find((f) => f.id === idFicheEnCoursDEdition)) == null ? void 0 : _a.numeroFiche) || numeroFicheCourante : numeroFicheCourante;
           const data = {
-            nomPatient: nomPatient || "Patient non renseign\xE9",
+            nomPatient: formaterNomPropre(nomPatient) || "Patient non renseign\xE9",
             selectedOng: selectedOng || "\u2014",
             numDossier: numDossierPatient || "N/R",
             lignes: lignes || [],

@@ -4,7 +4,7 @@ const { useState, useEffect, useMemo, useRef } = React;
 const { auth, db, enregistrerAudit } = require('../api/firebase');
 const { chf, toPaiementApi } = require('../api/supabase');
 const { CONFIG_LITS } = require('../utils/constants');
-const { formatGourdes, formatDH, echapperHTML } = require('../utils/helpers');
+const { formatGourdes, formatDH, echapperHTML, formaterNomPropre } = require('../utils/helpers');
 const { Search, Plus, X, Clock, Check } = require('../utils/icons');
 const ConfirmModal = require('./ConfirmModal');
 const NouveauDossierForm = require('./NouveauDossierForm');
@@ -336,7 +336,7 @@ function CalculateurPanel({
     const ligneHebergement2 = fiche.exeat?.multiPeriode && fiche.exeat?.dateEntree2 ? `<tr><td>Séjour P2 : ${echapperHTML(CONFIG_LITS[fiche.exeat.typeLit2]?.nom || fiche.exeat.typeLit2)}</td><td class="qte">${fiche.exeat.nbJours2}j</td><td class="prix">${formatGourdes(CONFIG_LITS[fiche.exeat.typeLit2]?.prix || 0)}</td><td class="sous-total">${formatGourdes(fiche.exeat.totalHebergement2)}</td></tr>` : '';
     const prixChirSpecFiche = fiche.rawState?.hasChirSpec ? (parseFloat(fiche.rawState.prixChirSpec) || 0) : 0;
     const ligneChir = fiche.rawState?.hasChirSpec && fiche.rawState?.nomChirSpec ? `<tr><td>Chirurgie: ${echapperHTML(fiche.rawState.nomChirSpec)}</td><td class="qte">1</td><td class="prix">${formatGourdes(prixChirSpecFiche)}</td><td class="sous-total">${formatGourdes(prixChirSpecFiche)}</td></tr>` : '';
-    return `<div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p></div><div style="font-weight:bold;font-size:11px;margin-bottom:6px;">Patient: ${echapperHTML(nomPatient)}</div><div style="font-size:10px;margin-bottom:2px;">${typePatient === 'ONG' ? `Partenaire : ${echapperHTML(selectedOng || 'N/R')}` : 'Privé'}</div><div style="font-size:10px;margin-bottom:2px;">📞 ${echapperHTML(telephone || 'N/R')}</div><table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${ligneHebergement}${ligneHebergement2}${ligneChir}${lignesDetaillees.map(l => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte*l.prix)}</td></tr>`).join('')}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes (${formatDH(fiche.totalGlobal)} DH)</div><p style="font-size:10px;margin-top:4px;">${fiche.prescritPar ? `Prescrit par : ${echapperHTML(fiche.prescritPar)}` : ''}</p><div class="footer">Merci de votre visite ! Bonne guérison !<br/>CHF-${new Date().getFullYear()}</div>`;
+    return `<div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p></div><div style="font-weight:bold;font-size:11px;margin-bottom:6px;">Patient: ${echapperHTML(formaterNomPropre(nomPatient))}</div><div style="font-size:10px;margin-bottom:2px;">${typePatient === 'ONG' ? `Partenaire : ${echapperHTML(selectedOng || 'N/R')}` : 'Privé'}</div><div style="font-size:10px;margin-bottom:2px;">📞 ${echapperHTML(telephone || 'N/R')}</div><table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${ligneHebergement}${ligneHebergement2}${ligneChir}${lignesDetaillees.map(l => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte*l.prix)}</td></tr>`).join('')}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes (${formatDH(fiche.totalGlobal)} DH)</div><p style="font-size:10px;margin-top:4px;">${fiche.prescritPar ? `Prescrit par : ${echapperHTML(fiche.prescritPar)}` : ''}</p><div class="footer">Merci de votre visite ! Bonne guérison !<br/>CHF-${new Date().getFullYear()}</div>`;
   };
   const STYLE_TICKET = `@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.page-fiche{page-break-after:always;}`;
 
@@ -352,7 +352,7 @@ function CalculateurPanel({
   const imprimerToutesLesFichesDuDossier = () => {
     if (fichesDossier.length === 0) { showToast("Aucune fiche à imprimer.", "error"); return; }
     const corps = fichesDossier.map(f => `<div class="page-fiche">${genererCorpsTicket(f)}</div>`).join('');
-    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${fichesDossier.length} fiches — ${echapperHTML(nomPatient)}</title><style>${STYLE_TICKET}</style></head><body>${corps}</body></html>`;
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${fichesDossier.length} fiches — ${echapperHTML(formaterNomPropre(nomPatient))}</title><style>${STYLE_TICKET}</style></head><body>${corps}</body></html>`;
     const win = window.open('', '_blank', 'width=500,height=700');
     if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
     win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 400);
@@ -362,7 +362,7 @@ function CalculateurPanel({
   const imprimerTicket = (forcer = false) => {
     if (!forcer && !paiementEffectue) { showToast("Enregistre d'abord la fiche avant d'imprimer.", "error"); return; }
     const data = {
-      nomPatient: nomPatient || "Patient non renseigné",
+      nomPatient: formaterNomPropre(nomPatient) || "Patient non renseigné",
       selectedOng: selectedOng || "—",
       numDossier: numDossierPatient || 'N/R',
       lignes: lignes || [],
@@ -386,7 +386,7 @@ function CalculateurPanel({
     if (!paiementEffectue) { showToast("Enregistre d'abord la fiche.", "error"); return; }
     const numeroFicheReelle = idFicheEnCoursDEdition ? (fichesDossier.find(f => f.id === idFicheEnCoursDEdition)?.numeroFiche || numeroFicheCourante) : numeroFicheCourante;
     const data = {
-      nomPatient: nomPatient || "Patient non renseigné",
+      nomPatient: formaterNomPropre(nomPatient) || "Patient non renseigné",
       selectedOng: selectedOng || "—",
       numDossier: numDossierPatient || 'N/R',
       lignes: lignes || [],

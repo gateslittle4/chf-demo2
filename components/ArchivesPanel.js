@@ -576,7 +576,8 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
 
     const champ = (label, valeur, large) => `<span class="champ${large ? ' large' : ''}"><span class="lbl-champ">${echapperHTML(label)}</span><span class="val-champ">${valeur ? echapperHTML(valeur) : '&nbsp;'}</span></span>`;
 
-    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Formulaire CHF - ${echapperHTML(dossier.nomPatient)}</title><style>
+    const nomPatientPropre = formaterNomPropre(dossier.nomPatient);
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Formulaire CHF - ${echapperHTML(nomPatientPropre)}</title><style>
       @page{size:A4;margin:8mm 14mm;}
       body{font-family:'Times New Roman',Georgia,serif;color:#000;font-size:11px;}
       .entete{display:flex;align-items:center;justify-content:center;gap:10px;border-bottom:2px solid #000;padding-bottom:5px;margin-bottom:8px;position:relative;}
@@ -610,7 +611,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
         </div>
       </div>
       <div class="champs">
-        <div class="ligne-champs">${champ('Nom', dossier.nomPatient)}${champ('Prénom', '', true)}</div>
+        <div class="ligne-champs">${champ('Nom', nomPatientPropre)}${champ('Prénom', '', true)}</div>
         <div class="ligne-champs">${champ('Age', '')}${champ('Sexe', '')}</div>
         <div class="ligne-champs">${champ('Statut Matrimonial', '', true)}</div>
         <div class="ligne-champs">${champ("Date D'admission", dateAdmissionFormulaireCHF(dossier), true)}</div>
