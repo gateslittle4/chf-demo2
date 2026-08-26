@@ -628,6 +628,20 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     }
   };
 
+  // Marquage manuel "dossier prêt" dans la vue Lot — juste une case à cocher pour le suivi visuel,
+  // n'affecte rien d'autre (facturation, statut du dossier...).
+  const toggleDossierComplet = async (dossier) => {
+    const nouveauStatut = !dossier.dossierComplet;
+    setVerifications(prev => prev.map(v => v.id === dossier.id ? { ...v, dossierComplet: nouveauStatut } : v));
+    try {
+      await chf.updateEpisode(dossier.id, toEpisodeApi({ dossierComplet: nouveauStatut }));
+      showToast(nouveauStatut ? `✅ Dossier de ${dossier.nomPatient} marqué complet` : `Dossier de ${dossier.nomPatient} démarqué`, "success");
+    } catch (error) {
+      if (error.isOfflineQueue) showToast("📴 Changement enregistré hors ligne", "info");
+      else showToast("Erreur: " + error.message, "error");
+    }
+  };
+
   return (
     <div className="space-y-4 text-xs">
       <div className="bg-white p-3 rounded-xl border shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -709,6 +723,9 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                     <div className="flex-1 min-w-0">
                       <span className={`inline-block w-16 mr-3 ${v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? 'text-gray-500' : 'text-red-500'}`}>{v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? v.dateEntreePourTri.split('-').reverse().join('/') : 'sans exeat'}</span>
                       {v.nomPatient}{' '}
+                      <button onClick={() => toggleDossierComplet(v)} title={v.dossierComplet ? "Dossier marqué complet — cliquer pour annuler" : "Marquer ce dossier comme complet"} className={`inline-flex items-center justify-center w-4 h-4 rounded-full border align-middle mr-1 ${v.dossierComplet ? 'bg-emerald-500 border-emerald-600 text-white' : 'bg-white border-gray-300 text-gray-300 hover:border-emerald-400 hover:text-emerald-400'}`}>
+                        <Check size={10}/>
+                      </button>
                       {v.estBebeSansMere && <span title="Bébé sans dossier de mère dans ce lot — vérifie s'il faut ouvrir une fiche d'urgence pour ce bébé" className="bg-red-100 text-red-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">🚨 Sans mère</span>}
                       {v.cesarienneSansSono && <span title="Césarienne ou accouchement facturé, mais aucune sonographie sur ce dossier — vérifie si elle a été oubliée" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">⚠️ Sono manquante</span>}
                       {v.sansAdmission && <span title="Aucune Admission / Consultation facturée sur ce dossier — vérifie si elle a été oubliée" className="bg-orange-100 text-orange-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">⚠️ Admission manquante</span>}
