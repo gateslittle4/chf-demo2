@@ -865,7 +865,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                   <div key={v.id} className="flex justify-between items-start py-2 text-xs font-mono gap-2">
                     <div className="flex-1 min-w-0">
                       <span className="inline-flex items-center justify-center h-5 px-1.5 mr-2 bg-gray-700 text-white rounded text-[10px] font-bold whitespace-nowrap" title="Position dans ce lot — correspond à la ligne dans l'Excel envoyé au partenaire">N-{ordinalParDossierLot[v.id]}</span>
-                      <span className="inline-block sm:w-20 mr-2 sm:mr-2 text-gray-400 font-bold" title="N° Dossier">N°{v.numDossier || '—'}</span>
+                      <span className="inline-block sm:w-20 mr-2 sm:mr-2 text-gray-400 font-bold" title="N° Dossier">{v.numDossier ? `N°${v.numDossier}` : ''}</span>
                       <span className={`inline-block sm:w-16 mr-2 sm:mr-3 ${v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? 'text-gray-500' : 'text-red-500'}`}>{v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? v.dateEntreePourTri.split('-').reverse().join('/') : 'sans exeat'}</span>
                       {v.nomPatient}{' '}
                       <button onClick={() => toggleDossierComplet(v)} title={v.dossierComplet ? "Dossier marqué complet — cliquer pour annuler" : "Marquer ce dossier comme complet"} className={`inline-flex items-center justify-center w-4 h-4 rounded-full border align-middle mr-1 ${v.dossierComplet ? 'bg-emerald-500 border-emerald-600 text-white' : 'bg-white border-gray-300 text-gray-300 hover:border-emerald-400 hover:text-emerald-400'}`}>
