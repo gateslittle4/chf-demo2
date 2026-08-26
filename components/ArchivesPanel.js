@@ -16,39 +16,48 @@ const cumulCategoriesDossier = (v) => {
   return totaux;
 };
 
-// Médicaments de sortie : un dossier qui a un séjour (exeat) devrait avoir au moins 2 médicaments
-// "de sortie" (Ferfolat, Globugen, Tothema, Amox..., Vit C, Paracétamol) dans la fiche du séjour
-// elle-même, ou dans la fiche juste avant/après (par numéro de fiche) — sinon ils ont probablement
-// été oubliés. Comparaison insensible aux accents/majuscules.
+// Medicaments de sortie : un dossier qui a un sejour (exeat) devrait avoir au moins 2 medicaments
+// "de sortie" (Ferfolat, Globugen, Tothema, Amox..., Vit C, Paracetamol) dans la fiche du sejour
+// elle-meme, ou dans une fiche jusqu'a 3 numeros avant/apres (par numero de fiche) -- sinon ils ont
+// probablement ete oublies. Comparaison insensible aux accents/majuscules.
 const MEDICAMENTS_SORTIE_MOTSCLES = ['ferfolat', 'globugen', 'tothema', 'amox', 'paracetamol', 'vitamine c', 'vit c'];
+const MARGE_FICHES_AUTOUR_EXEAT = 3;
 const normaliserTexte = (t) => (t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 const estMedicamentSortie = (nomLigne) => { const n = normaliserTexte(nomLigne); return MEDICAMENTS_SORTIE_MOTSCLES.some(mc => n.includes(mc)); };
 const compterMedicamentsSortie = (fiche) => (fiche?.rawState?.lignesCalcul || []).filter(l => l.type === 'med' && estMedicamentSortie(l.nom)).length;
 const medicamentsSortieManquants = (dossier) => {
   const fiches = [...(dossier.fiches || [])].sort((a, b) => (a.numeroFiche || 0) - (b.numeroFiche || 0));
   const indexesSejour = fiches.map((f, i) => (f.exeat ? i : -1)).filter(i => i !== -1);
-  if (indexesSejour.length === 0) return false; // pas de séjour dans ce dossier -> alerte non applicable
-  return !indexesSejour.some(i => [fiches[i - 1], fiches[i], fiches[i + 1]].some(f => compterMedicamentsSortie(f) >= 2));
+  if (indexesSejour.length === 0) return false; // pas de sejour dans ce dossier -> alerte non applicable
+  return !indexesSejour.some(i => {
+    const debut = Math.max(0, i - MARGE_FICHES_AUTOUR_EXEAT), fin = Math.min(fiches.length - 1, i + MARGE_FICHES_AUTOUR_EXEAT);
+    for (let j = debut; j <= fin; j++) { if (compterMedicamentsSortie(fiches[j]) >= 2) return true; }
+    return false;
+  });
 };
 
-// Regroupement mère/bébé (utilisé pour la liste d'un lot à l'écran ET l'export Excel) : un dossier
-// nommé "Bb <nom de la mère>" (ou "Bébé <nom>") est trié juste après le dossier de sa mère, même
-// si sa propre date d'entrée diffère — il hérite de la date de la mère pour le tri.
-// Calcule aussi 4 alertes de contrôle qualité par dossier (affichées à l'écran seulement, jamais
-// dans l'export Excel envoyé aux partenaires) :
-//  - estBebeSansMere : bébé dont la mère n'est pas dans la même liste (fiche d'urgence à envisager)
-//  - cesarienneSansSono : dossier avec césarienne/accouchement mais aucune sonographie facturée
-//  - sansAdmission : dossier sans "Admission / Consultation", sauf les bébés dont la mère est trouvée
-//    (ils n'ont normalement pas leur propre ligne d'admission, ils sont rattachés à celle de la mère)
-//  - medicamentsSortieManquants : séjour sans au moins 3 médicaments dans la fiche du séjour ou
-//    une fiche adjacente (avant/après)
+// Regroupement mere/bebe (utilise pour la liste d'un lot a l'ecran ET l'export Excel) : un dossier
+// nomme "Bb <nom de la mere>" (ou "Bebe <nom>") est trie juste apres le dossier de sa mere, meme
+// si sa propre date d'entree differe -- il herite de la date de la mere pour le tri. La recherche
+// de la mere se fait dans TOUT l'archive (tousLesDossiers), pas seulement dans le lot en cours --
+// la mere peut avoir ete facturee dans un autre lot ou un autre mois.
+// Calcule aussi 5 alertes de controle qualite par dossier (affichees a l'ecran seulement, jamais
+// dans l'export Excel envoye aux partenaires) :
+//  - estBebeSansMere : bebe dont la mere n'est trouvee nulle part dans l'archive (fiche d'urgence a envisager)
+//  - cesarienneSansSono : dossier avec cesarienne/accouchement mais aucune sonographie facturee
+//  - sansExeat : dossier sans aucun sejour/exeat -- tout le monde doit en avoir un dans ce contexte
+//  - sansAdmission : dossier sans "Admission / Consultation" (urgence, pediatre...), sauf les bebes
+//    dont la mere est trouvee (ils sont rattaches a l'admission de leur mere)
+//  - medicamentsSortieManquants : sejour sans medicaments de sortie dans la fiche ou les 3 fiches
+//    avant/apres
 const extraireNomMere = (nom) => { const m = (nom || '').trim().match(/^(?:bb|beb[ée])\.?\s+(.+)$/i); return m ? m[1].trim().toLowerCase() : null; };
 const cleFamilleDossier = (nom) => extraireNomMere(nom) || (nom || '').trim().toLowerCase();
-const trierAvecRegroupementMereBebe = (dossiers) => {
+const trierAvecRegroupementMereBebe = (dossiersDuLot, tousLesDossiers) => {
+  const poolRecherche = tousLesDossiers || dossiersDuLot;
   const dateMereParCle = {};
-  dossiers.forEach(v => { if (!extraireNomMere(v.nomPatient)) dateMereParCle[cleFamilleDossier(v.nomPatient)] = v.dateEntreePourTri; });
+  poolRecherche.forEach(v => { if (!extraireNomMere(v.nomPatient)) dateMereParCle[cleFamilleDossier(v.nomPatient)] = v.dateEntreePourTri; });
   const dateEffective = (v) => { const nomMere = extraireNomMere(v.nomPatient); return (nomMere && dateMereParCle[nomMere]) ? dateMereParCle[nomMere] : v.dateEntreePourTri; };
-  return [...dossiers].sort((a, b) => {
+  return [...dossiersDuLot].sort((a, b) => {
     const diff = new Date(dateEffective(a)) - new Date(dateEffective(b));
     if (diff !== 0) return diff;
     const cleA = cleFamilleDossier(a.nomPatient), cleB = cleFamilleDossier(b.nomPatient);
@@ -62,6 +71,7 @@ const trierAvecRegroupementMereBebe = (dossiers) => {
       ...v,
       estBebeSansMere: !!nomMere && dateMereParCle[nomMere] === undefined,
       cesarienneSansSono: ((cumul.cesarienne || 0) > 0 || (cumul.accouchement || 0) > 0) && !((cumul.sono || 0) > 0),
+      sansExeat: !(v.fiches || []).some(f => f.exeat),
       sansAdmission: !estBebeAvecMere && !((cumul.service || 0) > 0),
       medicamentsSortieManquants: medicamentsSortieManquants(v)
     };
@@ -183,7 +193,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     });
     return Object.keys(parNumero).map(n => Number(n)).sort((a, b) => b - a).map(n => ({
       numero: n,
-      dossiers: trierAvecRegroupementMereBebe(parNumero[n]),
+      dossiers: trierAvecRegroupementMereBebe(parNumero[n], verifications),
       total: parNumero[n].reduce((s, v) => s + (v.totalGlobal || 0), 0)
     }));
   }, [verifications, lotOngSelectionne]);
@@ -202,6 +212,19 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
   }, [verifications, lotOngSelectionne]);
 
   const lotFocused = lotFocusedNumero != null ? (lotsDuPartenaire.find(l => l.numero === lotFocusedNumero) || null) : null;
+
+  // Petit compteur pour vérification avant soumission du lot : combien de dossiers du lot ont une
+  // césarienne, un accouchement ou une chirurgie facturée (un même dossier peut compter dans plusieurs cases).
+  const compteursLotFocused = useMemo(() => {
+    if (!lotFocused) return { cesarienne: 0, accouchement: 0, chirurgie: 0 };
+    return lotFocused.dossiers.reduce((acc, v) => {
+      const cumul = cumulCategoriesDossier(v);
+      if ((cumul.cesarienne || 0) > 0) acc.cesarienne++;
+      if ((cumul.accouchement || 0) > 0) acc.accouchement++;
+      if ((cumul.chirurgie || 0) > 0) acc.chirurgie++;
+      return acc;
+    }, { cesarienne: 0, accouchement: 0, chirurgie: 0 });
+  }, [lotFocused]);
 
   const dossiersFiltres = useMemo(() => {
     return verifications.filter(v => {
@@ -269,7 +292,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       // le bébé n'a pas sa propre date d'hébergement (il hérite alors de celle de sa mère pour le tri).
       // L'alerte "bébé sans mère" reste uniquement dans l'app (toast) — jamais dans le fichier envoyé
       // au partenaire.
-      let listeDossiersONG = trierAvecRegroupementMereBebe(verifications.filter(v => idsDossiers.includes(v.id)));
+      let listeDossiersONG = trierAvecRegroupementMereBebe(verifications.filter(v => idsDossiers.includes(v.id)), verifications);
 
       if (listeDossiersONG.length === 0) { showToast(`Aucun dossier trouvé pour ${ongCible}`, "error"); return; }
       const nomsBebesSansMere = listeDossiersONG.filter(v => v.estBebeSansMere).map(v => v.nomPatient);
@@ -706,6 +729,12 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                   <button onClick={() => setLotFocusedNumero(null)}><X size={14}/></button>
                 </div>
               </div>
+              <div className="flex flex-wrap items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-lg p-2 text-xs">
+                <span className="font-bold text-indigo-800">🔎 À vérifier avant soumission :</span>
+                <span className="font-mono font-bold text-indigo-900">Césarienne : {compteursLotFocused.cesarienne}</span>
+                <span className="font-mono font-bold text-indigo-900">Accouchement : {compteursLotFocused.accouchement}</span>
+                <span className="font-mono font-bold text-indigo-900">Chirurgie : {compteursLotFocused.chirurgie}</span>
+              </div>
               <div className="flex flex-wrap items-center gap-4 bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs">
                 <span className="font-bold text-amber-800">💡 Oublié à la génération ? Coche/renseigne puis réimprime ce lot pour l'appliquer :</span>
                 <label className="flex items-center gap-1 font-bold text-purple-900 cursor-pointer"><input type="checkbox" checked={appliqueRabais10} onChange={e=>setAppliqueRabais10(e.target.checked)} className="rounded" /> Rabais 10%</label>
@@ -727,6 +756,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                         <Check size={10}/>
                       </button>
                       {v.estBebeSansMere && <span title="Bébé sans dossier de mère dans ce lot — vérifie s'il faut ouvrir une fiche d'urgence pour ce bébé" className="bg-red-100 text-red-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">🚨 Sans mère</span>}
+                      {v.sansExeat && <span title="Aucun séjour (exeat) sur ce dossier — vérifie s'il a été oublié" className="bg-red-100 text-red-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">🚨 Sans exeat</span>}
                       {v.cesarienneSansSono && <span title="Césarienne ou accouchement facturé, mais aucune sonographie sur ce dossier — vérifie si elle a été oubliée" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">⚠️ Sono manquante</span>}
                       {v.sansAdmission && <span title="Aucune Admission / Consultation facturée sur ce dossier — vérifie si elle a été oubliée" className="bg-orange-100 text-orange-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">⚠️ Admission manquante</span>}
                       {v.medicamentsSortieManquants && <span title="Séjour sans au moins 2 médicaments de sortie (Ferfolat, Globugen, Tothema, Amox..., Vit C, Paracétamol) dans la fiche du séjour ou une fiche adjacente — vérifie si les médicaments de sortie ont été oubliés" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">💊 Médicaments sortie manquants</span>}
