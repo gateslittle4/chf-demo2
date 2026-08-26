@@ -22,7 +22,7 @@ const cumulCategoriesDossier = (v) => {
 // probablement ete oublies. Comparaison insensible aux accents/majuscules.
 const MEDICAMENTS_SORTIE_MOTSCLES = ['ferfolat', 'globugen', 'tothema', 'amox', 'paracetamol', 'vitamine c', 'vit c'];
 const MARGE_FICHES_AUTOUR_EXEAT = 3;
-const normaliserTexte = (t) => (t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const normaliserTexte = (t) => (t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
 const estMedicamentSortie = (nomLigne) => { const n = normaliserTexte(nomLigne); return MEDICAMENTS_SORTIE_MOTSCLES.some(mc => n.includes(mc)); };
 const compterMedicamentsSortie = (fiche) => (fiche?.rawState?.lignesCalcul || []).filter(l => l.type === 'med' && estMedicamentSortie(l.nom)).length;
 const medicamentsSortieManquants = (dossier) => {
@@ -40,36 +40,54 @@ const medicamentsSortieManquants = (dossier) => {
 // nomme "Bb <nom de la mere>" (ou "Bebe <nom>") est trie juste apres le dossier de sa mere, meme
 // si sa propre date d'entree differe -- il herite de la date de la mere pour le tri. La recherche
 // de la mere se fait dans TOUT l'archive (tousLesDossiers), pas seulement dans le lot en cours --
-// la mere peut avoir ete facturee dans un autre lot ou un autre mois.
-// Calcule aussi 5 alertes de controle qualite par dossier (affichees a l'ecran seulement, jamais
-// dans l'export Excel envoye aux partenaires) :
+// la mere peut avoir ete facturee dans un autre lot ou un autre mois. Le rapprochement mere/bebe
+// compare les noms normalises (normaliserTexte : insensible aux accents/majuscules/espaces), pour
+// ne pas rater un lien a cause d'une orthographe legerement differente entre les deux dossiers.
+// Calcule aussi 6 alertes de controle qualite par dossier (affichees a l'ecran seulement, jamais
+// dans l'export Excel envoye aux partenaires, qui reste tel que tape) :
 //  - estBebeSansMere : bebe dont la mere n'est trouvee nulle part dans l'archive (fiche d'urgence a envisager)
+//  - orthographeIncoherente : mere trouvee, mais le nom tape dans "Bb <nom>" differe (accents/espaces)
+//    du nom exact du dossier de la mere -- a harmoniser avant l'envoi du lot
 //  - cesarienneSansSono : dossier avec cesarienne/accouchement mais aucune sonographie facturee
 //  - sansExeat : dossier sans aucun sejour/exeat -- tout le monde doit en avoir un dans ce contexte
 //  - sansAdmission : dossier sans "Admission / Consultation" (urgence, pediatre...), sauf les bebes
 //    dont la mere est trouvee (ils sont rattaches a l'admission de leur mere)
 //  - medicamentsSortieManquants : sejour sans medicaments de sortie dans la fiche ou les 3 fiches
 //    avant/apres
-const extraireNomMere = (nom) => { const m = (nom || '').trim().match(/^(?:bb|beb[ée])\.?\s+(.+)$/i); return m ? m[1].trim().toLowerCase() : null; };
-const cleFamilleDossier = (nom) => extraireNomMere(nom) || (nom || '').trim().toLowerCase();
+const extraireNomMerePortion = (nom) => { const m = (nom || '').trim().match(/^(?:bb|beb[ée])\.?\s+(.+)$/i); return m ? m[1].trim() : null; };
+const estUnBebe = (nom) => extraireNomMerePortion(nom) !== null;
+const cleFamilleDossier = (nom) => normaliserTexte(extraireNomMerePortion(nom) || nom);
 const trierAvecRegroupementMereBebe = (dossiersDuLot, tousLesDossiers) => {
   const poolRecherche = tousLesDossiers || dossiersDuLot;
   const dateMereParCle = {};
-  poolRecherche.forEach(v => { if (!extraireNomMere(v.nomPatient)) dateMereParCle[cleFamilleDossier(v.nomPatient)] = v.dateEntreePourTri; });
-  const dateEffective = (v) => { const nomMere = extraireNomMere(v.nomPatient); return (nomMere && dateMereParCle[nomMere]) ? dateMereParCle[nomMere] : v.dateEntreePourTri; };
+  const nomMereParCle = {};
+  poolRecherche.forEach(v => {
+    if (!estUnBebe(v.nomPatient)) {
+      const cle = cleFamilleDossier(v.nomPatient);
+      dateMereParCle[cle] = v.dateEntreePourTri;
+      nomMereParCle[cle] = v.nomPatient;
+    }
+  });
+  const dateEffective = (v) => {
+    const cle = cleFamilleDossier(v.nomPatient);
+    return (estUnBebe(v.nomPatient) && dateMereParCle[cle]) ? dateMereParCle[cle] : v.dateEntreePourTri;
+  };
   return [...dossiersDuLot].sort((a, b) => {
     const diff = new Date(dateEffective(a)) - new Date(dateEffective(b));
     if (diff !== 0) return diff;
     const cleA = cleFamilleDossier(a.nomPatient), cleB = cleFamilleDossier(b.nomPatient);
     if (cleA !== cleB) return cleA.localeCompare(cleB);
-    return (extraireNomMere(a.nomPatient) ? 1 : 0) - (extraireNomMere(b.nomPatient) ? 1 : 0);
+    return (estUnBebe(a.nomPatient) ? 1 : 0) - (estUnBebe(b.nomPatient) ? 1 : 0);
   }).map(v => {
-    const nomMere = extraireNomMere(v.nomPatient);
-    const estBebeAvecMere = !!nomMere && dateMereParCle[nomMere] !== undefined;
+    const bebe = estUnBebe(v.nomPatient);
+    const cle = cleFamilleDossier(v.nomPatient);
+    const estBebeAvecMere = bebe && dateMereParCle[cle] !== undefined;
     const cumul = cumulCategoriesDossier(v);
+    const nomMereExtrait = bebe ? extraireNomMerePortion(v.nomPatient) : null;
     return {
       ...v,
-      estBebeSansMere: !!nomMere && dateMereParCle[nomMere] === undefined,
+      estBebeSansMere: bebe && !estBebeAvecMere,
+      orthographeIncoherente: estBebeAvecMere && formaterNomPropre(nomMereExtrait) !== formaterNomPropre(nomMereParCle[cle]),
       cesarienneSansSono: ((cumul.cesarienne || 0) > 0 || (cumul.accouchement || 0) > 0) && !((cumul.sono || 0) > 0),
       sansExeat: !(v.fiches || []).some(f => f.exeat),
       sansAdmission: !estBebeAvecMere && !((cumul.service || 0) > 0),
@@ -758,6 +776,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                       </button>
                       {v.estBebeSansMere && <span title="Bébé sans dossier de mère dans ce lot — vérifie s'il faut ouvrir une fiche d'urgence pour ce bébé" className="bg-red-100 text-red-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">🚨 Sans mère</span>}
                       {v.sansExeat && <span title="Aucun séjour (exeat) sur ce dossier — vérifie s'il a été oublié" className="bg-red-100 text-red-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">🚨 Sans exeat</span>}
+                      {v.orthographeIncoherente && <span title="Le nom de la mère tapé dans ce dossier bébé ne correspond pas exactement à l'orthographe du dossier de la mère (accents, espaces...) — harmonise les deux avant l'envoi du lot" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">✏️ Orthographe mère/bébé</span>}
                       {v.cesarienneSansSono && <span title="Césarienne ou accouchement facturé, mais aucune sonographie sur ce dossier — vérifie si elle a été oubliée" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">⚠️ Sono manquante</span>}
                       {v.sansAdmission && <span title="Aucune Admission / Consultation facturée sur ce dossier — vérifie si elle a été oubliée" className="bg-orange-100 text-orange-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">⚠️ Admission manquante</span>}
                       {v.medicamentsSortieManquants && <span title="Séjour sans au moins 2 médicaments de sortie (Ferfolat, Globugen, Tothema, Amox..., Vit C, Paracétamol) dans la fiche du séjour ou une fiche adjacente — vérifie si les médicaments de sortie ont été oubliés" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">💊 Médicaments sortie manquants</span>}
