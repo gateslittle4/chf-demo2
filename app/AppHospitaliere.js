@@ -894,7 +894,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
   }, [dossierActif]);
 
   useEffect(() => {
-    const LIMITE_INACTIVITE_MS = 15 * 60 * 1000;
+    const LIMITE_INACTIVITE_MS = 60 * 60 * 1000;
     const DELAI_AVERTISSEMENT_MS = 2 * 60 * 1000; // avertit 2 minutes avant la déconnexion
     let minuteurAvertissement, minuteurDeconnexion;
     const reinitialiserMinuteur = () => {
@@ -905,7 +905,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
         setAvertissementInactivite(true);
       }, LIMITE_INACTIVITE_MS - DELAI_AVERTISSEMENT_MS);
       minuteurDeconnexion = setTimeout(() => {
-        showToast("🔒 Déconnexion automatique après 15 minutes d'inactivité", "info");
+        showToast("🔒 Déconnexion automatique après 1 heure d'inactivité", "info");
         onQuitter();
       }, LIMITE_INACTIVITE_MS);
     };
