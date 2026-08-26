@@ -793,10 +793,11 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                   <button onClick={() => { if (dossierAAjouterAuLot) { ajouterDossierAuLot(dossierAAjouterAuLot, lotFocused.numero, lotOngSelectionne); setDossierAAjouterAuLot(""); } }} disabled={!dossierAAjouterAuLot} className="bg-emerald-700 text-white font-bold px-2 py-1.5 rounded text-[10px] disabled:opacity-30 whitespace-nowrap">➕ Ajouter</button>
                 </div>
               )}
-              <div className="divide-y max-h-80 overflow-y-auto">
+              <div className="divide-y max-h-[640px] overflow-y-auto">
                 {lotFocused.dossiers.map(v => (
                   <div key={v.id} className="flex justify-between items-start py-2 text-xs font-mono gap-2">
                     <div className="flex-1 min-w-0">
+                      <span className="inline-block w-20 mr-2 text-gray-400 font-bold" title="N° Dossier">N°{v.numDossier || '—'}</span>
                       <span className={`inline-block w-16 mr-3 ${v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? 'text-gray-500' : 'text-red-500'}`}>{v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? v.dateEntreePourTri.split('-').reverse().join('/') : 'sans exeat'}</span>
                       {v.nomPatient}{' '}
                       <button onClick={() => toggleDossierComplet(v)} title={v.dossierComplet ? "Dossier marqué complet — cliquer pour annuler" : "Marquer ce dossier comme complet"} className={`inline-flex items-center justify-center w-4 h-4 rounded-full border align-middle mr-1 ${v.dossierComplet ? 'bg-emerald-500 border-emerald-600 text-white' : 'bg-white border-gray-300 text-gray-300 hover:border-emerald-400 hover:text-emerald-400'}`}>
@@ -809,7 +810,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                       {v.sansAdmission && <span title="Aucune Admission / Consultation facturée sur ce dossier — vérifie si elle a été oubliée" className="bg-orange-100 text-orange-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">⚠️ Admission manquante</span>}
                       {v.medicamentsSortieManquants && <span title="Séjour sans au moins 2 médicaments de sortie (Ferfolat, Globugen, Tothema, Amox..., Vit C, Paracétamol) dans la fiche du séjour ou une fiche adjacente — vérifie si les médicaments de sortie ont été oubliés" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">💊 Médicaments sortie manquants</span>}
                       <span className="text-gray-400">— {formatGourdes(v.totalGlobal||0)} Gdes <span className="text-indigo-400">({formatDH(v.totalGlobal||0)} DH)</span></span>
-                      <div className="flex flex-wrap gap-1 mt-1 pl-16">
+                      <div className="flex flex-wrap gap-1 mt-1 pl-40">
                         {ventilationDossier(v).map(x => (
                           <span key={x.label} className="bg-indigo-50 text-indigo-700 border border-indigo-100 rounded px-1.5 py-0.5 text-[10px] whitespace-nowrap">{x.label}: {formatDH(x.montant)} DH</span>
                         ))}
@@ -832,7 +833,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
         <h2 className="text-xs font-black text-gray-700 uppercase border-b pb-1">📁 Dossiers ({dossiersFiltres.length}{dossiersFiltres.length > nombreAffiche ? ` — ${nombreAffiche} affichés` : ''})</h2>
         <div className="overflow-x-auto max-h-96 overflow-y-auto">
           <table className="w-full text-left">
-            <thead className="sticky top-0 bg-white shadow-sm"><tr className="bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono"><th className="p-2">Date</th><th className="p-2">Patient</th><th className="p-2">Type</th><th className="p-2">Partenaire</th><th className="p-2 text-center">Vol.</th><th className="p-2 text-right">Total</th><th className="p-2 text-center">Statut</th><th className="p-2 text-center">Actions</th></tr></thead>
+            <thead className="sticky top-0 bg-white shadow-sm"><tr className="bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono"><th className="p-2">Date</th><th className="p-2">N° Dossier</th><th className="p-2">Patient</th><th className="p-2">Type</th><th className="p-2">Partenaire</th><th className="p-2 text-center">Vol.</th><th className="p-2 text-right">Total</th><th className="p-2 text-center">Statut</th><th className="p-2 text-center">Actions</th></tr></thead>
             <tbody className="divide-y divide-gray-100 font-mono text-[11px]">
               {dossiersFiltres.slice(0, nombreAffiche).map(v => {
                 const statut = v.status || 'archived';
@@ -846,6 +847,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                 return (
                   <tr key={v.id} className={isSuspendu ? 'bg-amber-50/60 border-l-4 border-amber-400' : isReporte ? 'bg-indigo-50/60 border-l-4 border-indigo-400' : (v.contientErreurs?'bg-red-50/40 border-l-4 border-red-500':'hover:bg-gray-50/50')}>
                     <td className="p-2 text-gray-500">{v.dateHeure}</td>
+                    <td className="p-2 text-gray-500">{v.numDossier || '—'}</td>
                     <td className="p-2 font-bold font-sans flex items-center gap-1">
                       {v.verrouilleFacture && <span>🔒</span>}
                       {v.noteSuspension && <span title={`📝 Note : ${v.noteSuspension}`} className="cursor-help">📝</span>}

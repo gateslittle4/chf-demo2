@@ -993,7 +993,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
           )}
         </div>
       </header>
-      <main className="flex-1 max-w-6xl w-full mx-auto p-4 pb-24">
+      <main className={`flex-1 w-full mx-auto p-4 pb-24 ${onglet === "verifie" ? "max-w-[1600px]" : "max-w-6xl"}`}>
         {onglet === "accueil" && (
           <AccueilPanel
             verifications={verifications} paiements={paiements} medicaments={medicaments}
