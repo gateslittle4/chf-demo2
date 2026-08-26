@@ -910,6 +910,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                       </div>
                     </div>
                     <div className="flex gap-1">
+                      <button onClick={() => imprimerTousLesRecusDuLot([v])} className="text-gray-600 p-1 bg-gray-50 rounded" title="Imprimer les reçus de ce patient"><Printer size={13}/></button>
                       {peutModifier && <button onClick={() => { if ((v.status||'archived')==='archived' && !confirm(`Ce dossier est déjà archivé (Lot ${lotFocused.numero}). Le modifier corrigera ce dossier existant — pense à réimprimer le lot ensuite.\n\nContinuer ?`)) return; onChargerPourModif(v, { ongPartenaire: lotOngSelectionne, numeroLot: lotFocused.numero }); }} className="text-amber-700 p-1 bg-amber-50 rounded" title="Modifier / corriger"><Pencil size={13}/></button>}
                       {peutModifier && <button onClick={() => retirerDossierDuLot(v)} className="text-red-600 p-1 bg-red-50 rounded" title="Retirer du lot">➖</button>}
                     </div>
