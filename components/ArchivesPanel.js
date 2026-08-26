@@ -24,6 +24,36 @@ const MEDICAMENTS_SORTIE_MOTSCLES = ['ferfolat', 'globugen', 'tothema', 'amox', 
 const MARGE_FICHES_AUTOUR_EXEAT = 3;
 const normaliserTexte = (t) => (t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
 const estMedicamentSortie = (nomLigne) => { const n = normaliserTexte(nomLigne); return MEDICAMENTS_SORTIE_MOTSCLES.some(mc => n.includes(mc)); };
+
+// Distance de Levenshtein (nombre minimal de lettres \u00e0 ajouter/retirer/changer pour passer de a \u00e0 b)
+// -- utilis\u00e9e pour la recherche approximative de patient dans un lot (tol\u00e8re une faute de frappe).
+const distanceLevenshtein = (a, b) => {
+  const m = a.length, n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+  return dp[m][n];
+};
+// Recherche de patient dans un lot : match direct (sous-cha\u00eene, insensible accents/casse) en
+// priorit\u00e9, sinon tol\u00e8re une orthographe approch\u00e9e (faute de frappe, lettre en trop/en moins) --
+// compar\u00e9 \u00e0 la fois au nom complet et \u00e0 chaque "mot" du nom, avec une marge d'erreur proportionnelle
+// \u00e0 la longueur de la recherche.
+const nomCorrespondApproximativement = (nomDossier, recherche) => {
+  const cible = normaliserTexte(recherche);
+  if (!cible) return true;
+  const nom = normaliserTexte(nomDossier);
+  if (nom.includes(cible)) return true;
+  const seuil = Math.max(1, Math.floor(cible.length * 0.3));
+  if (distanceLevenshtein(nom, cible) <= seuil) return true;
+  return nom.split(' ').some(mot => distanceLevenshtein(mot, cible) <= seuil);
+};
 const compterMedicamentsSortie = (fiche) => (fiche?.rawState?.lignesCalcul || []).filter(l => l.type === 'med' && estMedicamentSortie(l.nom)).length;
 const medicamentsSortieManquants = (dossier) => {
   const fiches = [...(dossier.fiches || [])].sort((a, b) => (a.numeroFiche || 0) - (b.numeroFiche || 0));
@@ -175,6 +205,8 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
   const [lotOngSelectionne, setLotOngSelectionne] = useState("");
   const [lotFocusedNumero, setLotFocusedNumero] = useState(null);
   const [dossierAAjouterAuLot, setDossierAAjouterAuLot] = useState("");
+  const [rechercheLot, setRechercheLot] = useState("");
+  const [filtreCategorieLot, setFiltreCategorieLot] = useState(""); // "", "cesarienne", "accouchement", "chirurgie"
 
   useEffect(() => { if (filtreInitialNom) { setRechercheNomPatient(filtreInitialNom); clearFiltreInitialNom(); } }, [filtreInitialNom]);
   useEffect(() => {
@@ -185,7 +217,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       clearLotInitialFocus();
     }
   }, [lotInitialFocus]);
-  useEffect(() => { setAppliqueRabais10(false); setMontantDonIntrants(""); }, [lotFocusedNumero]);
+  useEffect(() => { setAppliqueRabais10(false); setMontantDonIntrants(""); setRechercheLot(""); setFiltreCategorieLot(""); }, [lotFocusedNumero]);
   useEffect(() => { setNombreAffiche(100); }, [filtreType, filtreOng, rechercheNomPatient, filtreDateDebut, filtreDateFin, filtreCategorie, filtreStatut]);
 
   const numeroDepartConfigure = (ongCible) => {
@@ -243,6 +275,22 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       return acc;
     }, { cesarienne: 0, accouchement: 0, chirurgie: 0 });
   }, [lotFocused]);
+
+  // Filtre + recherche appliqués à l'affichage de la liste d'un lot (le lot lui-même, le total, et
+  // les impressions/exports groupés restent basés sur TOUS les dossiers du lot, pas seulement ceux
+  // affichés ici) : clique sur "Césarienne/Accouchement/Chirurgie" pour voir qui précisément, et/ou
+  // tape un nom (recherche approximative, tolère une faute de frappe) pour vérifier s'il est dans ce lot.
+  const dossiersLotAffiches = useMemo(() => {
+    if (!lotFocused) return [];
+    return lotFocused.dossiers.filter(v => {
+      if (filtreCategorieLot) {
+        const cumul = cumulCategoriesDossier(v);
+        if (!((cumul[filtreCategorieLot] || 0) > 0)) return false;
+      }
+      if (rechercheLot.trim() && !nomCorrespondApproximativement(v.nomPatient, rechercheLot)) return false;
+      return true;
+    });
+  }, [lotFocused, filtreCategorieLot, rechercheLot]);
 
   const dossiersFiltres = useMemo(() => {
     return verifications.filter(v => {
@@ -777,11 +825,19 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-lg p-2 text-xs">
-                <span className="font-bold text-indigo-800">🔎 À vérifier avant soumission :</span>
-                <span className="font-mono font-bold text-indigo-900">Césarienne : {compteursLotFocused.cesarienne}</span>
-                <span className="font-mono font-bold text-indigo-900">Accouchement : {compteursLotFocused.accouchement}</span>
-                <span className="font-mono font-bold text-indigo-900">Chirurgie : {compteursLotFocused.chirurgie}</span>
+                <span className="font-bold text-indigo-800">🔎 À vérifier avant soumission (clique pour voir qui) :</span>
+                {[["cesarienne", "Césarienne"], ["accouchement", "Accouchement"], ["chirurgie", "Chirurgie"]].map(([cle, label]) => (
+                  <button key={cle} onClick={() => setFiltreCategorieLot(f => f === cle ? "" : cle)} className={`font-mono font-bold px-2 py-0.5 rounded ${filtreCategorieLot === cle ? 'bg-indigo-700 text-white' : 'text-indigo-900 hover:bg-indigo-100'}`}>{label} : {compteursLotFocused[cle]}</button>
+                ))}
+                {filtreCategorieLot && <button onClick={() => setFiltreCategorieLot("")} className="text-indigo-500 underline">Réinitialiser</button>}
+                <div className="flex-1 min-w-[180px] flex items-center gap-1 ml-auto">
+                  <input type="text" value={rechercheLot} onChange={e => setRechercheLot(e.target.value)} placeholder="🔍 Chercher un patient dans ce lot..." className="border rounded p-1 flex-1 outline-none text-xs" />
+                  {rechercheLot && <button onClick={() => setRechercheLot("")} className="text-gray-400 hover:text-gray-600"><X size={12}/></button>}
+                </div>
               </div>
+              {(filtreCategorieLot || rechercheLot.trim()) && (
+                <p className="text-[10px] text-gray-500">{dossiersLotAffiches.length} / {lotFocused.dossiers.length} dossier{lotFocused.dossiers.length > 1 ? 's' : ''} affiché{dossiersLotAffiches.length > 1 ? 's' : ''}</p>
+              )}
               <div className="flex flex-wrap items-center gap-4 bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs">
                 <span className="font-bold text-amber-800">💡 Oublié à la génération ? Coche/renseigne puis réimprime ce lot pour l'appliquer :</span>
                 <label className="flex items-center gap-1 font-bold text-purple-900 cursor-pointer"><input type="checkbox" checked={appliqueRabais10} onChange={e=>setAppliqueRabais10(e.target.checked)} className="rounded" /> Rabais 10%</label>
@@ -794,7 +850,8 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                 </div>
               )}
               <div className="divide-y max-h-[640px] overflow-y-auto">
-                {lotFocused.dossiers.map(v => (
+                {dossiersLotAffiches.length === 0 && <p className="text-gray-400 text-center py-3">Aucun dossier ne correspond à ce filtre/recherche.</p>}
+                {dossiersLotAffiches.map(v => (
                   <div key={v.id} className="flex justify-between items-start py-2 text-xs font-mono gap-2">
                     <div className="flex-1 min-w-0">
                       <span className="inline-block w-20 mr-2 text-gray-400 font-bold" title="N° Dossier">N°{v.numDossier || '—'}</span>
