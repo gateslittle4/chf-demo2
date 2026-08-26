@@ -263,6 +263,16 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
 
   const lotFocused = lotFocusedNumero != null ? (lotsDuPartenaire.find(l => l.numero === lotFocusedNumero) || null) : null;
 
+  // Numéro d'ordre (1, 2, 3...) de chaque dossier dans ce lot -- basé sur l'ordre complet du lot
+  // (pas sur la liste filtrée/affichée), donc correspond toujours à la même position que dans
+  // l'export Excel envoyé au partenaire. Sert à repérer/nommer un dossier précis (ex. "le 3e du lot").
+  const ordinalParDossierLot = useMemo(() => {
+    if (!lotFocused) return {};
+    const m = {};
+    lotFocused.dossiers.forEach((v, i) => { m[v.id] = i + 1; });
+    return m;
+  }, [lotFocused]);
+
   // Petit compteur pour vérification avant soumission du lot : combien de dossiers du lot ont une
   // césarienne, un accouchement ou une chirurgie facturée (un même dossier peut compter dans plusieurs cases).
   const compteursLotFocused = useMemo(() => {
@@ -854,6 +864,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                 {dossiersLotAffiches.map(v => (
                   <div key={v.id} className="flex justify-between items-start py-2 text-xs font-mono gap-2">
                     <div className="flex-1 min-w-0">
+                      <span className="inline-flex items-center justify-center w-6 h-5 mr-2 bg-gray-700 text-white rounded text-[10px] font-bold" title="Position dans ce lot — correspond à la ligne dans l'Excel envoyé au partenaire">{ordinalParDossierLot[v.id]}</span>
                       <span className="inline-block sm:w-20 mr-2 sm:mr-2 text-gray-400 font-bold" title="N° Dossier">N°{v.numDossier || '—'}</span>
                       <span className={`inline-block sm:w-16 mr-2 sm:mr-3 ${v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? 'text-gray-500' : 'text-red-500'}`}>{v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? v.dateEntreePourTri.split('-').reverse().join('/') : 'sans exeat'}</span>
                       {v.nomPatient}{' '}
