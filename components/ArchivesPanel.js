@@ -565,27 +565,25 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       if (key === 'hospit' && fiche.exeat) { return `<tr><td>Hébergement (${fiche.exeat.nbJours}j)</td><td class="qte">${fiche.exeat.nbJours}</td><td class="prix">${formatGourdes(fiche.exeat.prixParJour)}</td><td class="sous-total">${formatGourdes(val)}</td></tr>`; }
       return `<tr><td>${label}</td><td class="qte">1</td><td class="prix">${formatGourdes(val)}</td><td class="sous-total">${formatGourdes(val)}</td></tr>`;
     }).join('') : '';
-    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N°${fiche.numeroFiche}</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:13px;margin-bottom:6px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.info-patient{font-size:12px;margin-bottom:4px;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p><p>Fiche du ${(fiche.dateCreation ? new Date(fiche.dateCreation) : new Date()).toLocaleDateString('fr-FR')} (réimprimée le ${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})})</p></div><div class="info"><span>Patient: ${echapperHTML(focusedVerif.nomPatient)}</span><span>${focusedVerif.typePatient === 'ONG' ? `Partenaire : ${echapperHTML(focusedVerif.ongPartenaire || 'N/R')}` : 'Privé'}</span></div><div class="info"><span>Fiche N°${fiche.numeroFiche}</span><span>Mode: ${echapperHTML(fiche.modePaiement || 'cash').toUpperCase()}</span></div><div class="info info-patient"><span>📞 ${echapperHTML(focusedVerif.telephone || 'N/R')}</span><span>📁 ${echapperHTML(focusedVerif.numDossier || 'N/R')}</span></div><div class="info info-patient"><span>Enregistré par: ${echapperHTML(fiche.creePar || 'inconnu')}</span></div>${fiche.exeat ? `<p style="font-size:10px; margin:4px 0;"><strong>Séjour:</strong> ${fiche.exeat.dateEntree.split('-').reverse().slice(0,2).join('/')} → ${fiche.exeat.dateSortie.split('-').reverse().slice(0,2).join('/')}</p>` : ''}<table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${hasLignes ? lignesHTML : fallbackHTML}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes<br/>${formatDH(fiche.totalGlobal)} DH</div>${fiche.solde && fiche.solde > 0 ? `<p style="font-size:12px; color:red;"><strong>Solde restant :</strong> ${formatGourdes(fiche.solde)} Gdes</p>` : ''}<div class="footer">Merci de votre visite !<br/>CHF Système Hospitalier – ${new Date().getFullYear()}</div></body></html>`;
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N°${fiche.numeroFiche}</title><style>@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{position:relative;text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.logo-entete{position:absolute;top:0;right:0;width:30px;height:30px;object-fit:contain;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:13px;margin-bottom:6px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.info-patient{font-size:12px;margin-bottom:4px;}</style></head><body><div class="entete"><img class="logo-entete" src="${LOGO_CHF_BASE64}" alt="Logo CHF"/><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p><p>Fiche du ${(fiche.dateCreation ? new Date(fiche.dateCreation) : new Date()).toLocaleDateString('fr-FR')} (réimprimée le ${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})})</p></div><div class="info"><span>Patient: ${echapperHTML(focusedVerif.nomPatient)}</span><span>${focusedVerif.typePatient === 'ONG' ? `Partenaire : ${echapperHTML(focusedVerif.ongPartenaire || 'N/R')}` : 'Privé'}</span></div><div class="info"><span>Fiche N°${fiche.numeroFiche}</span><span>Mode: ${echapperHTML(fiche.modePaiement || 'cash').toUpperCase()}</span></div><div class="info info-patient"><span>📞 ${echapperHTML(focusedVerif.telephone || 'N/R')}</span><span>📁 ${echapperHTML(focusedVerif.numDossier || 'N/R')}</span></div><div class="info info-patient"><span>Enregistré par: ${echapperHTML(fiche.creePar || 'inconnu')}</span></div>${fiche.exeat ? `<p style="font-size:10px; margin:4px 0;"><strong>Séjour:</strong> ${fiche.exeat.dateEntree.split('-').reverse().slice(0,2).join('/')} → ${fiche.exeat.dateSortie.split('-').reverse().slice(0,2).join('/')}</p>` : ''}<table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${hasLignes ? lignesHTML : fallbackHTML}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes<br/>${formatDH(fiche.totalGlobal)} DH</div>${fiche.solde && fiche.solde > 0 ? `<p style="font-size:12px; color:red;"><strong>Solde restant :</strong> ${formatGourdes(fiche.solde)} Gdes</p>` : ''}<div class="footer">Merci de votre visite !<br/>CHF Système Hospitalier – ${new Date().getFullYear()}</div></body></html>`;
     const win = window.open('', '_blank', 'width=500,height=700');
     if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
     win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 500);
   };
 
-  // Reproduction fidèle du formulaire papier d'admission du CHF (logo, en-tête, grille "Services /
-  // Lit Hospit. / Laboratoire..." avec colonnes $) — chaque case vide affiche "$" comme sur le papier ;
-  // première et dernière colonne affichent le montant de la catégorie, GRAND TOTAL pareil.
+  // Reproduction fidele du formulaire papier d'admission du CHF (logo, en-tete, grille "Services /
+  // Lit Hospit. / Laboratoire..." avec colonnes $) -- chaque case vide affiche "$" comme sur le papier ;
+  // premiere et derniere colonne affichent le montant de la categorie, GRAND TOTAL pareil.
   // "Personne Responsable" = le partenaire qui prend en charge le patient.
-  const imprimerFormulaireCHF = (dossier) => {
+  // Extrait le corps HTML (sans doctype/head/style) pour pouvoir l'imprimer seul OU enchaine avec
+  // d'autres dossiers (impression groupee pour tout un lot, une page par dossier).
+  const genererCorpsFormulaireCHF = (dossier) => {
     const cumul = cumulPourFormulaireCHF(dossier);
     const totalFormulaire = Object.values(cumul).reduce((a, b) => a + b, 0);
     const totalReelDossier = dossier.totalGlobal || 0;
     const ecartCategoriesHorsFormulaire = Math.round((totalReelDossier - totalFormulaire) * 100) / 100;
     const personneResponsable = dossier.typePatient === 'ONG' ? (dossier.ongPartenaire || 'N/R') : 'Privé (patient/famille)';
-    if (ecartCategoriesHorsFormulaire !== 0) {
-      showToast(`⚠️ Ce formulaire ne couvre pas toutes les catégories facturées à ${dossier.nomPatient} : ${formatGourdes(Math.abs(ecartCategoriesHorsFormulaire))} Gdes de plus dans le dossier complet (ex. Radiographie / Visite) — vérifie l'onglet Dossiers pour le détail.`, "info");
-    }
 
-    // Cellule : "$" seul si pas de montant à cet endroit, sinon le montant précédé de "$" (comme le papier)
     const celluleMontant = (montant, estColonneRemplie) => (estColonneRemplie && montant > 0) ? `<span class="montant">$${formatGourdes(montant)}</span>` : `<span class="dollar">$</span>`;
     const ligneTableau = (label, montant) => `<tr><td class="lbl">${echapperHTML(label)}</td>${Array.from({ length: NB_COLONNES_MONTANT_FORMULAIRE }, (_, i) => `<td class="mnt">${celluleMontant(montant, i === 0 || i === NB_COLONNES_MONTANT_FORMULAIRE - 1)}</td>`).join('')}</tr>`;
 
@@ -595,11 +593,32 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     const champ = (label, valeur, large) => `<span class="champ${large ? ' large' : ''}"><span class="lbl-champ">${echapperHTML(label)}</span><span class="val-champ">${valeur ? echapperHTML(valeur) : '&nbsp;'}</span></span>`;
 
     const nomPatientPropre = formaterNomPropre(dossier.nomPatient);
-    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Formulaire CHF - ${echapperHTML(nomPatientPropre)}</title><style>
+    const corps = `<div class="entete">
+        <img src="${LOGO_CHF_BASE64}" alt="Logo CHF" />
+        <div class="entete-texte">
+          <h1>CENTRE HOSPITALIER DE FONTAINE</h1>
+          <p>#13, Fontaine Duvivier, Cité Soleil, HAITI</p>
+          <p>Tels: (+509) 3647-0563 / (+509) 4609-4893 / (+509) 4654-2552</p>
+          <p class="email">chfcentrehospitalierdefontaine@gmail.com</p>
+        </div>
+      </div>
+      <div class="champs">
+        <div class="ligne-champs">${champ('Nom', nomPatientPropre)}${champ('Prénom', '', true)}</div>
+        <div class="ligne-champs">${champ('Age', '')}${champ('Sexe', '')}</div>
+        <div class="ligne-champs">${champ('Statut Matrimonial', '', true)}</div>
+        <div class="ligne-champs">${champ("Date D'admission", dateAdmissionFormulaireCHF(dossier), true)}</div>
+        <div class="ligne-champs">${champ('Personne Responsable', personneResponsable, true)}</div>
+        <div class="ligne-champs">${champ('Phone', dossier.telephone, true)}</div>
+      </div>
+      <table><tbody>${lignesHTML}${ligneGrandTotal}</tbody></table>`;
+    return { corps, ecartCategoriesHorsFormulaire, nomPatientPropre };
+  };
+
+  const STYLE_FORMULAIRE_CHF = `
       @page{size:A4;margin:8mm 14mm;}
       body{font-family:'Times New Roman',Georgia,serif;color:#000;font-size:11px;}
       .entete{display:flex;align-items:center;justify-content:center;gap:10px;border-bottom:2px solid #000;padding-bottom:5px;margin-bottom:8px;position:relative;}
-      .entete img{width:46px;height:46px;object-fit:contain;position:absolute;left:0;top:2px;}
+      .entete img{width:46px;height:46px;object-fit:contain;position:absolute;right:0;top:2px;}
       .entete-texte{text-align:center;}
       .entete-texte h1{font-size:20px;margin:0;letter-spacing:0.5px;font-weight:bold;}
       .entete-texte p{margin:1px 0;font-size:10px;}
@@ -618,33 +637,41 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       .dollar{color:#555;font-size:11px;}
       .montant{font-weight:bold;font-size:9px;white-space:nowrap;}
       tr.grand-total td.lbl{font-size:11px;}
-      </style></head><body>
-      <div class="entete">
-        <img src="${LOGO_CHF_BASE64}" alt="Logo CHF" />
-        <div class="entete-texte">
-          <h1>CENTRE HOSPITALIER DE FONTAINE</h1>
-          <p>#13, Fontaine Duvivier, Cité Soleil, HAITI</p>
-          <p>Tels: (+509) 3647-0563 / (+509) 4609-4893 / (+509) 4654-2552</p>
-          <p class="email">chfcentrehospitalierdefontaine@gmail.com</p>
-        </div>
-      </div>
-      <div class="champs">
-        <div class="ligne-champs">${champ('Nom', nomPatientPropre)}${champ('Prénom', '', true)}</div>
-        <div class="ligne-champs">${champ('Age', '')}${champ('Sexe', '')}</div>
-        <div class="ligne-champs">${champ('Statut Matrimonial', '', true)}</div>
-        <div class="ligne-champs">${champ("Date D'admission", dateAdmissionFormulaireCHF(dossier), true)}</div>
-        <div class="ligne-champs">${champ('Personne Responsable', personneResponsable, true)}</div>
-        <div class="ligne-champs">${champ('Phone', dossier.telephone, true)}</div>
-      </div>
-      <table><tbody>${lignesHTML}${ligneGrandTotal}</tbody></table>
-      </body></html>`;
+      .page-formulaire{page-break-after:always;}
+      .page-formulaire:last-child{page-break-after:auto;}`;
+
+  const imprimerFormulaireCHF = (dossier) => {
+    const { corps, ecartCategoriesHorsFormulaire, nomPatientPropre } = genererCorpsFormulaireCHF(dossier);
+    if (ecartCategoriesHorsFormulaire !== 0) {
+      showToast(`⚠️ Ce formulaire ne couvre pas toutes les catégories facturées à ${dossier.nomPatient} : ${formatGourdes(Math.abs(ecartCategoriesHorsFormulaire))} Gdes de plus dans le dossier complet (ex. Radiographie / Visite) — vérifie l'onglet Dossiers pour le détail.`, "info");
+    }
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Formulaire CHF - ${echapperHTML(nomPatientPropre)}</title><style>${STYLE_FORMULAIRE_CHF}</style></head><body>${corps}</body></html>`;
+    const win = window.open('', '_blank', 'width=850,height=1100');
+    if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
+    win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 500);
+  };
+
+  // Imprime le formulaire papier CHF de TOUS les dossiers d'un lot d'affilee, un par page --
+  // pratique pour preparer tous les formulaires d'un coup avant l'envoi du lot.
+  const imprimerFormulaireCHFPourLot = (dossiers) => {
+    if (!dossiers || dossiers.length === 0) { showToast("Aucun dossier dans ce lot.", "error"); return; }
+    const dossiersIncomplets = [];
+    const pages = dossiers.map(d => {
+      const { corps, ecartCategoriesHorsFormulaire } = genererCorpsFormulaireCHF(d);
+      if (ecartCategoriesHorsFormulaire !== 0) dossiersIncomplets.push(d.nomPatient);
+      return `<div class="page-formulaire">${corps}</div>`;
+    }).join('');
+    if (dossiersIncomplets.length > 0) {
+      showToast(`⚠️ ${dossiersIncomplets.length} formulaire(s) ne couvrent pas toutes les catégories facturées (ex. Radiographie / Visite) : ${dossiersIncomplets.join(', ')}`, "info");
+    }
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Formulaires CHF - Lot (${dossiers.length} dossiers)</title><style>${STYLE_FORMULAIRE_CHF}</style></head><body>${pages}</body></html>`;
     const win = window.open('', '_blank', 'width=850,height=1100');
     if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
     win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 500);
   };
 
   const imprimerArchive = (dossier) => {
-    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Dossier ${echapperHTML(dossier.nomPatient)}</title><style>body{font-family:sans-serif;padding:20px;color:#000;} .entete{text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:14px;} .entete h1{font-size:22px;margin:4px 0;} .entete p{margin:2px 0;font-size:12px;} h1.titre{font-size:18px;margin-top:10px;} table{width:100%;border-collapse:collapse;margin-top:10px;} th,td{border:1px solid #ccc;padding:6px;text-align:left;font-size:12px;} .total{font-weight:bold;font-size:16px;margin-top:10px;} .info-patient{font-size:12px;margin:4px 0;} .meta-fiche{font-size:10px;color:#555;margin-top:4px;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p><p>${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</p></div><h1 class="titre">Dossier patient</h1><p class="info-patient"><strong>Nom :</strong> ${echapperHTML(dossier.nomPatient)} &nbsp;|&nbsp; <strong>N° Dossier :</strong> ${echapperHTML(dossier.numDossier || 'N/R')}</p><p class="info-patient"><strong>Partenaire / Type :</strong> ${dossier.typePatient === 'ONG' ? echapperHTML(dossier.ongPartenaire || 'N/R') : 'Privé'} (${dossier.typePatient === 'ONG' ? 'Partenaire' : 'Privé'})</p><p class="info-patient"><strong>Téléphone :</strong> ${echapperHTML(dossier.telephone || 'N/R')}</p><p class="info-patient"><strong>Date d'ouverture :</strong> ${echapperHTML(dossier.dateHeure)}</p><p><strong>Total :</strong> ${formatGourdes(dossier.totalGlobal)} Gdes (${formatDH(dossier.totalGlobal)} DH)</p><h3>Fiches :</h3>${dossier.fiches?.map(f => `<div style="border:1px solid #ddd;margin:10px 0;padding:10px;"><p><strong>Fiche N°${f.numeroFiche}</strong> - Total : ${formatGourdes(f.totalGlobal)} Gdes</p><table><thead><tr><th>Catégorie</th><th>Montant</th></tr></thead><tbody>${Object.entries(f.breakdown || {}).map(([key, val]) => { if (val === 0) return ''; const cat = CATEGORIES_LISTE.find(c => c.key === key); return `<tr><td>${echapperHTML(cat ? cat.label : key)}</td><td>${formatGourdes(val)}</td></tr>`; }).join('')}</tbody></table><p class="meta-fiche">Mode de paiement : ${echapperHTML((f.modePaiement || 'cash').toUpperCase())} &nbsp;|&nbsp; Encaissé par : ${echapperHTML(f.creePar || 'inconnu')} &nbsp;|&nbsp; ${f.dateCreation ? new Date(f.dateCreation).toLocaleString('fr-FR') : ''}</p></div>`).join('')}<p class="total">Total général : ${formatGourdes(dossier.totalGlobal)} Gdes (${formatDH(dossier.totalGlobal)} DH)</p></body></html>`;
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Dossier ${echapperHTML(dossier.nomPatient)}</title><style>body{font-family:sans-serif;padding:20px;color:#000;} .entete{position:relative;text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:14px;} .logo-entete{position:absolute;top:0;right:0;width:40px;height:40px;object-fit:contain;} .entete h1{font-size:22px;margin:4px 0;} .entete p{margin:2px 0;font-size:12px;} h1.titre{font-size:18px;margin-top:10px;} table{width:100%;border-collapse:collapse;margin-top:10px;} th,td{border:1px solid #ccc;padding:6px;text-align:left;font-size:12px;} .total{font-weight:bold;font-size:16px;margin-top:10px;} .info-patient{font-size:12px;margin:4px 0;} .meta-fiche{font-size:10px;color:#555;margin-top:4px;}</style></head><body><div class="entete"><img class="logo-entete" src="${LOGO_CHF_BASE64}" alt="Logo CHF"/><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p><p>${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</p></div><h1 class="titre">Dossier patient</h1><p class="info-patient"><strong>Nom :</strong> ${echapperHTML(dossier.nomPatient)} &nbsp;|&nbsp; <strong>N° Dossier :</strong> ${echapperHTML(dossier.numDossier || 'N/R')}</p><p class="info-patient"><strong>Partenaire / Type :</strong> ${dossier.typePatient === 'ONG' ? echapperHTML(dossier.ongPartenaire || 'N/R') : 'Privé'} (${dossier.typePatient === 'ONG' ? 'Partenaire' : 'Privé'})</p><p class="info-patient"><strong>Téléphone :</strong> ${echapperHTML(dossier.telephone || 'N/R')}</p><p class="info-patient"><strong>Date d'ouverture :</strong> ${echapperHTML(dossier.dateHeure)}</p><p><strong>Total :</strong> ${formatGourdes(dossier.totalGlobal)} Gdes (${formatDH(dossier.totalGlobal)} DH)</p><h3>Fiches :</h3>${dossier.fiches?.map(f => `<div style="border:1px solid #ddd;margin:10px 0;padding:10px;"><p><strong>Fiche N°${f.numeroFiche}</strong> - Total : ${formatGourdes(f.totalGlobal)} Gdes</p><table><thead><tr><th>Catégorie</th><th>Montant</th></tr></thead><tbody>${Object.entries(f.breakdown || {}).map(([key, val]) => { if (val === 0) return ''; const cat = CATEGORIES_LISTE.find(c => c.key === key); return `<tr><td>${echapperHTML(cat ? cat.label : key)}</td><td>${formatGourdes(val)}</td></tr>`; }).join('')}</tbody></table><p class="meta-fiche">Mode de paiement : ${echapperHTML((f.modePaiement || 'cash').toUpperCase())} &nbsp;|&nbsp; Encaissé par : ${echapperHTML(f.creePar || 'inconnu')} &nbsp;|&nbsp; ${f.dateCreation ? new Date(f.dateCreation).toLocaleString('fr-FR') : ''}</p></div>`).join('')}<p class="total">Total général : ${formatGourdes(dossier.totalGlobal)} Gdes (${formatDH(dossier.totalGlobal)} DH)</p></body></html>`;
     const win = window.open('', '_blank', 'width=800,height=600');
     if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
     win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 500);
@@ -745,6 +772,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                 <h3 className="font-black text-gray-700 text-xs uppercase">📦 Lot {lotFocused.numero} — {lotOngSelectionne} — {lotFocused.dossiers.length} dossier{lotFocused.dossiers.length > 1 ? 's' : ''} — {formatGourdes(lotFocused.total)} Gdes</h3>
                 <div className="flex gap-2">
                   <button onClick={() => reimprimerLot(lotOngSelectionne, lotFocused.numero)} className="bg-purple-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1"><Download size={12}/> Réimprimer ce lot</button>
+                  <button onClick={() => imprimerFormulaireCHFPourLot(lotFocused.dossiers)} className="bg-indigo-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1" title="Imprime le formulaire papier CHF de chaque dossier de ce lot, un par page"><Printer size={12}/> Formulaires CHF du lot</button>
                   <button onClick={() => setLotFocusedNumero(null)}><X size={14}/></button>
                 </div>
               </div>

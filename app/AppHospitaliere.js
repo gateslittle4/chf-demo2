@@ -734,7 +734,12 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
   const injecterLigneAuCalculateur = (item, cat, qte) => {
     // Si "Nouveau prix" est choisi ET que l'article a bien un nouveau prix défini, on l'utilise ;
     // sinon (article sans nouveau prix, ou "Actuel" choisi) on garde le prix actuel normalement.
-    const prixEffectif = (tarifChoisi === "nouveau" && item.nouveauPrix != null && item.nouveauPrix !== "") ? parseFloat(item.nouveauPrix) : item.prix;
+    // Exception : médicament reçu en don de l'ONG facturée elle-même (Gestion des stocks → "Dons
+    // ONG") -- on ne peut pas lui refacturer son propre don, donc prix forcé à 0 dans ce cas précis,
+    // quelle que soit la quantité.
+    const estDonDeCetOng = cat === "med" && typePatient === "ONG" && selectedOng && (item.dons || []).some(d => d.ong === selectedOng);
+    const prixEffectif = estDonDeCetOng ? 0 : ((tarifChoisi === "nouveau" && item.nouveauPrix != null && item.nouveauPrix !== "") ? parseFloat(item.nouveauPrix) : item.prix);
+    if (estDonDeCetOng) showToast(`🎁 ${item.nom} facturé 0 — stock donné par ${selectedOng}`, "info");
     setLignesCalcul(prev => {
       const index = prev.findIndex(l => l.itemId === item.id && l.type === cat);
       if (index !== -1) return prev.map((l, idx) => idx === index ? { ...l, qte: l.qte + qte } : l);

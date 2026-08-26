@@ -4,6 +4,7 @@ const { useState } = React;
 const { chf } = require('../api/supabase');
 const { LOG_MEDS_KEY } = require('../api/firebase');
 const { formatGourdes } = require('../utils/helpers');
+const { LISTE_ONG } = require('../utils/constants');
 const { Check, X, Pencil } = require('../utils/icons');
 
 function GestionStockPanel({ items, setItems, showToast }) {
@@ -12,6 +13,8 @@ function GestionStockPanel({ items, setItems, showToast }) {
   const [editQuantite, setEditQuantite] = useState("");
   const [editSeuil, setEditSeuil] = useState("");
   const [ajoutQuantite, setAjoutQuantite] = useState({});
+  const [donOng, setDonOng] = useState({});
+  const [donQuantite, setDonQuantite] = useState({});
 
   const sauvegarderStock = async (nouvelleListe) => {
     setItems(nouvelleListe);
@@ -26,6 +29,33 @@ function GestionStockPanel({ items, setItems, showToast }) {
     setAjoutQuantite({ ...ajoutQuantite, [id]: "" });
     showToast(`Stock ajouté : +${qte}`, "success");
   };
+
+  // Dons d'ONG : stock reçu gratuitement d'un partenaire, qu'on ne peut pas lui refacturer. Dès
+  // qu'un médicament a un don enregistré pour un ONG donné, le Calculateur facture automatiquement
+  // 0 pour ce médicament sur les fiches ouvertes pour ce même ONG (quelle que soit la quantité).
+  const ajouterDon = (id, ong, quantiteAjoutee) => {
+    const qte = parseFloat(quantiteAjoutee) || 0;
+    if (!ong) { showToast("Choisis un ONG donateur", "error"); return; }
+    if (qte <= 0) { showToast("Quantité de don invalide", "error"); return; }
+    const updated = items.map(item => {
+      if (item.id !== id) return item;
+      const dons = [...(item.dons || [])];
+      const idx = dons.findIndex(d => d.ong === ong);
+      if (idx !== -1) dons[idx] = { ...dons[idx], quantite: (dons[idx].quantite || 0) + qte };
+      else dons.push({ ong, quantite: qte });
+      return { ...item, dons };
+    });
+    sauvegarderStock(updated);
+    setDonOng({ ...donOng, [id]: "" });
+    setDonQuantite({ ...donQuantite, [id]: "" });
+    showToast(`Don enregistré : ${ong} → +${qte}. Ce médicament sera facturé 0 à ${ong}.`, "success");
+  };
+  const retirerDon = (id, ong) => {
+    const updated = items.map(item => item.id === id ? { ...item, dons: (item.dons || []).filter(d => d.ong !== ong) } : item);
+    sauvegarderStock(updated);
+    showToast(`Don de ${ong} retiré — ce médicament sera de nouveau facturé normalement à ${ong}.`, "success");
+  };
+
   const itemsFiltres = items.filter(i => i.nom.toLowerCase().includes(filtre.toLowerCase()));
   return (
     <div className="space-y-4 text-xs">
@@ -34,7 +64,7 @@ function GestionStockPanel({ items, setItems, showToast }) {
         <input type="text" value={filtre} onChange={e=>setFiltre(e.target.value)} placeholder="Filtrer..." className="w-full border rounded-lg p-2 mb-4" />
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead><tr className="bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono"><th className="p-2">Médicament</th><th className="p-2 text-center">Prix</th><th className="p-2 text-center">Stock</th><th className="p-2 text-center">Seuil</th><th className="p-2 text-center">Actions</th></tr></thead>
+            <thead><tr className="bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono"><th className="p-2">Médicament</th><th className="p-2 text-center">Prix</th><th className="p-2 text-center">Stock</th><th className="p-2 text-center">Seuil</th><th className="p-2 text-center">Dons ONG (facturés 0)</th><th className="p-2 text-center">Actions</th></tr></thead>
             <tbody className="divide-y divide-gray-100">
               {itemsFiltres.map(item => {
                 const enAlerte = (item.quantite || 0) <= (item.seuilAlerte || 5);
@@ -48,6 +78,24 @@ function GestionStockPanel({ items, setItems, showToast }) {
                     </td>
                     <td className="p-2 text-center">
                       {editingId === item.id ? <input type="number" value={editSeuil} onChange={e=>setEditSeuil(e.target.value)} className="w-16 border rounded p-1 text-center font-mono" /> : <span>{item.seuilAlerte || 5}</span>}
+                    </td>
+                    <td className="p-2">
+                      <div className="flex flex-wrap gap-1 justify-center mb-1">
+                        {(item.dons || []).map(d => (
+                          <span key={d.ong} className="bg-emerald-100 text-emerald-800 rounded px-1.5 py-0.5 text-[10px] font-bold flex items-center gap-1">
+                            🎁 {d.ong} : {d.quantite}
+                            <button onClick={() => retirerDon(item.id, d.ong)} title="Retirer ce don" className="text-emerald-900 hover:text-red-600"><X size={9}/></button>
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-1 justify-center">
+                        <select value={donOng[item.id] || ""} onChange={e=>setDonOng({...donOng, [item.id]: e.target.value})} className="border rounded p-0.5 text-[10px]">
+                          <option value="">-- ONG --</option>
+                          {LISTE_ONG.map(o => <option key={o} value={o}>{o}</option>)}
+                        </select>
+                        <input type="number" min="1" value={donQuantite[item.id]||""} onChange={e=>setDonQuantite({...donQuantite,[item.id]:e.target.value})} placeholder="Qté" className="w-12 border rounded p-0.5 text-center text-[10px]" />
+                        <button onClick={()=>ajouterDon(item.id, donOng[item.id], donQuantite[item.id])} className="bg-emerald-700 text-white px-1.5 py-0.5 rounded text-[10px]">+ Don</button>
+                      </div>
                     </td>
                     <td className="p-2 text-center">
                       {editingId === item.id ? (
