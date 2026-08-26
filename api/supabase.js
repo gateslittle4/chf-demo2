@@ -38,7 +38,13 @@ class CHF_API {
       if (method === 'DELETE') return { success: true };
       return await response.json();
     } catch (error) {
-      if (error.message.includes('Failed to fetch') || !navigator.onLine) {
+      // Une vraie coupure réseau (hors ligne, DNS, connexion refusée...) fait toujours échouer
+      // fetch() avec un TypeError -- mais le message exact dépend du navigateur ("Failed to fetch"
+      // sur Chrome, "NetworkError when attempting to fetch resource" sur Firefox, "Load failed" sur
+      // Safari). Se fier au texte du message ratait donc la détection hors Chrome ; on se fie au
+      // type de l'erreur à la place, qui lui est constant. Une erreur HTTP (ligne 37 ci-dessus) est
+      // un Error normal, pas un TypeError, donc elle continue de remonter comme une vraie erreur.
+      if (error instanceof TypeError || !navigator.onLine) {
         console.warn('🔴 Hors ligne, mise en file d\'attente:', endpoint, data);
         this.pendingQueue.push({ endpoint, method, data, timestamp: Date.now(), localId: meta.localId || null });
         localStorage.setItem('pending_ops', JSON.stringify(this.pendingQueue));
