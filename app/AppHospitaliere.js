@@ -258,27 +258,13 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
     }
   };
 
-  // Numéro de dossier auto (format "N-1", "N-2"...) attribué seulement quand le champ est laissé
-  // vide à la création -- sert à s'orienter avec les dossiers papier en main même quand aucun
-  // numéro physique n'a été tapé. Calculé à partir du plus grand "N-X" déjà vu dans les dossiers
-  // chargés ; comme pour les numéros de lot, un doublon n'est possible qu'en cas de création
-  // vraiment simultanée sur deux appareils (rare en pratique ici).
-  const genererProchainNumDossierAuto = () => {
-    const numeros = verifications
-      .map(v => (v.numDossier || '').trim().match(/^N-(\d+)$/))
-      .filter(Boolean)
-      .map(m => parseInt(m[1], 10));
-    return `N-${numeros.length > 0 ? Math.max(...numeros) + 1 : 1}`;
-  };
-
-  const initialiserNouveauDossier = async (nom, ong, numDossierSaisi, type, naissance, tel, serviceChoisi) => {
+  const initialiserNouveauDossier = async (nom, ong, numDossier, type, naissance, tel, serviceChoisi) => {
     setOrigineLotEdition(null);
     const propreNom = formaterNomPropre(nom);
     if (!propreNom || (!ong && type === "ONG")) { showToast("Veuillez remplir tous les champs.", "error"); return; }
-    const numDossier = (numDossierSaisi || '').trim() || genererProchainNumDossierAuto();
     const episodeData = {
       nomPatient: propreNom, ongPartenaire: type === "ONG" ? ong : "", typePatient: type,
-      numDossier, dateNaissance: naissance || "", telephone: tel || "",
+      numDossier: numDossier || "", dateNaissance: naissance || "", telephone: tel || "",
       serviceChoisi: serviceChoisi || "",
       status: 'actif', timestamp: Date.now(), dateHeure: new Date().toLocaleDateString("fr-FR"),
       totalGlobal: 0, fiches: [], montantPaye: 0, solde: 0
