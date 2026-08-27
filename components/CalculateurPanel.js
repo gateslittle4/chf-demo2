@@ -72,6 +72,11 @@ function CalculateurPanel({
   const [selection, setSelection] = useState(null);
   const [quantite, setQuantite] = useState("1");
 
+  // Nombre d'éléments distincts tapés dans la fiche en cours (médicaments/actes + hébergement +
+  // chirurgie spéciale s'il y en a) -- PAS la somme des quantités -- pour comparer facilement au
+  // nombre de lignes écrites à la main sur la fiche papier.
+  const nombreElementsFiche = lignes.length + (dateEntree1 && dateSortie1 ? 1 : 0) + (multiPeriode && dateEntree2 && dateSortie2 ? 1 : 0) + (hasChirSpec && nomChirSpec ? 1 : 0);
+
   const [montantVerse, setMontantVerse] = useState("");
   const [modePaiement, setModePaiement] = useState("cash");
   const [ongPartenaireFiche, setOngPartenaireFiche] = useState("");
@@ -853,7 +858,7 @@ function CalculateurPanel({
                 {coutsParService?.incomplet && Object.values(coutsParService.valeurs).some(v=>v>0) && <p className="text-[9px] text-gray-400 italic pt-1">Coût partiel : certains articles de cette fiche (ou l'hébergement/chirurgie spéciale) n'ont pas encore de coût renseigné dans le catalogue.</p>}
               </div>
               <div className="bg-[#1E2A24] text-white p-4 flex justify-between items-center font-bold text-sm font-mono sticky bottom-0">
-                <span>SOUS-TOTAL FICHE {idFicheEnCoursDEdition ? 'EN MODIFICATION' : `N°${numeroFicheCourante}`} :</span>
+                <span>SOUS-TOTAL FICHE {idFicheEnCoursDEdition ? 'EN MODIFICATION' : `N°${numeroFicheCourante}`} <span className="text-emerald-400 font-normal text-xs">({nombreElementsFiche} élément{nombreElementsFiche > 1 ? 's' : ''})</span> :</span>
                 <span>{formatGourdes(grandTotal)} Gdes ({formatDH(grandTotal)} DH)</span>
               </div>
             </div>
@@ -863,7 +868,7 @@ function CalculateurPanel({
           {/* --- Mobile : barre fixe en bas (toujours visible), tap = récapitulatif complet plein écran --- */}
           {estMobile && dossierActif && (
             <button onClick={() => setDetailOuvert(true)} className="fixed bottom-0 left-0 right-0 z-40 bg-[#1E2A24] text-white px-4 py-3 flex justify-between items-center font-bold text-sm shadow-2xl">
-              <span>{lignes.length + (dateEntree1 && dateSortie1 ? 1 : 0) + (multiPeriode && dateEntree2 && dateSortie2 ? 1 : 0) + (hasChirSpec && nomChirSpec ? 1 : 0)} article(s)</span>
+              <span>{nombreElementsFiche} article(s)</span>
               <span>{formatDH(grandTotal)} DH ▲</span>
             </button>
           )}
