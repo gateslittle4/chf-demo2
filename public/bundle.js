@@ -5753,7 +5753,21 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
       var AccueilPanel = require_AccueilPanel();
       var AnalyticsPanel = require_AnalyticsPanel();
       var GestionOngPanel = require_GestionOng();
+      var DUREE_MAX_BROUILLON_MS = 24 * 60 * 60 * 1e3;
+      function chargerBrouillonDossier() {
+        try {
+          const brut = localStorage.getItem(LOG_DOSSIER_BROUILLON_KEY);
+          if (!brut) return null;
+          const brouillon = JSON.parse(brut);
+          if (!brouillon || !brouillon.dossierActif) return null;
+          if (!brouillon.timestamp || Date.now() - brouillon.timestamp > DUREE_MAX_BROUILLON_MS) return null;
+          return brouillon;
+        } catch (e) {
+          return null;
+        }
+      }
       function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, roleParDefaut }) {
+        const [brouillonRestaure] = useState(chargerBrouillonDossier);
         const [onglet, setOnglet] = useState(() => localStorage.getItem("chf-dernier-onglet") || "accueil");
         const [medicaments, setMedicaments] = useState([]);
         const [actes, setActes] = useState([]);
@@ -5762,38 +5776,38 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
         const [chargement, setChargement] = useState(true);
         const [ongTargets, setOngTargets] = useState({ "MSF-H": 0, "MSF-F": 0, "ALIMA": 0, "AVSI": 0, "GRID MISSION": 0, "WAY TO HEALTH": 0, "TEAM TASSY": 0 });
         const [listeOngDocs, setListeOngDocs] = useState([]);
-        const [dossierActif, setDossierActif] = useState(false);
+        const [dossierActif, setDossierActif] = useState(() => !!(brouillonRestaure == null ? void 0 : brouillonRestaure.dossierActif));
         const [origineLotEdition, setOrigineLotEdition] = useState(null);
         const [lotAFocuserAuRetour, setLotAFocuserAuRetour] = useState(null);
-        const [nomPatient, setNomPatient] = useState("");
-        const [selectedOng, setSelectedOng] = useState("");
-        const [typePatient, setTypePatient] = useState("ONG");
-        const [numDossierPatient, setNumDossierPatient] = useState("");
-        const [dateNaissance, setDateNaissance] = useState("");
-        const [telephone, setTelephone] = useState("");
-        const [fichesDossier, setFichesDossier] = useState([]);
-        const [idFicheEnCoursDEdition, setIdFicheEnCoursDEdition] = useState(null);
-        const [modePreValidation, setModePreValidation] = useState(false);
-        const [lignesCalcul, setLignesCalcul] = useState([]);
+        const [nomPatient, setNomPatient] = useState(() => (brouillonRestaure == null ? void 0 : brouillonRestaure.nomPatient) || "");
+        const [selectedOng, setSelectedOng] = useState(() => (brouillonRestaure == null ? void 0 : brouillonRestaure.selectedOng) || "");
+        const [typePatient, setTypePatient] = useState(() => (brouillonRestaure == null ? void 0 : brouillonRestaure.typePatient) || "ONG");
+        const [numDossierPatient, setNumDossierPatient] = useState(() => (brouillonRestaure == null ? void 0 : brouillonRestaure.numDossierPatient) || "");
+        const [dateNaissance, setDateNaissance] = useState(() => (brouillonRestaure == null ? void 0 : brouillonRestaure.dateNaissance) || "");
+        const [telephone, setTelephone] = useState(() => (brouillonRestaure == null ? void 0 : brouillonRestaure.telephone) || "");
+        const [fichesDossier, setFichesDossier] = useState(() => (brouillonRestaure == null ? void 0 : brouillonRestaure.fichesDossier) || []);
+        const [idFicheEnCoursDEdition, setIdFicheEnCoursDEdition] = useState(() => (brouillonRestaure == null ? void 0 : brouillonRestaure.idFicheEnCoursDEdition) || null);
+        const [modePreValidation, setModePreValidation] = useState(() => !!(brouillonRestaure == null ? void 0 : brouillonRestaure.modePreValidation));
+        const [lignesCalcul, setLignesCalcul] = useState(() => (brouillonRestaure == null ? void 0 : brouillonRestaure.lignesCalcul) || []);
         const [dateFiche, setDateFiche] = useState(() => (/* @__PURE__ */ new Date()).toISOString().split("T")[0]);
         const [prescritPar, setPrescritPar] = useState("");
-        const [dateEntree1, setDateEntree1] = useState("");
-        const [dateSortie1, setDateSortie1] = useState("");
-        const [typeLit1, setTypeLit1] = useState("normal");
-        const [multiPeriode, setMultiPeriode] = useState(false);
-        const [dateEntree2, setDateEntree2] = useState("");
-        const [dateSortie2, setDateSortie2] = useState("");
-        const [typeLit2, setTypeLit2] = useState("normal");
-        const [hasChirSpec, setHasChirSpec] = useState(false);
+        const [dateEntree1, setDateEntree1] = useState(() => (brouillonRestaure == null ? void 0 : brouillonRestaure.dateEntree1) || "");
+        const [dateSortie1, setDateSortie1] = useState(() => (brouillonRestaure == null ? void 0 : brouillonRestaure.dateSortie1) || "");
+        const [typeLit1, setTypeLit1] = useState(() => (brouillonRestaure == null ? void 0 : brouillonRestaure.typeLit1) || "normal");
+        const [multiPeriode, setMultiPeriode] = useState(() => !!(brouillonRestaure == null ? void 0 : brouillonRestaure.multiPeriode));
+        const [dateEntree2, setDateEntree2] = useState(() => (brouillonRestaure == null ? void 0 : brouillonRestaure.dateEntree2) || "");
+        const [dateSortie2, setDateSortie2] = useState(() => (brouillonRestaure == null ? void 0 : brouillonRestaure.dateSortie2) || "");
+        const [typeLit2, setTypeLit2] = useState(() => (brouillonRestaure == null ? void 0 : brouillonRestaure.typeLit2) || "normal");
+        const [hasChirSpec, setHasChirSpec] = useState(() => !!(brouillonRestaure == null ? void 0 : brouillonRestaure.hasChirSpec));
         const [tarifChoisi, setTarifChoisi] = useState("actuel");
-        const [nomChirSpec, setNomChirSpec] = useState("");
-        const [prixChirSpec, setPrixChirSpec] = useState("");
+        const [nomChirSpec, setNomChirSpec] = useState(() => (brouillonRestaure == null ? void 0 : brouillonRestaure.nomChirSpec) || "");
+        const [prixChirSpec, setPrixChirSpec] = useState(() => (brouillonRestaure == null ? void 0 : brouillonRestaure.prixChirSpec) || "");
         const [filtreArchivesInitialNom, setFiltreArchivesInitialNom] = useState("");
         const [needsBackupWarning, setNeedsBackupWarning] = useState(false);
         const [modeSimulation, setModeSimulation] = useState(false);
-        const [dossierId, setDossierId] = useState(null);
+        const [dossierId, setDossierId] = useState(() => (brouillonRestaure == null ? void 0 : brouillonRestaure.dossierId) || null);
         const [dossierUpdatedAtOuverture, setDossierUpdatedAtOuverture] = useState(null);
-        const [paiementEffectue, setPaiementEffectue] = useState(false);
+        const [paiementEffectue, setPaiementEffectue] = useState(() => !!(brouillonRestaure == null ? void 0 : brouillonRestaure.paiementEffectue));
         const [achatExpressOuvert, setAchatExpressOuvert] = useState(false);
         const [confirmModal, setConfirmModal] = useState(null);
         const [avertissementInactivite, setAvertissementInactivite] = useState(false);
@@ -5811,6 +5825,12 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
             showToast("\u26A0\uFE0F Ton r\xF4le habituel n'a pas pu \xEAtre retrouv\xE9 \u2014 connect\xE9 en Auditeur (lecture seule) par d\xE9faut. Si ce n'est pas normal, pr\xE9viens un administrateur.", "error");
           }
         }, [roleParDefaut]);
+        useEffect(() => {
+          if (brouillonRestaure == null ? void 0 : brouillonRestaure.dossierActif) {
+            const nbFiches = (brouillonRestaure.fichesDossier || []).length;
+            showToast(`\u{1F4CB} Dossier de ${brouillonRestaure.nomPatient || "un patient"} restaur\xE9 (${nbFiches} fiche${nbFiches > 1 ? "s" : ""}) \u2014 ferm\xE9 sans suspendre ni archiver la derni\xE8re fois`, "info");
+          }
+        }, []);
         useEffect(() => {
           localStorage.setItem("chf-dernier-onglet", onglet);
         }, [onglet]);
@@ -5898,7 +5918,8 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
               prixChirSpec,
               idFicheEnCoursDEdition,
               dossierId,
-              paiementEffectue
+              paiementEffectue,
+              timestamp: Date.now()
             };
             localStorage.setItem(LOG_DOSSIER_BROUILLON_KEY, JSON.stringify(brouillon));
           }

@@ -30,8 +30,26 @@ const AccueilPanel = require('../components/AccueilPanel');
 const AnalyticsPanel = require('../components/AnalyticsPanel');
 const GestionOngPanel = require('../components/GestionOng');
 
+// Un dossier en cours (fiches déjà "enregistrées" dans le calculateur) n'est envoyé au serveur qu'à
+// l'archivage/la suspension/le report -- avant ça, il ne vit qu'en mémoire. Le brouillon local
+// (localStorage) sert de filet de sécurité si l'onglet/le navigateur se ferme entre-temps : on ne
+// perd pas les fiches déjà saisies. Ignoré s'il n'y avait pas de dossier actif, ou s'il date de plus
+// de 24h (onglet oublié plutôt que vrai dossier en cours).
+const DUREE_MAX_BROUILLON_MS = 24 * 60 * 60 * 1000;
+function chargerBrouillonDossier() {
+  try {
+    const brut = localStorage.getItem(LOG_DOSSIER_BROUILLON_KEY);
+    if (!brut) return null;
+    const brouillon = JSON.parse(brut);
+    if (!brouillon || !brouillon.dossierActif) return null;
+    if (!brouillon.timestamp || Date.now() - brouillon.timestamp > DUREE_MAX_BROUILLON_MS) return null;
+    return brouillon;
+  } catch { return null; }
+}
+
 // ========================== COMPOSANT PRINCIPAL ==========================
 function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, roleParDefaut }) {
+  const [brouillonRestaure] = useState(chargerBrouillonDossier);
   const [onglet, setOnglet] = useState(() => localStorage.getItem('chf-dernier-onglet') || "accueil");
   const [medicaments, setMedicaments] = useState([]);
   const [actes, setActes] = useState([]);
@@ -40,38 +58,38 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
   const [chargement, setChargement] = useState(true);
   const [ongTargets, setOngTargets] = useState({ "MSF-H": 0, "MSF-F": 0, "ALIMA": 0, "AVSI": 0, "GRID MISSION": 0, "WAY TO HEALTH": 0, "TEAM TASSY": 0 });
   const [listeOngDocs, setListeOngDocs] = useState([]); // [{id, nom}] — chargé depuis Firestore (collection ong_partenaires)
-  const [dossierActif, setDossierActif] = useState(false);
+  const [dossierActif, setDossierActif] = useState(() => !!brouillonRestaure?.dossierActif);
   const [origineLotEdition, setOrigineLotEdition] = useState(null); // {ongPartenaire, numeroLot} si on corrige un dossier depuis un lot déjà préparé, pour y revenir après sauvegarde
   const [lotAFocuserAuRetour, setLotAFocuserAuRetour] = useState(null); // déclenche le repositionnement dans ArchivesPanel une fois la sauvegarde faite
-  const [nomPatient, setNomPatient] = useState("");
-  const [selectedOng, setSelectedOng] = useState("");
-  const [typePatient, setTypePatient] = useState("ONG");
-  const [numDossierPatient, setNumDossierPatient] = useState("");
-  const [dateNaissance, setDateNaissance] = useState("");
-  const [telephone, setTelephone] = useState("");
-  const [fichesDossier, setFichesDossier] = useState([]);
-  const [idFicheEnCoursDEdition, setIdFicheEnCoursDEdition] = useState(null); // ID de la fiche en édition
-  const [modePreValidation, setModePreValidation] = useState(false);
-  const [lignesCalcul, setLignesCalcul] = useState([]);
+  const [nomPatient, setNomPatient] = useState(() => brouillonRestaure?.nomPatient || "");
+  const [selectedOng, setSelectedOng] = useState(() => brouillonRestaure?.selectedOng || "");
+  const [typePatient, setTypePatient] = useState(() => brouillonRestaure?.typePatient || "ONG");
+  const [numDossierPatient, setNumDossierPatient] = useState(() => brouillonRestaure?.numDossierPatient || "");
+  const [dateNaissance, setDateNaissance] = useState(() => brouillonRestaure?.dateNaissance || "");
+  const [telephone, setTelephone] = useState(() => brouillonRestaure?.telephone || "");
+  const [fichesDossier, setFichesDossier] = useState(() => brouillonRestaure?.fichesDossier || []);
+  const [idFicheEnCoursDEdition, setIdFicheEnCoursDEdition] = useState(() => brouillonRestaure?.idFicheEnCoursDEdition || null); // ID de la fiche en édition
+  const [modePreValidation, setModePreValidation] = useState(() => !!brouillonRestaure?.modePreValidation);
+  const [lignesCalcul, setLignesCalcul] = useState(() => brouillonRestaure?.lignesCalcul || []);
   const [dateFiche, setDateFiche] = useState(() => new Date().toISOString().split('T')[0]); // date réelle du service — modifiable si saisie en retard
   const [prescritPar, setPrescritPar] = useState(""); // nom du médecin/infirmière qui a prescrit — tapé clairement, remplace la signature manuscrite illisible
-  const [dateEntree1, setDateEntree1] = useState("");
-  const [dateSortie1, setDateSortie1] = useState("");
-  const [typeLit1, setTypeLit1] = useState("normal");
-  const [multiPeriode, setMultiPeriode] = useState(false);
-  const [dateEntree2, setDateEntree2] = useState("");
-  const [dateSortie2, setDateSortie2] = useState("");
-  const [typeLit2, setTypeLit2] = useState("normal");
-  const [hasChirSpec, setHasChirSpec] = useState(false);
+  const [dateEntree1, setDateEntree1] = useState(() => brouillonRestaure?.dateEntree1 || "");
+  const [dateSortie1, setDateSortie1] = useState(() => brouillonRestaure?.dateSortie1 || "");
+  const [typeLit1, setTypeLit1] = useState(() => brouillonRestaure?.typeLit1 || "normal");
+  const [multiPeriode, setMultiPeriode] = useState(() => !!brouillonRestaure?.multiPeriode);
+  const [dateEntree2, setDateEntree2] = useState(() => brouillonRestaure?.dateEntree2 || "");
+  const [dateSortie2, setDateSortie2] = useState(() => brouillonRestaure?.dateSortie2 || "");
+  const [typeLit2, setTypeLit2] = useState(() => brouillonRestaure?.typeLit2 || "normal");
+  const [hasChirSpec, setHasChirSpec] = useState(() => !!brouillonRestaure?.hasChirSpec);
   const [tarifChoisi, setTarifChoisi] = useState("actuel"); // "actuel" | "nouveau" — quel prix du catalogue utiliser
-  const [nomChirSpec, setNomChirSpec] = useState("");
-  const [prixChirSpec, setPrixChirSpec] = useState("");
+  const [nomChirSpec, setNomChirSpec] = useState(() => brouillonRestaure?.nomChirSpec || "");
+  const [prixChirSpec, setPrixChirSpec] = useState(() => brouillonRestaure?.prixChirSpec || "");
   const [filtreArchivesInitialNom, setFiltreArchivesInitialNom] = useState("");
   const [needsBackupWarning, setNeedsBackupWarning] = useState(false);
   const [modeSimulation, setModeSimulation] = useState(false);
-  const [dossierId, setDossierId] = useState(null);
+  const [dossierId, setDossierId] = useState(() => brouillonRestaure?.dossierId || null);
   const [dossierUpdatedAtOuverture, setDossierUpdatedAtOuverture] = useState(null);
-  const [paiementEffectue, setPaiementEffectue] = useState(false);
+  const [paiementEffectue, setPaiementEffectue] = useState(() => !!brouillonRestaure?.paiementEffectue);
   const [achatExpressOuvert, setAchatExpressOuvert] = useState(false);
   const [confirmModal, setConfirmModal] = useState(null);
   const [avertissementInactivite, setAvertissementInactivite] = useState(false);
@@ -89,6 +107,13 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
       showToast("⚠️ Ton rôle habituel n'a pas pu être retrouvé — connecté en Auditeur (lecture seule) par défaut. Si ce n'est pas normal, préviens un administrateur.", "error");
     }
   }, [roleParDefaut]);
+
+  useEffect(() => {
+    if (brouillonRestaure?.dossierActif) {
+      const nbFiches = (brouillonRestaure.fichesDossier || []).length;
+      showToast(`📋 Dossier de ${brouillonRestaure.nomPatient || 'un patient'} restauré (${nbFiches} fiche${nbFiches > 1 ? 's' : ''}) — fermé sans suspendre ni archiver la dernière fois`, "info");
+    }
+  }, []);
 
   useEffect(() => { localStorage.setItem('chf-dernier-onglet', onglet); }, [onglet]);
 
@@ -161,7 +186,8 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
       const brouillon = {
         dossierActif, nomPatient, selectedOng, typePatient, numDossierPatient, dateNaissance, telephone, fichesDossier, modePreValidation,
         lignesCalcul, dateEntree1, dateSortie1, typeLit1, multiPeriode, dateEntree2, dateSortie2, typeLit2,
-        hasChirSpec, nomChirSpec, prixChirSpec, idFicheEnCoursDEdition, dossierId, paiementEffectue
+        hasChirSpec, nomChirSpec, prixChirSpec, idFicheEnCoursDEdition, dossierId, paiementEffectue,
+        timestamp: Date.now()
       };
       localStorage.setItem(LOG_DOSSIER_BROUILLON_KEY, JSON.stringify(brouillon));
     }
