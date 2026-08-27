@@ -5727,7 +5727,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
     "app/AppHospitaliere.js"(exports, module) {
       var React = window.React;
       var ReactDOM = window.ReactDOM;
-      var { useState, useEffect, useMemo } = React;
+      var { useState, useEffect, useMemo, useRef } = React;
       var { chf, toEpisodeApi, fromEpisodeApi, generateLocalId, fromPaiementApi } = require_supabase();
       var { firebase: firebase2, auth, db, LOG_TARGETS_KEY, LOG_DOSSIER_BROUILLON_KEY, enregistrerAudit } = require_firebase();
       var { CONFIG_LITS, CATEGORIES_LISTE, LISTE_ONG } = require_constants();
@@ -5820,6 +5820,16 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           }, 4e3);
         };
         const removeToast = (id) => setToasts((prev) => prev.filter((t) => t.id !== id));
+        const actionsEnCoursRef = useRef({});
+        const executerUneSeuleFois = async (cle, fn) => {
+          if (actionsEnCoursRef.current[cle]) return;
+          actionsEnCoursRef.current[cle] = true;
+          try {
+            await fn();
+          } finally {
+            actionsEnCoursRef.current[cle] = false;
+          }
+        };
         useEffect(() => {
           if (roleParDefaut) {
             showToast("\u26A0\uFE0F Ton r\xF4le habituel n'a pas pu \xEAtre retrouv\xE9 \u2014 connect\xE9 en Auditeur (lecture seule) par d\xE9faut. Si ce n'est pas normal, pr\xE9viens un administrateur.", "error");
@@ -6036,7 +6046,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
             showToast("Fiche enregistr\xE9e", "success");
           }
         };
-        const initialiserNouveauDossier = async (nom, ong, numDossier, type, naissance, tel, serviceChoisi) => {
+        const initialiserNouveauDossier = async (nom, ong, numDossier, type, naissance, tel, serviceChoisi) => executerUneSeuleFois("ouvrirDossier", async () => {
           setOrigineLotEdition(null);
           const propreNom = formaterNomPropre(nom);
           if (!propreNom || !ong && type === "ONG") {
@@ -6088,7 +6098,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           viderLeCalculateurFicheUniquement();
           if (idFinal === localId) return;
           showToast(`Dossier de ${propreNom} ouvert`, "success");
-        };
+        });
         const chargerDossierExistant = (patientDoc, origineLot) => {
           setOrigineLotEdition(origineLot || null);
           setDossierId(patientDoc.id);
@@ -6153,7 +6163,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
             setModePreValidation(true);
           });
         };
-        const executerArchivage = async () => {
+        const executerArchivage = async () => executerUneSeuleFois("archiverDossier", async () => {
           var _a;
           const somme = fichesDossier.reduce((s, f) => s + f.totalGlobal, 0);
           const verrouilleFactureExistante = ((_a = verifications.find((v) => v.id === dossierId)) == null ? void 0 : _a.verrouilleFacture) || false;
@@ -6233,7 +6243,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
             }
             showToast("\u{1F4F4} Dossier archiv\xE9 hors ligne \u2014 sera synchronis\xE9 au retour d'internet", "info");
           }
-        };
+        });
         const verifierConflit = async () => {
           if (!dossierId || !dossierUpdatedAtOuverture) return false;
           try {
@@ -6274,7 +6284,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
           }
           demanderConfirmation();
         };
-        const executerSuspension = async (fichesAUtiliser, note) => {
+        const executerSuspension = async (fichesAUtiliser, note) => executerUneSeuleFois("suspendreDossier", async () => {
           const listeFiches = fichesAUtiliser || fichesDossier;
           const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
           const datesTrouvees = [];
@@ -6332,7 +6342,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
           viderLeCalculateurFicheUniquement();
           setDossierId(null);
           localStorage.removeItem(LOG_DOSSIER_BROUILLON_KEY);
-        };
+        });
         const suspendreDossier = async () => {
           if (!dossierId) {
             showToast("Aucun dossier actif.", "error");
@@ -6373,7 +6383,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             })();
           });
         };
-        const executerReport = async (fichesAUtiliser) => {
+        const executerReport = async (fichesAUtiliser) => executerUneSeuleFois("reporterDossier", async () => {
           const listeFiches = fichesAUtiliser || fichesDossier;
           const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
           const datesTrouvees = [];
@@ -6433,7 +6443,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
           viderLeCalculateurFicheUniquement();
           setDossierId(null);
           localStorage.removeItem(LOG_DOSSIER_BROUILLON_KEY);
-        };
+        });
         const reporterDossierAuMoisSuivant = async () => {
           if (!dossierId) {
             showToast("Aucun dossier actif.", "error");

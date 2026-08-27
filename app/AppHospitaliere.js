@@ -1,7 +1,7 @@
 // app/AppHospitaliere.js
 const React = window.React;
 const ReactDOM = window.ReactDOM;
-const { useState, useEffect, useMemo } = React;
+const { useState, useEffect, useMemo, useRef } = React;
 
 const { chf, toEpisodeApi, fromEpisodeApi, generateLocalId, fromPaiementApi } = require('../api/supabase');
 const { firebase, auth, db, LOG_TARGETS_KEY, LOG_DOSSIER_BROUILLON_KEY, enregistrerAudit } = require('../api/firebase');
@@ -101,6 +101,20 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
     setTimeout(() => { setToasts(prev => prev.filter(t => t.id !== id)); }, 4000);
   };
   const removeToast = (id) => setToasts(prev => prev.filter(t => t.id !== id));
+
+  // Protection anti-double-clic : ouvrir/clôturer/archiver/suspendre un dossier envoient une requête
+  // au serveur (création ou mise à jour). Un ref (pas un state) est nécessaire pour bloquer dès le
+  // TOUT premier appel, sans attendre un nouveau rendu -- sinon deux clics très rapprochés passent
+  // tous les deux avant que l'état "en cours" n'ait le temps de se propager. La 2e tentative est
+  // simplement ignorée, sans message d'erreur (elle ne correspond à aucune intention réelle de
+  // l'utilisateur).
+  const actionsEnCoursRef = useRef({});
+  const executerUneSeuleFois = async (cle, fn) => {
+    if (actionsEnCoursRef.current[cle]) return;
+    actionsEnCoursRef.current[cle] = true;
+    try { await fn(); }
+    finally { actionsEnCoursRef.current[cle] = false; }
+  };
 
   useEffect(() => {
     if (roleParDefaut) {
@@ -298,7 +312,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
     }
   };
 
-  const initialiserNouveauDossier = async (nom, ong, numDossier, type, naissance, tel, serviceChoisi) => {
+  const initialiserNouveauDossier = async (nom, ong, numDossier, type, naissance, tel, serviceChoisi) => executerUneSeuleFois('ouvrirDossier', async () => {
     setOrigineLotEdition(null);
     const propreNom = formaterNomPropre(nom);
     if (!propreNom || (!ong && type === "ONG")) { showToast("Veuillez remplir tous les champs.", "error"); return; }
@@ -335,7 +349,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
     viderLeCalculateurFicheUniquement();
     if (idFinal === localId) return;
     showToast(`Dossier de ${propreNom} ouvert`, "success");
-  };
+  });
 
   const chargerDossierExistant = (patientDoc, origineLot) => {
     setOrigineLotEdition(origineLot || null);
@@ -403,7 +417,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
     });
   };
 
-  const executerArchivage = async () => {
+  const executerArchivage = async () => executerUneSeuleFois('archiverDossier', async () => {
     const somme = fichesDossier.reduce((s, f) => s + f.totalGlobal, 0);
     // Corriger un dossier déjà verrouillé (facturé/inclus dans un lot envoyé) ne doit pas le déverrouiller
     // silencieusement — sinon son 🔒 disparaît et le bouton Supprimer se réactive dans Archives.
@@ -447,7 +461,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
       if (origineLotEdition) { setOnglet("verifie"); setLotAFocuserAuRetour(origineLotEdition); setOrigineLotEdition(null); }
       showToast("📴 Dossier archivé hors ligne — sera synchronisé au retour d'internet", "info");
     }
-  };
+  });
 
   const verifierConflit = async () => {
     if (!dossierId || !dossierUpdatedAtOuverture) return false;
@@ -484,7 +498,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
   };
 
   // --- CORRECTION DE LA SUSPENSION : sauvegarde les fiches ---
-  const executerSuspension = async (fichesAUtiliser, note) => {
+  const executerSuspension = async (fichesAUtiliser, note) => executerUneSeuleFois('suspendreDossier', async () => {
     const listeFiches = fichesAUtiliser || fichesDossier;
     const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
     const datesTrouvees = [];
@@ -547,7 +561,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
     viderLeCalculateurFicheUniquement();
     setDossierId(null);
     localStorage.removeItem(LOG_DOSSIER_BROUILLON_KEY);
-  };
+  });
 
   const suspendreDossier = async () => {
     if (!dossierId) { showToast("Aucun dossier actif.", "error"); return; }
@@ -582,7 +596,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
   // --- REPORT AU MOIS SUIVANT : pour un dossier non complet en fin de mois. Garde les fiches
   // déjà saisies (comme la suspension) mais marque le dossier avec le mois cible, pour qu'il soit
   // exclu du rapport Excel du mois en cours et facilement retrouvable pour le mois suivant.
-  const executerReport = async (fichesAUtiliser) => {
+  const executerReport = async (fichesAUtiliser) => executerUneSeuleFois('reporterDossier', async () => {
     const listeFiches = fichesAUtiliser || fichesDossier;
     const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
     const datesTrouvees = [];
@@ -641,7 +655,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
     viderLeCalculateurFicheUniquement();
     setDossierId(null);
     localStorage.removeItem(LOG_DOSSIER_BROUILLON_KEY);
-  };
+  });
 
   const reporterDossierAuMoisSuivant = async () => {
     if (!dossierId) { showToast("Aucun dossier actif.", "error"); return; }
