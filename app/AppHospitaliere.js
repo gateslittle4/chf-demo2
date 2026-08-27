@@ -254,10 +254,22 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
     if (!silencieux) showToast(`Édition de la fiche N°${fiche.numeroFiche}`, "info");
   };
 
+  // Pousse IMMÉDIATEMENT le dossier actif (ses fiches + le total) au serveur à chaque ajout/
+  // modification/suppression de fiche -- pas seulement à l'archivage/la suspension -- pour que rien
+  // ne soit perdu même en changeant d'appareil ou si le brouillon local expire. Échec silencieux si
+  // hors ligne : la file d'attente + le brouillon local prennent déjà le relais dans ce cas.
+  const synchroniserDossierActif = async (fichesMaJour) => {
+    if (!dossierId) return;
+    const somme = fichesMaJour.reduce((s, f) => s + f.totalGlobal, 0);
+    try { await chf.updateEpisode(dossierId, toEpisodeApi({ fiches: fichesMaJour, totalGlobal: somme })); }
+    catch (e) { /* hors ligne : brouillon local + file d'attente prennent déjà le relais */ }
+  };
+
   // --- NOUVEAU : Enregistrer une fiche modifiée (remplace l'ancienne) ---
   const enregistrerFicheModifiee = (nouvelleFiche) => {
     const fichesMisesAJour = fichesDossier.map(f => f.id === nouvelleFiche.id ? nouvelleFiche : f);
     setFichesDossier(fichesMisesAJour);
+    synchroniserDossierActif(fichesMisesAJour);
     // S'il y a une fiche suivante (par numéro) dans ce dossier, basculer directement dessus
     const triees = [...fichesMisesAJour].sort((a, b) => a.numeroFiche - b.numeroFiche);
     const idx = triees.findIndex(f => f.id === nouvelleFiche.id);
@@ -278,7 +290,9 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
       enregistrerFicheModifiee({ ...fiche, id: idFicheEnCoursDEdition });
     } else {
       // Sinon on l'ajoute
-      setFichesDossier(prev => [...prev, fiche]);
+      const fichesMisesAJour = [...fichesDossier, fiche];
+      setFichesDossier(fichesMisesAJour);
+      synchroniserDossierActif(fichesMisesAJour);
       viderLeCalculateurFicheUniquement();
       showToast("Fiche enregistrée", "success");
     }
@@ -827,7 +841,9 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
   const supprimerFicheDossier = (idF) => {
     if (confirm("Supprimer cette fiche ?")) {
       const fiche = fichesDossier.find(f => f.id === idF);
-      setFichesDossier(prev => prev.filter(f => f.id !== idF));
+      const fichesMisesAJour = fichesDossier.filter(f => f.id !== idF);
+      setFichesDossier(fichesMisesAJour);
+      synchroniserDossierActif(fichesMisesAJour);
       if (fiche) restituerStock([fiche]);
       showToast("Fiche supprimée — stock remis à jour", "success");
     }
@@ -837,13 +853,17 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
     const fiche = fichesDossier.find(f => f.id === idF);
     if (!fiche) return;
     if (fiche.probleme) {
-      setFichesDossier(prev => prev.map(f => f.id === idF ? { ...f, probleme: false, noteProbleme: '' } : f));
+      const fichesMisesAJour = fichesDossier.map(f => f.id === idF ? { ...f, probleme: false, noteProbleme: '' } : f);
+      setFichesDossier(fichesMisesAJour);
+      synchroniserDossierActif(fichesMisesAJour);
       showToast("Marquage retiré", "success");
       return;
     }
     const saisie = window.prompt(`Quel est le problème avec la Fiche N°${fiche.numeroFiche} ?`, "");
     if (saisie === null) return; // annulé — on ne marque rien
-    setFichesDossier(prev => prev.map(f => f.id === idF ? { ...f, probleme: true, noteProbleme: saisie.trim() } : f));
+    const fichesMisesAJour = fichesDossier.map(f => f.id === idF ? { ...f, probleme: true, noteProbleme: saisie.trim() } : f);
+    setFichesDossier(fichesMisesAJour);
+    synchroniserDossierActif(fichesMisesAJour);
     showToast("Fiche marquée à vérifier", "success");
   };
 

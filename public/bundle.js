@@ -6002,9 +6002,18 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           setPaiementEffectue(false);
           if (!silencieux) showToast(`\xC9dition de la fiche N\xB0${fiche.numeroFiche}`, "info");
         };
+        const synchroniserDossierActif = async (fichesMaJour) => {
+          if (!dossierId) return;
+          const somme = fichesMaJour.reduce((s, f) => s + f.totalGlobal, 0);
+          try {
+            await chf.updateEpisode(dossierId, toEpisodeApi({ fiches: fichesMaJour, totalGlobal: somme }));
+          } catch (e) {
+          }
+        };
         const enregistrerFicheModifiee = (nouvelleFiche) => {
           const fichesMisesAJour = fichesDossier.map((f) => f.id === nouvelleFiche.id ? nouvelleFiche : f);
           setFichesDossier(fichesMisesAJour);
+          synchroniserDossierActif(fichesMisesAJour);
           const triees = [...fichesMisesAJour].sort((a, b) => a.numeroFiche - b.numeroFiche);
           const idx = triees.findIndex((f) => f.id === nouvelleFiche.id);
           const suivante = idx !== -1 ? triees[idx + 1] : null;
@@ -6020,7 +6029,9 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           if (idFicheEnCoursDEdition) {
             enregistrerFicheModifiee({ ...fiche, id: idFicheEnCoursDEdition });
           } else {
-            setFichesDossier((prev) => [...prev, fiche]);
+            const fichesMisesAJour = [...fichesDossier, fiche];
+            setFichesDossier(fichesMisesAJour);
+            synchroniserDossierActif(fichesMisesAJour);
             viderLeCalculateurFicheUniquement();
             showToast("Fiche enregistr\xE9e", "success");
           }
@@ -6691,7 +6702,9 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
         const supprimerFicheDossier = (idF) => {
           if (confirm("Supprimer cette fiche ?")) {
             const fiche = fichesDossier.find((f) => f.id === idF);
-            setFichesDossier((prev) => prev.filter((f) => f.id !== idF));
+            const fichesMisesAJour = fichesDossier.filter((f) => f.id !== idF);
+            setFichesDossier(fichesMisesAJour);
+            synchroniserDossierActif(fichesMisesAJour);
             if (fiche) restituerStock([fiche]);
             showToast("Fiche supprim\xE9e \u2014 stock remis \xE0 jour", "success");
           }
@@ -6700,13 +6713,17 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
           const fiche = fichesDossier.find((f) => f.id === idF);
           if (!fiche) return;
           if (fiche.probleme) {
-            setFichesDossier((prev) => prev.map((f) => f.id === idF ? { ...f, probleme: false, noteProbleme: "" } : f));
+            const fichesMisesAJour2 = fichesDossier.map((f) => f.id === idF ? { ...f, probleme: false, noteProbleme: "" } : f);
+            setFichesDossier(fichesMisesAJour2);
+            synchroniserDossierActif(fichesMisesAJour2);
             showToast("Marquage retir\xE9", "success");
             return;
           }
           const saisie = window.prompt(`Quel est le probl\xE8me avec la Fiche N\xB0${fiche.numeroFiche} ?`, "");
           if (saisie === null) return;
-          setFichesDossier((prev) => prev.map((f) => f.id === idF ? { ...f, probleme: true, noteProbleme: saisie.trim() } : f));
+          const fichesMisesAJour = fichesDossier.map((f) => f.id === idF ? { ...f, probleme: true, noteProbleme: saisie.trim() } : f);
+          setFichesDossier(fichesMisesAJour);
+          synchroniserDossierActif(fichesMisesAJour);
           showToast("Fiche marqu\xE9e \xE0 v\xE9rifier", "success");
         };
         const changerTypeOngPourDossier = async (idCible, nouveauType, nouvelOng) => {
