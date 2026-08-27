@@ -1003,7 +1003,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
       )}
 
       {dossierActif && !modePreValidation && (
-        <div className="fixed top-28 right-4 z-40 bg-[#1E2A24] text-white px-4 py-2 rounded-xl shadow-2xl border border-emerald-500/30 flex flex-col items-end">
+        <div className="fixed top-20 right-4 z-40 bg-[#1E2A24] text-white px-4 py-2 rounded-xl shadow-2xl border border-emerald-500/30 flex flex-col items-end">
           <span className="text-[9px] uppercase tracking-wider text-[#9FB8A8] font-bold">Dossier {nomPatient}</span>
           <span className="text-sm font-mono font-black">{formatGourdes(totalDossierGourdes + grandTotalGlobalFiche)} Gdes</span>
           <span className="text-[10px] font-mono text-emerald-400">{formatDH(totalDossierGourdes + grandTotalGlobalFiche)} DH</span>
