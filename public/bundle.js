@@ -6859,7 +6859,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
           return () => window.removeEventListener("beforeunload", warningQuitter);
         }, [dossierActif]);
         useEffect(() => {
-          const LIMITE_INACTIVITE_MS = 60 * 60 * 1e3;
+          const LIMITE_INACTIVITE_MS = 3 * 60 * 60 * 1e3;
           const DELAI_AVERTISSEMENT_MS = 2 * 60 * 1e3;
           let minuteurAvertissement, minuteurDeconnexion;
           const reinitialiserMinuteur = () => {
@@ -6870,7 +6870,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
               setAvertissementInactivite(true);
             }, LIMITE_INACTIVITE_MS - DELAI_AVERTISSEMENT_MS);
             minuteurDeconnexion = setTimeout(() => {
-              showToast("\u{1F512} D\xE9connexion automatique apr\xE8s 1 heure d'inactivit\xE9", "info");
+              showToast("\u{1F512} D\xE9connexion automatique apr\xE8s 3 heures d'inactivit\xE9", "info");
               onQuitter();
             }, LIMITE_INACTIVITE_MS);
           };
