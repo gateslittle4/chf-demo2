@@ -25,8 +25,14 @@ const MARGE_FICHES_AUTOUR_EXEAT = 3;
 const normaliserTexte = (t) => (t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
 const estMedicamentSortie = (nomLigne) => { const n = normaliserTexte(nomLigne); return MEDICAMENTS_SORTIE_MOTSCLES.some(mc => n.includes(mc)); };
 
-// Distance de Levenshtein (nombre minimal de lettres \u00e0 ajouter/retirer/changer pour passer de a \u00e0 b)
-// -- utilis\u00e9e pour la recherche approximative de patient dans un lot (tol\u00e8re une faute de frappe).
+// Oxytocine (Syntocinon...) est typiquement administrée pour déclencher/accélérer un accouchement --
+// si elle est facturée mais qu'aucun accouchement ni césarienne n'apparaît sur le dossier, l'acte a
+// probablement été oublié dans la fiche : signale pour aller vérifier le dossier.
+const estOxytocine = (nomLigne) => normaliserTexte(nomLigne).includes('oxytocin');
+const dossierAOxytocine = (dossier) => (dossier.fiches || []).some(f => (f.rawState?.lignesCalcul || []).some(l => l.type === 'med' && estOxytocine(l.nom)));
+
+// Distance de Levenshtein (nombre minimal de lettres à ajouter/retirer/changer pour passer de a à b)
+// -- utilisée pour la recherche approximative de patient dans un lot (tolère une faute de frappe).
 const distanceLevenshtein = (a, b) => {
   const m = a.length, n = b.length;
   if (m === 0) return n;
@@ -41,10 +47,10 @@ const distanceLevenshtein = (a, b) => {
   }
   return dp[m][n];
 };
-// Recherche de patient dans un lot : match direct (sous-cha\u00eene, insensible accents/casse) en
-// priorit\u00e9, sinon tol\u00e8re une orthographe approch\u00e9e (faute de frappe, lettre en trop/en moins) --
-// compar\u00e9 \u00e0 la fois au nom complet et \u00e0 chaque "mot" du nom, avec une marge d'erreur proportionnelle
-// \u00e0 la longueur de la recherche.
+// Recherche de patient dans un lot : match direct (sous-chaîne, insensible accents/casse) en
+// priorité, sinon tolère une orthographe approchée (faute de frappe, lettre en trop/en moins) --
+// comparé à la fois au nom complet et à chaque "mot" du nom, avec une marge d'erreur proportionnelle
+// à la longueur de la recherche.
 const nomCorrespondApproximativement = (nomDossier, recherche) => {
   const cible = normaliserTexte(recherche);
   if (!cible) return true;
@@ -73,7 +79,7 @@ const medicamentsSortieManquants = (dossier) => {
 // la mere peut avoir ete facturee dans un autre lot ou un autre mois. Le rapprochement mere/bebe
 // compare les noms normalises (normaliserTexte : insensible aux accents/majuscules/espaces), pour
 // ne pas rater un lien a cause d'une orthographe legerement differente entre les deux dossiers.
-// Calcule aussi 6 alertes de controle qualite par dossier (affichees a l'ecran seulement, jamais
+// Calcule aussi 7 alertes de controle qualite par dossier (affichees a l'ecran seulement, jamais
 // dans l'export Excel envoye aux partenaires, qui reste tel que tape) :
 //  - estBebeSansMere : bebe dont la mere n'est trouvee nulle part dans l'archive (fiche d'urgence a envisager)
 //  - orthographeIncoherente : mere trouvee, mais le nom tape dans "Bb <nom>" differe (accents/espaces)
@@ -84,6 +90,7 @@ const medicamentsSortieManquants = (dossier) => {
 //    dont la mere est trouvee (ils sont rattaches a l'admission de leur mere)
 //  - medicamentsSortieManquants : sejour sans medicaments de sortie dans la fiche ou les 3 fiches
 //    avant/apres
+//  - oxytocineSansAccouchement : oxytocine facturee mais aucun accouchement/cesarienne sur le dossier
 const extraireNomMerePortion = (nom) => { const m = (nom || '').trim().match(/^(?:bb|beb[ée])\.?\s+(.+)$/i); return m ? m[1].trim() : null; };
 const estUnBebe = (nom) => extraireNomMerePortion(nom) !== null;
 const cleFamilleDossier = (nom) => normaliserTexte(extraireNomMerePortion(nom) || nom);
@@ -121,7 +128,8 @@ const trierAvecRegroupementMereBebe = (dossiersDuLot, tousLesDossiers) => {
       cesarienneSansSono: ((cumul.cesarienne || 0) > 0 || (cumul.accouchement || 0) > 0) && !((cumul.sono || 0) > 0),
       sansExeat: !(v.fiches || []).some(f => f.exeat),
       sansAdmission: !estBebeAvecMere && !((cumul.service || 0) > 0),
-      medicamentsSortieManquants: medicamentsSortieManquants(v)
+      medicamentsSortieManquants: medicamentsSortieManquants(v),
+      oxytocineSansAccouchement: dossierAOxytocine(v) && !((cumul.accouchement || 0) > 0) && !((cumul.cesarienne || 0) > 0)
     };
   });
 };
@@ -905,6 +913,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                       {v.cesarienneSansSono && <span title="Césarienne ou accouchement facturé, mais aucune sonographie sur ce dossier — vérifie si elle a été oubliée" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">⚠️ Sono manquante</span>}
                       {v.sansAdmission && <span title="Aucune Admission / Consultation facturée sur ce dossier — vérifie si elle a été oubliée" className="bg-orange-100 text-orange-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">⚠️ Admission manquante</span>}
                       {v.medicamentsSortieManquants && <span title="Séjour sans au moins 2 médicaments de sortie (Ferfolat, Globugen, Tothema, Amox..., Vit C, Paracétamol) dans la fiche du séjour ou une fiche adjacente — vérifie si les médicaments de sortie ont été oubliés" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">💊 Médicaments sortie manquants</span>}
+                      {v.oxytocineSansAccouchement && <span title="Oxytocine facturée mais aucun accouchement ni césarienne sur ce dossier — vérifie si l'accouchement/la césarienne a été oublié(e) dans la fiche" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">💊 Oxytocine sans accouchement</span>}
                       <span className="text-gray-400">— {formatGourdes(v.totalGlobal||0)} Gdes <span className="text-indigo-400">({formatDH(v.totalGlobal||0)} DH)</span></span>
                       <div className="flex flex-wrap gap-1 mt-1 pl-2 sm:pl-40">
                         {ventilationDossier(v).map(x => (
