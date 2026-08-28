@@ -10,6 +10,15 @@ function generateLocalId() {
 class CHF_API {
   constructor() {
     this.pendingQueue = JSON.parse(localStorage.getItem('pending_ops') || '[]');
+    // Correspondance ID local (créé hors ligne) -> vrai ID serveur, apprise au fur et à mesure que
+    // les créations en attente se synchronisent. Indispensable pour rejouer correctement les
+    // opérations suivantes sur ce même dossier (fiches ajoutées, archivage...) faites hors ligne
+    // AVANT que sa création n'ait pu être confirmée par le serveur : sans ça, ces opérations
+    // ciblent encore l'ID local une fois rejouées, qui ne correspond à aucune ligne côté serveur --
+    // et comme `episodes.id` est une colonne texte (pas un UUID strict), Supabase répond alors 200
+    // avec un résultat vide plutôt qu'une erreur : l'opération est silencieusement ignorée (rien
+    // n'est mis à jour) au lieu d'échouer et de se remettre en file.
+    this.localIdMap = JSON.parse(localStorage.getItem('local_id_map') || '{}');
     this.isOnline = navigator.onLine;
     window.addEventListener('online', () => { this.isOnline = true; this.syncPending(); });
     window.addEventListener('offline', () => { this.isOnline = false; });
@@ -89,9 +98,24 @@ class CHF_API {
     const queue = [...this.pendingQueue];
     this.pendingQueue = [];
     for (const op of queue) {
+      // Si cette opération vise encore un ID local déjà résolu (sa création a synchronisé plus tôt
+      // dans cette même file, ou lors d'un passage précédent), on la rejoue vers le vrai ID serveur.
+      let endpoint = op.endpoint;
+      for (const [localId, realId] of Object.entries(this.localIdMap)) {
+        if (endpoint.includes(localId)) { endpoint = endpoint.replace(localId, realId); break; }
+      }
+      // L'ID local référencé n'a encore aucune correspondance connue -- sa création est probablement
+      // toujours dans cette même file, pas encore synchronisée. On n'envoie SURTOUT PAS cette mise à
+      // jour telle quelle : `episodes.id` est une colonne texte (pas un UUID strict), donc Supabase
+      // répondrait 200 avec un résultat vide au lieu d'une erreur, et l'opération serait retirée de
+      // la file sans avoir rien appliqué (perte silencieuse). On la remet plutôt en attente pour le
+      // prochain passage, une fois que sa création aura eu la chance d'aboutir avant elle.
+      if (endpoint.includes('/local-')) { this.pendingQueue.push(op); continue; }
       try {
-        const result = await this.request(op.endpoint, op.method, op.data);
+        const result = await this.request(endpoint, op.method, op.data);
         if (op.localId && result && result.id) {
+          this.localIdMap[op.localId] = result.id;
+          localStorage.setItem('local_id_map', JSON.stringify(this.localIdMap));
           // Prévient l'app qu'un ID temporaire local a maintenant un vrai ID serveur
           window.dispatchEvent(new CustomEvent('chf:synced', { detail: { localId: op.localId, realId: result.id, endpoint: op.endpoint } }));
         }

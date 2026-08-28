@@ -62,6 +62,7 @@
       var CHF_API = class {
         constructor() {
           this.pendingQueue = JSON.parse(localStorage.getItem("pending_ops") || "[]");
+          this.localIdMap = JSON.parse(localStorage.getItem("local_id_map") || "{}");
           this.isOnline = navigator.onLine;
           window.addEventListener("online", () => {
             this.isOnline = true;
@@ -131,9 +132,22 @@
           const queue = [...this.pendingQueue];
           this.pendingQueue = [];
           for (const op of queue) {
+            let endpoint = op.endpoint;
+            for (const [localId, realId] of Object.entries(this.localIdMap)) {
+              if (endpoint.includes(localId)) {
+                endpoint = endpoint.replace(localId, realId);
+                break;
+              }
+            }
+            if (endpoint.includes("/local-")) {
+              this.pendingQueue.push(op);
+              continue;
+            }
             try {
-              const result = await this.request(op.endpoint, op.method, op.data);
+              const result = await this.request(endpoint, op.method, op.data);
               if (op.localId && result && result.id) {
+                this.localIdMap[op.localId] = result.id;
+                localStorage.setItem("local_id_map", JSON.stringify(this.localIdMap));
                 window.dispatchEvent(new CustomEvent("chf:synced", { detail: { localId: op.localId, realId: result.id, endpoint: op.endpoint } }));
               }
             } catch (e) {
