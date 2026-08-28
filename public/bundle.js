@@ -139,12 +139,25 @@
                 break;
               }
             }
-            if (endpoint.includes("/local-")) {
+            let data = op.data;
+            if (data && typeof data === "object") {
+              let modifie = false;
+              const reecrit = {};
+              for (const [k, v] of Object.entries(data)) {
+                const vr = typeof v === "string" && this.localIdMap[v] ? this.localIdMap[v] : v;
+                reecrit[k] = vr;
+                if (vr !== v) modifie = true;
+              }
+              if (modifie) data = reecrit;
+            }
+            const referenceIdLocalNonResolu = (s) => typeof s === "string" && s.includes("local-") && !Object.keys(this.localIdMap).some((l) => s.includes(l));
+            const bloque = referenceIdLocalNonResolu(endpoint) || data && typeof data === "object" && Object.values(data).some(referenceIdLocalNonResolu);
+            if (bloque) {
               this.pendingQueue.push(op);
               continue;
             }
             try {
-              const result = await this.request(endpoint, op.method, op.data);
+              const result = await this.request(endpoint, op.method, data);
               if (op.localId && result && result.id) {
                 this.localIdMap[op.localId] = result.id;
                 localStorage.setItem("local_id_map", JSON.stringify(this.localIdMap));

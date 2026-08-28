@@ -98,21 +98,38 @@ class CHF_API {
     const queue = [...this.pendingQueue];
     this.pendingQueue = [];
     for (const op of queue) {
-      // Si cette opération vise encore un ID local déjà résolu (sa création a synchronisé plus tôt
-      // dans cette même file, ou lors d'un passage précédent), on la rejoue vers le vrai ID serveur.
+      // Si cette opération vise ou contient encore un ID local déjà résolu (sa création a
+      // synchronisé plus tôt dans cette même file, ou lors d'un passage précédent), on la réécrit
+      // vers le vrai ID serveur -- que ce soit dans l'URL (mise à jour d'un dossier créé hors ligne)
+      // OU dans les données envoyées (ex. le episode_id d'un paiement/dépôt lié à ce même dossier).
       let endpoint = op.endpoint;
       for (const [localId, realId] of Object.entries(this.localIdMap)) {
         if (endpoint.includes(localId)) { endpoint = endpoint.replace(localId, realId); break; }
       }
-      // L'ID local référencé n'a encore aucune correspondance connue -- sa création est probablement
-      // toujours dans cette même file, pas encore synchronisée. On n'envoie SURTOUT PAS cette mise à
-      // jour telle quelle : `episodes.id` est une colonne texte (pas un UUID strict), donc Supabase
-      // répondrait 200 avec un résultat vide au lieu d'une erreur, et l'opération serait retirée de
-      // la file sans avoir rien appliqué (perte silencieuse). On la remet plutôt en attente pour le
-      // prochain passage, une fois que sa création aura eu la chance d'aboutir avant elle.
-      if (endpoint.includes('/local-')) { this.pendingQueue.push(op); continue; }
+      let data = op.data;
+      if (data && typeof data === 'object') {
+        let modifie = false;
+        const reecrit = {};
+        for (const [k, v] of Object.entries(data)) {
+          const vr = (typeof v === 'string' && this.localIdMap[v]) ? this.localIdMap[v] : v;
+          reecrit[k] = vr;
+          if (vr !== v) modifie = true;
+        }
+        if (modifie) data = reecrit;
+      }
+      // Si l'URL ou une valeur des données référence encore un ID local SANS correspondance connue,
+      // sa création est probablement toujours dans cette même file, pas encore synchronisée. On
+      // n'envoie SURTOUT PAS cette opération telle quelle : les colonnes id sont du texte (pas un
+      // UUID strict), donc le serveur répondrait quand même avec succès (200, éventuellement un
+      // résultat vide pour une mise à jour) au lieu d'une erreur -- l'opération serait alors retirée
+      // de la file sans avoir rien appliqué, ou pire, insérée avec une référence orpheline
+      // définitive (ex. un paiement pointant vers un episode_id qui n'existera jamais). On la remet
+      // plutôt en attente pour le prochain passage.
+      const referenceIdLocalNonResolu = (s) => typeof s === 'string' && s.includes('local-') && !Object.keys(this.localIdMap).some(l => s.includes(l));
+      const bloque = referenceIdLocalNonResolu(endpoint) || (data && typeof data === 'object' && Object.values(data).some(referenceIdLocalNonResolu));
+      if (bloque) { this.pendingQueue.push(op); continue; }
       try {
-        const result = await this.request(endpoint, op.method, op.data);
+        const result = await this.request(endpoint, op.method, data);
         if (op.localId && result && result.id) {
           this.localIdMap[op.localId] = result.id;
           localStorage.setItem('local_id_map', JSON.stringify(this.localIdMap));
