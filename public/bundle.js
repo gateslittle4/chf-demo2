@@ -216,7 +216,8 @@
           updatedAt: "updated_at",
           serviceChoisi: "service_choisi",
           numeroLot: "numero_lot",
-          moisReport: "mois_report"
+          moisReport: "mois_report",
+          moisLot: "mois_lot"
         };
         const result = {};
         for (const [k, v] of Object.entries(data)) result[map[k] || k] = v;
@@ -242,7 +243,8 @@
           updated_at: "updatedAt",
           service_choisi: "serviceChoisi",
           numero_lot: "numeroLot",
-          mois_report: "moisReport"
+          mois_report: "moisReport",
+          mois_lot: "moisLot"
         };
         const result = {};
         for (const [k, v] of Object.entries(data)) result[map[k] || k] = v;
@@ -2871,8 +2873,8 @@
         };
         const estAujourdhui = (date) => {
           if (!date || isNaN(date)) return false;
-          const now = /* @__PURE__ */ new Date();
-          return date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+          const now2 = /* @__PURE__ */ new Date();
+          return date.getDate() === now2.getDate() && date.getMonth() === now2.getMonth() && date.getFullYear() === now2.getFullYear();
         };
         const calculerStats = (dossiers, transactions) => {
           const mois = (/* @__PURE__ */ new Date()).getMonth();
@@ -3056,6 +3058,13 @@
       var { LOGO_CHF_BASE64 } = require_logoChf();
       var NOM_COMPLET_ONG = { "MSF-H": "MSF-HOLLANDE", "MSF-F": "MSF-FRANCE" };
       var nomCompletOng = (nom) => NOM_COMPLET_ONG[nom] || nom;
+      var RABAIS_CONTRACTUEL_PAR_ONG = { "MSF-F": 10 };
+      var formaterMoisFr = (moisLot) => {
+        if (!moisLot) return "";
+        const [annee, mois] = moisLot.split("-");
+        const nom = new Date(Number(annee), Number(mois) - 1, 1).toLocaleString("fr-FR", { month: "long" });
+        return `${nom.charAt(0).toUpperCase()}${nom.slice(1)} ${annee}`;
+      };
       var cumulCategoriesDossier = (v) => {
         const totaux = {};
         (v.fiches || []).forEach((f) => {
@@ -3224,6 +3233,12 @@
         const [filtreStatut, setFiltreStatut] = useState("");
         const [appliqueRabais10, setAppliqueRabais10] = useState(false);
         const [montantDonIntrants, setMontantDonIntrants] = useState("");
+        const [moisLotChoisi, setMoisLotChoisi] = useState(() => {
+          const d = /* @__PURE__ */ new Date();
+          d.setDate(1);
+          d.setMonth(d.getMonth() - 1);
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        });
         const [sousOngletArchives, setSousOngletArchives] = useState("dossiers");
         const [lotOngSelectionne, setLotOngSelectionne] = useState("");
         const [lotFocusedNumero, setLotFocusedNumero] = useState(null);
@@ -3245,11 +3260,11 @@
           }
         }, [lotInitialFocus]);
         useEffect(() => {
-          setAppliqueRabais10(false);
+          setAppliqueRabais10(!!RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]);
           setMontantDonIntrants("");
           setRechercheLot("");
           setFiltreCategorieLot("");
-        }, [lotFocusedNumero]);
+        }, [lotFocusedNumero, lotOngSelectionne]);
         useEffect(() => {
           setNombreAffiche(100);
         }, [filtreType, filtreOng, rechercheNomPatient, filtreDateDebut, filtreDateFin, filtreCategorie, filtreStatut]);
@@ -3271,11 +3286,15 @@
               parNumero[v.numeroLot].push(v);
             }
           });
-          return Object.keys(parNumero).map((n) => Number(n)).sort((a, b) => b - a).map((n) => ({
-            numero: n,
-            dossiers: trierAvecRegroupementMereBebe(parNumero[n], verifications),
-            total: parNumero[n].reduce((s, v) => s + (v.totalGlobal || 0), 0)
-          }));
+          return Object.keys(parNumero).map((n) => Number(n)).sort((a, b) => b - a).map((n) => {
+            var _a2;
+            return {
+              numero: n,
+              dossiers: trierAvecRegroupementMereBebe(parNumero[n], verifications),
+              total: parNumero[n].reduce((s, v) => s + (v.totalGlobal || 0), 0),
+              moisLot: ((_a2 = parNumero[n][0]) == null ? void 0 : _a2.moisLot) || null
+            };
+          });
         }, [verifications, lotOngSelectionne]);
         const dossiersEnAttenteDeLot = useMemo(() => {
           if (!lotOngSelectionne) return [];
@@ -3390,7 +3409,8 @@
           nebulisation: "Nebulisation",
           radio: "Radiographie"
         };
-        const genererFichierExcelPourLot = async (ongCible, idsDossiers, numeroLot) => {
+        const genererFichierExcelPourLot = async (ongCible, idsDossiers, numeroLot, moisLot) => {
+          var _a2;
           try {
             let listeDossiersONG = trierAvecRegroupementMereBebe(verifications.filter((v) => idsDossiers.includes(v.id)), verifications);
             if (listeDossiersONG.length === 0) {
@@ -3429,12 +3449,22 @@
             ligneCentree("tel: (509) 3647-0563 / 2226-8900", EXCEL_STYLES.sousTitre);
             ligneCentree("centrehfontaine@gmail.com", EXCEL_STYLES.sousTitre);
             r++;
-            const now = /* @__PURE__ */ new Date();
-            const moisRapport = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-            const moisTexte = moisRapport.toLocaleString("fr-FR", { month: "long" }).toUpperCase();
+            const moisLotFinal = moisLot || ((_a2 = listeDossiersONG[0]) == null ? void 0 : _a2.moisLot) || null;
+            let moisTexte, anneeTexte;
+            if (moisLotFinal) {
+              const [annee, mois] = moisLotFinal.split("-");
+              moisTexte = new Date(Number(annee), Number(mois) - 1, 1).toLocaleString("fr-FR", { month: "long" }).toUpperCase();
+              anneeTexte = annee;
+            } else {
+              const moisRapport = /* @__PURE__ */ new Date();
+              moisRapport.setDate(1);
+              moisRapport.setMonth(moisRapport.getMonth() - 1);
+              moisTexte = moisRapport.toLocaleString("fr-FR", { month: "long" }).toUpperCase();
+              anneeTexte = moisRapport.getFullYear();
+            }
             appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.gras);
             ws.getCell(r, 1).value = "DATE D'ADMISSION :";
-            ws.getCell(r, 2).value = `${moisTexte} ${moisRapport.getFullYear()}`;
+            ws.getCell(r, 2).value = `${moisTexte} ${anneeTexte}`;
             r++;
             appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.gras);
             ws.getCell(r, 1).value = "FACTURE";
@@ -3554,17 +3584,17 @@
             document.body.removeChild(lien);
             setTimeout(() => URL.revokeObjectURL(urlTelechargement), 1e3);
             const idsExportes = listeDossiersONG.map((d) => d.id);
-            setVerifications((prev) => prev.map((v) => idsExportes.includes(v.id) ? { ...v, numeroLot, verrouilleFacture: true } : v));
+            setVerifications((prev) => prev.map((v) => idsExportes.includes(v.id) ? { ...v, numeroLot, moisLot: moisLotFinal, verrouilleFacture: true } : v));
             let echecsVerrou = 0;
             await Promise.all(listeDossiersONG.map(async (d) => {
               try {
-                await chf.updateEpisode(d.id, toEpisodeApi({ numeroLot, verrouilleFacture: true }));
+                await chf.updateEpisode(d.id, toEpisodeApi({ numeroLot, moisLot: moisLotFinal, verrouilleFacture: true }));
               } catch (e) {
                 if (!e.isOfflineQueue) echecsVerrou++;
               }
             }));
             showToast(`\u2705 Lot ${numeroLot} de ${ongCible} : ${listeDossiersONG.length} dossier(s), ${formatGourdes(grandTotalGeneral)} Gdes${echecsVerrou > 0 ? ` \u2014 \u26A0\uFE0F ${echecsVerrou} dossier(s) non enregistr\xE9(s), r\xE9essaie plus tard` : ""}`, "success");
-            setAppliqueRabais10(false);
+            setAppliqueRabais10(!!RABAIS_CONTRACTUEL_PAR_ONG[ongCible]);
             setMontantDonIntrants("");
           } catch (error) {
             console.error("Erreur export Excel:", error);
@@ -3582,11 +3612,11 @@
           const totalEstime = eligibles.reduce((s, v) => s + (v.totalGlobal || 0), 0);
           setConfirmModal({
             titre: `\u{1F4E6} G\xE9n\xE9rer le Lot ${prochainNumero} pour ${ongCible} ?`,
-            message: `${eligibles.length} dossier(s) seront inclus, pour un total d'environ ${formatGourdes(totalEstime)} Gdes. Une fois g\xE9n\xE9r\xE9, ce lot sera fig\xE9 : ces dossiers ne seront plus jamais repris automatiquement dans un futur lot.`,
+            message: `${eligibles.length} dossier(s) seront inclus, pour un total d'environ ${formatGourdes(totalEstime)} Gdes, factur\xE9s sur ${formaterMoisFr(moisLotChoisi)}. Une fois g\xE9n\xE9r\xE9, ce lot sera fig\xE9 : ces dossiers ne seront plus jamais repris automatiquement dans un futur lot.`,
             confirmLabel: `\u{1F4E6} G\xE9n\xE9rer le Lot ${prochainNumero}`,
             onConfirm: () => {
               setConfirmModal(null);
-              genererFichierExcelPourLot(ongCible, eligibles.map((v) => v.id), prochainNumero);
+              genererFichierExcelPourLot(ongCible, eligibles.map((v) => v.id), prochainNumero, moisLotChoisi);
             },
             onCancel: () => setConfirmModal(null)
           });
@@ -3645,10 +3675,12 @@
           });
         };
         const ajouterDossierAuLot = async (idDossier, numeroLot, ongCible) => {
+          var _a2;
           const dossier = verifications.find((v) => v.id === idDossier);
-          setVerifications((prev) => prev.map((v) => v.id === idDossier ? { ...v, numeroLot, verrouilleFacture: true } : v));
+          const moisLotExistant = ((_a2 = verifications.find((v) => v.ongPartenaire === ongCible && v.numeroLot === numeroLot)) == null ? void 0 : _a2.moisLot) || null;
+          setVerifications((prev) => prev.map((v) => v.id === idDossier ? { ...v, numeroLot, moisLot: moisLotExistant, verrouilleFacture: true } : v));
           try {
-            await chf.updateEpisode(idDossier, toEpisodeApi({ numeroLot, verrouilleFacture: true }));
+            await chf.updateEpisode(idDossier, toEpisodeApi({ numeroLot, moisLot: moisLotExistant, verrouilleFacture: true }));
             showToast(`${(dossier == null ? void 0 : dossier.nomPatient) || "Dossier"} ajout\xE9 au Lot ${numeroLot}`, "success");
           } catch (error) {
             if (error.isOfflineQueue) showToast("\u{1F4F4} Changement enregistr\xE9 hors ligne", "info");
@@ -3871,7 +3903,7 @@ ${dossier.noteSuspension}` : ""}`)) return;
         }, className: "bg-gray-200 text-gray-700 px-3 py-1 rounded text-xs font-bold" }, "R\xE9initialiser")), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 border-b" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setSousOngletArchives("dossiers"), className: `px-4 py-2 text-xs font-bold rounded-t-lg ${sousOngletArchives === "dossiers" ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-500"}` }, "\u{1F4C1} Dossiers"), peutExporter && /* @__PURE__ */ React.createElement("button", { onClick: () => setSousOngletArchives("lots"), className: `px-4 py-2 text-xs font-bold rounded-t-lg ${sousOngletArchives === "lots" ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-500"}` }, "\u{1F4E6} Lots & Facturation")), sousOngletArchives === "lots" && peutExporter && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border border-purple-300 shadow-sm space-y-3" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col gap-1" }, /* @__PURE__ */ React.createElement("label", { className: "text-[10px] font-bold text-gray-400 uppercase" }, "Partenaire"), /* @__PURE__ */ React.createElement("select", { value: lotOngSelectionne, onChange: (e) => {
           setLotOngSelectionne(e.target.value);
           setLotFocusedNumero(null);
-        }, className: "border rounded-lg p-1.5 text-xs bg-white font-bold outline-none max-w-xs" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- S\xE9lectionner --"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o)))), lotOngSelectionne && !lotFocused && /* @__PURE__ */ React.createElement(React.Fragment, null, dossiersOrphelinsVerrouilles.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between gap-2 bg-amber-50 border border-amber-300 rounded-lg p-3" }, /* @__PURE__ */ React.createElement("span", { className: "text-amber-800 font-bold" }, "\u26A0\uFE0F ", dossiersOrphelinsVerrouilles.length, " dossier(s) d\xE9j\xE0 envoy\xE9s \xE0 ", lotOngSelectionne, " avant la mise en place des lots \u2014 ", formatGourdes(dossiersOrphelinsVerrouilles.reduce((s, v) => s + (v.totalGlobal || 0), 0)), " Gdes"), /* @__PURE__ */ React.createElement("button", { onClick: () => rattacherOrphelinsAUnLot(lotOngSelectionne), className: "bg-amber-600 text-white font-bold px-2 py-1.5 rounded text-[10px] whitespace-nowrap" }, "Rattacher au prochain lot")), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-4 items-center bg-gray-50 p-3 rounded-lg border border-dashed" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-gray-700" }, "\u{1F195} ", dossiersEnAttenteDeLot.length, " dossier(s) en attente \u2014 ", formatGourdes(dossiersEnAttenteDeLot.reduce((s, v) => s + (v.totalGlobal || 0), 0)), " Gdes"), /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1 font-bold text-purple-900 cursor-pointer" }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: appliqueRabais10, onChange: (e) => setAppliqueRabais10(e.target.checked), className: "rounded" }), " Rabais 10%"), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1" }, /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-gray-500" }, "Dons:"), /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", value: montantDonIntrants, onChange: (e) => setMontantDonIntrants(e.target.value), placeholder: "0", className: "border rounded p-1 w-24 font-mono font-bold text-right text-red-700 outline-none" })), /* @__PURE__ */ React.createElement("button", { onClick: () => genererProchainLot(lotOngSelectionne), className: "bg-purple-700 text-white font-bold px-3 py-1.5 rounded flex items-center gap-1 shadow disabled:opacity-30" }, /* @__PURE__ */ React.createElement(Download, { size: 13 }), " G\xE9n\xE9rer le prochain lot")), /* @__PURE__ */ React.createElement("h3", { className: "font-black text-gray-700 text-xs uppercase border-b pb-1" }, "Lots d\xE9j\xE0 envoy\xE9s"), lotsDuPartenaire.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "text-gray-400 text-center py-3" }, "Aucun lot envoy\xE9 pour ce partenaire encore."), /* @__PURE__ */ React.createElement("div", { className: "divide-y" }, lotsDuPartenaire.map((lot) => /* @__PURE__ */ React.createElement("div", { key: lot.numero, className: "flex justify-between items-center py-2 text-xs" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-gray-700" }, "Lot ", lot.numero, " \u2014 ", lot.dossiers.length, " dossier(s) \u2014 ", formatGourdes(lot.total), " Gdes"), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setLotFocusedNumero(lot.numero), className: "text-blue-600 font-bold underline" }, "Voir"), /* @__PURE__ */ React.createElement("button", { onClick: () => reimprimerLot(lotOngSelectionne, lot.numero), className: "text-purple-700 font-bold underline" }, "\u{1F504} R\xE9imprimer")))))), lotFocused && /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 border-b pb-1" }, /* @__PURE__ */ React.createElement("h3", { className: "font-black text-gray-700 text-xs uppercase" }, "\u{1F4E6} Lot ", lotFocused.numero, " \u2014 ", lotOngSelectionne, " \u2014 ", lotFocused.dossiers.length, " dossier", lotFocused.dossiers.length > 1 ? "s" : "", " \u2014 ", formatGourdes(lotFocused.total), " Gdes"), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-2 items-center" }, /* @__PURE__ */ React.createElement("button", { onClick: () => reimprimerLot(lotOngSelectionne, lotFocused.numero), className: "bg-purple-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Download, { size: 12 }), " R\xE9imprimer ce lot"), /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerFormulaireCHFPourLot(lotFocused.dossiers), className: "bg-indigo-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1", title: "Imprime le formulaire papier CHF de chaque dossier de ce lot, un par page" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Formulaires CHF du lot"), /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerTousLesRecusDuLot(lotFocused.dossiers), className: "bg-gray-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1", title: "Imprime le re\xE7u de chaque fiche de chaque dossier de ce lot, un par page" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Re\xE7us du lot"), /* @__PURE__ */ React.createElement("button", { onClick: () => setLotFocusedNumero(null) }, /* @__PURE__ */ React.createElement(X, { size: 14 })))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-lg p-2 text-xs" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-indigo-800" }, "\u{1F50E} \xC0 v\xE9rifier avant soumission (clique pour voir qui) :"), [["cesarienne", "C\xE9sarienne"], ["accouchement", "Accouchement"], ["chirurgie", "Chirurgie"]].map(([cle, label]) => /* @__PURE__ */ React.createElement("button", { key: cle, onClick: () => setFiltreCategorieLot((f) => f === cle ? "" : cle), className: `font-mono font-bold px-2 py-0.5 rounded ${filtreCategorieLot === cle ? "bg-indigo-700 text-white" : "text-indigo-900 hover:bg-indigo-100"}` }, label, " : ", compteursLotFocused[cle])), filtreCategorieLot && /* @__PURE__ */ React.createElement("button", { onClick: () => setFiltreCategorieLot(""), className: "text-indigo-500 underline" }, "R\xE9initialiser"), /* @__PURE__ */ React.createElement("div", { className: "flex-1 min-w-[180px] flex items-center gap-1 ml-auto" }, /* @__PURE__ */ React.createElement("input", { type: "text", value: rechercheLot, onChange: (e) => setRechercheLot(e.target.value), placeholder: "\u{1F50D} Chercher un patient dans ce lot...", className: "border rounded p-1 flex-1 outline-none text-xs" }), rechercheLot && /* @__PURE__ */ React.createElement("button", { onClick: () => setRechercheLot(""), className: "text-gray-400 hover:text-gray-600" }, /* @__PURE__ */ React.createElement(X, { size: 12 })))), (filtreCategorieLot || rechercheLot.trim()) && /* @__PURE__ */ React.createElement("p", { className: "text-[10px] text-gray-500" }, dossiersLotAffiches.length, " / ", lotFocused.dossiers.length, " dossier", lotFocused.dossiers.length > 1 ? "s" : "", " affich\xE9", dossiersLotAffiches.length > 1 ? "s" : ""), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap items-center gap-4 bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-amber-800" }, "\u{1F4A1} Oubli\xE9 \xE0 la g\xE9n\xE9ration ? Coche/renseigne puis r\xE9imprime ce lot pour l'appliquer :"), /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1 font-bold text-purple-900 cursor-pointer" }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: appliqueRabais10, onChange: (e) => setAppliqueRabais10(e.target.checked), className: "rounded" }), " Rabais 10%"), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1" }, /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-gray-500" }, "Dons:"), /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", value: montantDonIntrants, onChange: (e) => setMontantDonIntrants(e.target.value), placeholder: "0", className: "border rounded p-1 w-24 font-mono font-bold text-right text-red-700 outline-none" }))), dossiersEnAttenteDeLot.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 bg-gray-50 border border-dashed rounded-lg p-2" }, /* @__PURE__ */ React.createElement("select", { value: dossierAAjouterAuLot, onChange: (e) => setDossierAAjouterAuLot(e.target.value), className: "border rounded p-1.5 text-xs bg-white flex-1 outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- Ajouter un dossier libre \xE0 ce lot --"), dossiersEnAttenteDeLot.map((v) => /* @__PURE__ */ React.createElement("option", { key: v.id, value: v.id }, v.nomPatient, " \u2014 ", formatGourdes(v.totalGlobal || 0), " Gdes"))), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+        }, className: "border rounded-lg p-1.5 text-xs bg-white font-bold outline-none max-w-xs" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- S\xE9lectionner --"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o)))), lotOngSelectionne && !lotFocused && /* @__PURE__ */ React.createElement(React.Fragment, null, dossiersOrphelinsVerrouilles.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between gap-2 bg-amber-50 border border-amber-300 rounded-lg p-3" }, /* @__PURE__ */ React.createElement("span", { className: "text-amber-800 font-bold" }, "\u26A0\uFE0F ", dossiersOrphelinsVerrouilles.length, " dossier(s) d\xE9j\xE0 envoy\xE9s \xE0 ", lotOngSelectionne, " avant la mise en place des lots \u2014 ", formatGourdes(dossiersOrphelinsVerrouilles.reduce((s, v) => s + (v.totalGlobal || 0), 0)), " Gdes"), /* @__PURE__ */ React.createElement("button", { onClick: () => rattacherOrphelinsAUnLot(lotOngSelectionne), className: "bg-amber-600 text-white font-bold px-2 py-1.5 rounded text-[10px] whitespace-nowrap" }, "Rattacher au prochain lot")), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-4 items-center bg-gray-50 p-3 rounded-lg border border-dashed" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-gray-700" }, "\u{1F195} ", dossiersEnAttenteDeLot.length, " dossier(s) en attente \u2014 ", formatGourdes(dossiersEnAttenteDeLot.reduce((s, v) => s + (v.totalGlobal || 0), 0)), " Gdes"), RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] ? /* @__PURE__ */ React.createElement("span", { className: "flex items-center gap-1 font-bold text-purple-900", title: `Rabais de ${RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% fix\xE9 au contrat avec ${lotOngSelectionne} \u2014 toujours appliqu\xE9` }, "\u{1F512} Rabais ", RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne], "% (contractuel)") : /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1 font-bold text-purple-900 cursor-pointer" }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: appliqueRabais10, onChange: (e) => setAppliqueRabais10(e.target.checked), className: "rounded" }), " Rabais 10%"), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1" }, /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-gray-500" }, "Dons:"), /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", value: montantDonIntrants, onChange: (e) => setMontantDonIntrants(e.target.value), placeholder: "0", className: "border rounded p-1 w-24 font-mono font-bold text-right text-red-700 outline-none" })), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1" }, /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-gray-500" }, "Mois du lot:"), /* @__PURE__ */ React.createElement("input", { type: "month", value: moisLotChoisi, onChange: (e) => setMoisLotChoisi(e.target.value), className: "border rounded p-1 font-mono font-bold outline-none" })), /* @__PURE__ */ React.createElement("button", { onClick: () => genererProchainLot(lotOngSelectionne), className: "bg-purple-700 text-white font-bold px-3 py-1.5 rounded flex items-center gap-1 shadow disabled:opacity-30" }, /* @__PURE__ */ React.createElement(Download, { size: 13 }), " G\xE9n\xE9rer le prochain lot")), /* @__PURE__ */ React.createElement("h3", { className: "font-black text-gray-700 text-xs uppercase border-b pb-1" }, "Lots d\xE9j\xE0 envoy\xE9s"), lotsDuPartenaire.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "text-gray-400 text-center py-3" }, "Aucun lot envoy\xE9 pour ce partenaire encore."), /* @__PURE__ */ React.createElement("div", { className: "divide-y" }, lotsDuPartenaire.map((lot) => /* @__PURE__ */ React.createElement("div", { key: lot.numero, className: "flex justify-between items-center py-2 text-xs" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-gray-700" }, "Lot ", lot.numero, lot.moisLot && ` \u2014 ${formaterMoisFr(lot.moisLot)}`, " \u2014 ", lot.dossiers.length, " dossier(s) \u2014 ", formatGourdes(lot.total), " Gdes", RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] && /* @__PURE__ */ React.createElement("span", { className: "ml-1 text-purple-700", title: `Rabais de ${RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% fix\xE9 au contrat \u2014 toujours appliqu\xE9` }, "\u{1F512} ", RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne], "%")), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setLotFocusedNumero(lot.numero), className: "text-blue-600 font-bold underline" }, "Voir"), /* @__PURE__ */ React.createElement("button", { onClick: () => reimprimerLot(lotOngSelectionne, lot.numero), className: "text-purple-700 font-bold underline" }, "\u{1F504} R\xE9imprimer")))))), lotFocused && /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 border-b pb-1" }, /* @__PURE__ */ React.createElement("h3", { className: "font-black text-gray-700 text-xs uppercase" }, "\u{1F4E6} Lot ", lotFocused.numero, " \u2014 ", lotOngSelectionne, lotFocused.moisLot && ` \u2014 ${formaterMoisFr(lotFocused.moisLot)}`, " \u2014 ", lotFocused.dossiers.length, " dossier", lotFocused.dossiers.length > 1 ? "s" : "", " \u2014 ", formatGourdes(lotFocused.total), " Gdes", RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] && /* @__PURE__ */ React.createElement("span", { className: "ml-1 text-purple-700", title: `Rabais de ${RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% fix\xE9 au contrat \u2014 toujours appliqu\xE9` }, "\u{1F512} ", RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne], "%")), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-2 items-center" }, /* @__PURE__ */ React.createElement("button", { onClick: () => reimprimerLot(lotOngSelectionne, lotFocused.numero), className: "bg-purple-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Download, { size: 12 }), " R\xE9imprimer ce lot"), /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerFormulaireCHFPourLot(lotFocused.dossiers), className: "bg-indigo-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1", title: "Imprime le formulaire papier CHF de chaque dossier de ce lot, un par page" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Formulaires CHF du lot"), /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerTousLesRecusDuLot(lotFocused.dossiers), className: "bg-gray-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1", title: "Imprime le re\xE7u de chaque fiche de chaque dossier de ce lot, un par page" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Re\xE7us du lot"), /* @__PURE__ */ React.createElement("button", { onClick: () => setLotFocusedNumero(null) }, /* @__PURE__ */ React.createElement(X, { size: 14 })))), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-lg p-2 text-xs" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-indigo-800" }, "\u{1F50E} \xC0 v\xE9rifier avant soumission (clique pour voir qui) :"), [["cesarienne", "C\xE9sarienne"], ["accouchement", "Accouchement"], ["chirurgie", "Chirurgie"]].map(([cle, label]) => /* @__PURE__ */ React.createElement("button", { key: cle, onClick: () => setFiltreCategorieLot((f) => f === cle ? "" : cle), className: `font-mono font-bold px-2 py-0.5 rounded ${filtreCategorieLot === cle ? "bg-indigo-700 text-white" : "text-indigo-900 hover:bg-indigo-100"}` }, label, " : ", compteursLotFocused[cle])), filtreCategorieLot && /* @__PURE__ */ React.createElement("button", { onClick: () => setFiltreCategorieLot(""), className: "text-indigo-500 underline" }, "R\xE9initialiser"), /* @__PURE__ */ React.createElement("div", { className: "flex-1 min-w-[180px] flex items-center gap-1 ml-auto" }, /* @__PURE__ */ React.createElement("input", { type: "text", value: rechercheLot, onChange: (e) => setRechercheLot(e.target.value), placeholder: "\u{1F50D} Chercher un patient dans ce lot...", className: "border rounded p-1 flex-1 outline-none text-xs" }), rechercheLot && /* @__PURE__ */ React.createElement("button", { onClick: () => setRechercheLot(""), className: "text-gray-400 hover:text-gray-600" }, /* @__PURE__ */ React.createElement(X, { size: 12 })))), (filtreCategorieLot || rechercheLot.trim()) && /* @__PURE__ */ React.createElement("p", { className: "text-[10px] text-gray-500" }, dossiersLotAffiches.length, " / ", lotFocused.dossiers.length, " dossier", lotFocused.dossiers.length > 1 ? "s" : "", " affich\xE9", dossiersLotAffiches.length > 1 ? "s" : ""), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap items-center gap-4 bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-amber-800" }, "\u{1F4A1} Oubli\xE9 \xE0 la g\xE9n\xE9ration ? Coche/renseigne puis r\xE9imprime ce lot pour l'appliquer :"), RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] ? /* @__PURE__ */ React.createElement("span", { className: "flex items-center gap-1 font-bold text-purple-900", title: `Rabais de ${RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% fix\xE9 au contrat avec ${lotOngSelectionne} \u2014 toujours appliqu\xE9` }, "\u{1F512} Rabais ", RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne], "% (contractuel)") : /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1 font-bold text-purple-900 cursor-pointer" }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: appliqueRabais10, onChange: (e) => setAppliqueRabais10(e.target.checked), className: "rounded" }), " Rabais 10%"), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-1" }, /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-gray-500" }, "Dons:"), /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", value: montantDonIntrants, onChange: (e) => setMontantDonIntrants(e.target.value), placeholder: "0", className: "border rounded p-1 w-24 font-mono font-bold text-right text-red-700 outline-none" }))), dossiersEnAttenteDeLot.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 bg-gray-50 border border-dashed rounded-lg p-2" }, /* @__PURE__ */ React.createElement("select", { value: dossierAAjouterAuLot, onChange: (e) => setDossierAAjouterAuLot(e.target.value), className: "border rounded p-1.5 text-xs bg-white flex-1 outline-none" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- Ajouter un dossier libre \xE0 ce lot --"), dossiersEnAttenteDeLot.map((v) => /* @__PURE__ */ React.createElement("option", { key: v.id, value: v.id }, v.nomPatient, " \u2014 ", formatGourdes(v.totalGlobal || 0), " Gdes"))), /* @__PURE__ */ React.createElement("button", { onClick: () => {
           if (dossierAAjouterAuLot) {
             ajouterDossierAuLot(dossierAAjouterAuLot, lotFocused.numero, lotOngSelectionne);
             setDossierAAjouterAuLot("");

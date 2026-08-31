@@ -8,6 +8,17 @@ const { chf, toEpisodeApi } = require('../api/supabase');
 const { LOGO_CHF_BASE64 } = require('../utils/logoChf');
 const NOM_COMPLET_ONG = { "MSF-H": "MSF-HOLLANDE", "MSF-F": "MSF-FRANCE" }; // affiché en entier dans les rapports Excel — complète ici si d'autres partenaires sont abrégés
 const nomCompletOng = (nom) => NOM_COMPLET_ONG[nom] || nom;
+// Rabais fixé par contrat pour certains partenaires -- toujours appliqué, jamais une case à cocher
+// à retenir (contrairement au rabais ponctuel proposé aux autres ONG). Ajouter ici si un autre
+// partenaire a lui aussi un pourcentage fixe écrit dans son contrat.
+const RABAIS_CONTRACTUEL_PAR_ONG = { "MSF-F": 10 };
+// "2026-08" -> "Août 2026", pour afficher le mois assigné à un lot
+const formaterMoisFr = (moisLot) => {
+  if (!moisLot) return '';
+  const [annee, mois] = moisLot.split('-');
+  const nom = new Date(Number(annee), Number(mois) - 1, 1).toLocaleString('fr-FR', { month: 'long' });
+  return `${nom.charAt(0).toUpperCase()}${nom.slice(1)} ${annee}`;
+};
 
 // Cumule le breakdown de toutes les fiches d'un dossier, toutes catégories confondues (clés brutes)
 const cumulCategoriesDossier = (v) => {
@@ -209,6 +220,10 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
   const [filtreStatut, setFiltreStatut] = useState("");
   const [appliqueRabais10, setAppliqueRabais10] = useState(false);
   const [montantDonIntrants, setMontantDonIntrants] = useState("");
+  // Mois facturé par ce lot -- par défaut le mois précédent (comme l'ancien calcul automatique dans
+  // l'Excel), mais modifiable : utile pour générer un lot en retard ou pour de la saisie de données
+  // passées, où "le mois précédent la date du jour" ne correspondrait pas au bon mois.
+  const [moisLotChoisi, setMoisLotChoisi] = useState(() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; });
   const [sousOngletArchives, setSousOngletArchives] = useState("dossiers");
   const [lotOngSelectionne, setLotOngSelectionne] = useState("");
   const [lotFocusedNumero, setLotFocusedNumero] = useState(null);
@@ -225,7 +240,9 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       clearLotInitialFocus();
     }
   }, [lotInitialFocus]);
-  useEffect(() => { setAppliqueRabais10(false); setMontantDonIntrants(""); setRechercheLot(""); setFiltreCategorieLot(""); }, [lotFocusedNumero]);
+  // Rabais 10% pré-coché automatiquement pour les partenaires avec un pourcentage fixé au contrat
+  // (RABAIS_CONTRACTUEL_PAR_ONG) -- pas besoin de s'en souvenir à chaque lot.
+  useEffect(() => { setAppliqueRabais10(!!RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]); setMontantDonIntrants(""); setRechercheLot(""); setFiltreCategorieLot(""); }, [lotFocusedNumero, lotOngSelectionne]);
   useEffect(() => { setNombreAffiche(100); }, [filtreType, filtreOng, rechercheNomPatient, filtreDateDebut, filtreDateFin, filtreCategorie, filtreStatut]);
 
   const numeroDepartConfigure = (ongCible) => {
@@ -252,7 +269,8 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     return Object.keys(parNumero).map(n => Number(n)).sort((a, b) => b - a).map(n => ({
       numero: n,
       dossiers: trierAvecRegroupementMereBebe(parNumero[n], verifications),
-      total: parNumero[n].reduce((s, v) => s + (v.totalGlobal || 0), 0)
+      total: parNumero[n].reduce((s, v) => s + (v.totalGlobal || 0), 0),
+      moisLot: parNumero[n][0]?.moisLot || null
     }));
   }, [verifications, lotOngSelectionne]);
 
@@ -369,7 +387,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     nebulisation: 'Nebulisation', radio: 'Radiographie'
   };
 
-  const genererFichierExcelPourLot = async (ongCible, idsDossiers, numeroLot) => {
+  const genererFichierExcelPourLot = async (ongCible, idsDossiers, numeroLot, moisLot) => {
     try {
       // Regroupement mère/bébé : un dossier nommé "Bb <nom de la mère>" est trié juste après le
       // dossier de sa mère (même date effective, ordre alphabétique de la "famille" sinon), même si
@@ -418,12 +436,23 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       ligneCentree("centrehfontaine@gmail.com", EXCEL_STYLES.sousTitre);
       r++; // ligne vide
 
-      const now = new Date();
-      const moisRapport = new Date(now.getFullYear(), now.getMonth() - 1, 1); // le rapport envoyé début de mois porte toujours sur le mois précédent
-      const moisTexte = moisRapport.toLocaleString('fr-FR', { month: 'long' }).toUpperCase();
+      // Mois assigné à ce lot au moment de sa génération (choisi par la personne, stocké sur les
+      // dossiers) ; à défaut (réimpression d'un ancien lot généré avant l'ajout de ce champ), retombe
+      // sur l'ancien calcul automatique ("mois précédent la date du jour").
+      const moisLotFinal = moisLot || listeDossiersONG[0]?.moisLot || null;
+      let moisTexte, anneeTexte;
+      if (moisLotFinal) {
+        const [annee, mois] = moisLotFinal.split('-');
+        moisTexte = new Date(Number(annee), Number(mois) - 1, 1).toLocaleString('fr-FR', { month: 'long' }).toUpperCase();
+        anneeTexte = annee;
+      } else {
+        const moisRapport = new Date(); moisRapport.setDate(1); moisRapport.setMonth(moisRapport.getMonth() - 1);
+        moisTexte = moisRapport.toLocaleString('fr-FR', { month: 'long' }).toUpperCase();
+        anneeTexte = moisRapport.getFullYear();
+      }
       appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.gras);
       ws.getCell(r, 1).value = "DATE D'ADMISSION :";
-      ws.getCell(r, 2).value = `${moisTexte} ${moisRapport.getFullYear()}`;
+      ws.getCell(r, 2).value = `${moisTexte} ${anneeTexte}`;
       r++;
       appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.gras);
       ws.getCell(r, 1).value = "FACTURE";
@@ -519,15 +548,15 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       // Étape G : assigne le numéro de lot + verrouille les dossiers (protège contre modification
       // libre et suppression). Idempotent : réimprimer un lot existant réassigne le même numéro.
       const idsExportes = listeDossiersONG.map(d => d.id);
-      setVerifications(prev => prev.map(v => idsExportes.includes(v.id) ? { ...v, numeroLot, verrouilleFacture: true } : v));
+      setVerifications(prev => prev.map(v => idsExportes.includes(v.id) ? { ...v, numeroLot, moisLot: moisLotFinal, verrouilleFacture: true } : v));
       let echecsVerrou = 0;
       await Promise.all(listeDossiersONG.map(async (d) => {
-        try { await chf.updateEpisode(d.id, toEpisodeApi({ numeroLot, verrouilleFacture: true })); }
+        try { await chf.updateEpisode(d.id, toEpisodeApi({ numeroLot, moisLot: moisLotFinal, verrouilleFacture: true })); }
         catch (e) { if (!e.isOfflineQueue) echecsVerrou++; }
       }));
 
       showToast(`✅ Lot ${numeroLot} de ${ongCible} : ${listeDossiersONG.length} dossier(s), ${formatGourdes(grandTotalGeneral)} Gdes${echecsVerrou > 0 ? ` — ⚠️ ${echecsVerrou} dossier(s) non enregistré(s), réessaie plus tard` : ''}`, "success");
-      setAppliqueRabais10(false);
+      setAppliqueRabais10(!!RABAIS_CONTRACTUEL_PAR_ONG[ongCible]);
       setMontantDonIntrants("");
     } catch (error) {
       console.error("Erreur export Excel:", error);
@@ -543,9 +572,9 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     const totalEstime = eligibles.reduce((s, v) => s + (v.totalGlobal || 0), 0);
     setConfirmModal({
       titre: `📦 Générer le Lot ${prochainNumero} pour ${ongCible} ?`,
-      message: `${eligibles.length} dossier(s) seront inclus, pour un total d'environ ${formatGourdes(totalEstime)} Gdes. Une fois généré, ce lot sera figé : ces dossiers ne seront plus jamais repris automatiquement dans un futur lot.`,
+      message: `${eligibles.length} dossier(s) seront inclus, pour un total d'environ ${formatGourdes(totalEstime)} Gdes, facturés sur ${formaterMoisFr(moisLotChoisi)}. Une fois généré, ce lot sera figé : ces dossiers ne seront plus jamais repris automatiquement dans un futur lot.`,
       confirmLabel: `📦 Générer le Lot ${prochainNumero}`,
-      onConfirm: () => { setConfirmModal(null); genererFichierExcelPourLot(ongCible, eligibles.map(v => v.id), prochainNumero); },
+      onConfirm: () => { setConfirmModal(null); genererFichierExcelPourLot(ongCible, eligibles.map(v => v.id), prochainNumero, moisLotChoisi); },
       onCancel: () => setConfirmModal(null)
     });
   };
@@ -610,9 +639,12 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
   // lots à la fois (il faut d'abord le retirer de l'un avant de pouvoir l'ajouter à l'autre).
   const ajouterDossierAuLot = async (idDossier, numeroLot, ongCible) => {
     const dossier = verifications.find(v => v.id === idDossier);
-    setVerifications(prev => prev.map(v => v.id === idDossier ? { ...v, numeroLot, verrouilleFacture: true } : v));
+    // Hérite du mois déjà assigné au lot existant (celui d'un autre dossier déjà dedans), pour rester
+    // cohérent -- ce dossier rejoint un lot déjà figé, pas question de lui donner un autre mois.
+    const moisLotExistant = verifications.find(v => v.ongPartenaire === ongCible && v.numeroLot === numeroLot)?.moisLot || null;
+    setVerifications(prev => prev.map(v => v.id === idDossier ? { ...v, numeroLot, moisLot: moisLotExistant, verrouilleFacture: true } : v));
     try {
-      await chf.updateEpisode(idDossier, toEpisodeApi({ numeroLot, verrouilleFacture: true }));
+      await chf.updateEpisode(idDossier, toEpisodeApi({ numeroLot, moisLot: moisLotExistant, verrouilleFacture: true }));
       showToast(`${dossier?.nomPatient || 'Dossier'} ajouté au Lot ${numeroLot}`, "success");
     } catch (error) {
       if (error.isOfflineQueue) showToast("📴 Changement enregistré hors ligne", "info");
@@ -838,8 +870,13 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
               )}
               <div className="flex flex-wrap gap-4 items-center bg-gray-50 p-3 rounded-lg border border-dashed">
                 <span className="font-bold text-gray-700">🆕 {dossiersEnAttenteDeLot.length} dossier(s) en attente — {formatGourdes(dossiersEnAttenteDeLot.reduce((s,v)=>s+(v.totalGlobal||0),0))} Gdes</span>
-                <label className="flex items-center gap-1 font-bold text-purple-900 cursor-pointer"><input type="checkbox" checked={appliqueRabais10} onChange={e=>setAppliqueRabais10(e.target.checked)} className="rounded" /> Rabais 10%</label>
+                {RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] ? (
+                  <span className="flex items-center gap-1 font-bold text-purple-900" title={`Rabais de ${RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% fixé au contrat avec ${lotOngSelectionne} — toujours appliqué`}>🔒 Rabais {RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% (contractuel)</span>
+                ) : (
+                  <label className="flex items-center gap-1 font-bold text-purple-900 cursor-pointer"><input type="checkbox" checked={appliqueRabais10} onChange={e=>setAppliqueRabais10(e.target.checked)} className="rounded" /> Rabais 10%</label>
+                )}
                 <div className="flex items-center gap-1"><span className="font-semibold text-gray-500">Dons:</span><input type="number" min="0" value={montantDonIntrants} onChange={e=>setMontantDonIntrants(e.target.value)} placeholder="0" className="border rounded p-1 w-24 font-mono font-bold text-right text-red-700 outline-none" /></div>
+                <div className="flex items-center gap-1"><span className="font-semibold text-gray-500">Mois du lot:</span><input type="month" value={moisLotChoisi} onChange={e=>setMoisLotChoisi(e.target.value)} className="border rounded p-1 font-mono font-bold outline-none" /></div>
                 <button onClick={() => genererProchainLot(lotOngSelectionne)} className="bg-purple-700 text-white font-bold px-3 py-1.5 rounded flex items-center gap-1 shadow disabled:opacity-30"><Download size={13}/> Générer le prochain lot</button>
               </div>
 
@@ -848,7 +885,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
               <div className="divide-y">
                 {lotsDuPartenaire.map(lot => (
                   <div key={lot.numero} className="flex justify-between items-center py-2 text-xs">
-                    <span className="font-bold text-gray-700">Lot {lot.numero} — {lot.dossiers.length} dossier(s) — {formatGourdes(lot.total)} Gdes</span>
+                    <span className="font-bold text-gray-700">Lot {lot.numero}{lot.moisLot && ` — ${formaterMoisFr(lot.moisLot)}`} — {lot.dossiers.length} dossier(s) — {formatGourdes(lot.total)} Gdes{RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] && <span className="ml-1 text-purple-700" title={`Rabais de ${RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% fixé au contrat — toujours appliqué`}>🔒 {RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}%</span>}</span>
                     <div className="flex gap-2">
                       <button onClick={() => setLotFocusedNumero(lot.numero)} className="text-blue-600 font-bold underline">Voir</button>
                       <button onClick={() => reimprimerLot(lotOngSelectionne, lot.numero)} className="text-purple-700 font-bold underline">🔄 Réimprimer</button>
@@ -862,7 +899,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
           {lotFocused && (
             <div className="space-y-2">
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 border-b pb-1">
-                <h3 className="font-black text-gray-700 text-xs uppercase">📦 Lot {lotFocused.numero} — {lotOngSelectionne} — {lotFocused.dossiers.length} dossier{lotFocused.dossiers.length > 1 ? 's' : ''} — {formatGourdes(lotFocused.total)} Gdes</h3>
+                <h3 className="font-black text-gray-700 text-xs uppercase">📦 Lot {lotFocused.numero} — {lotOngSelectionne}{lotFocused.moisLot && ` — ${formaterMoisFr(lotFocused.moisLot)}`} — {lotFocused.dossiers.length} dossier{lotFocused.dossiers.length > 1 ? 's' : ''} — {formatGourdes(lotFocused.total)} Gdes{RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] && <span className="ml-1 text-purple-700" title={`Rabais de ${RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% fixé au contrat — toujours appliqué`}>🔒 {RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}%</span>}</h3>
                 <div className="flex flex-wrap gap-2 items-center">
                   <button onClick={() => reimprimerLot(lotOngSelectionne, lotFocused.numero)} className="bg-purple-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1"><Download size={12}/> Réimprimer ce lot</button>
                   <button onClick={() => imprimerFormulaireCHFPourLot(lotFocused.dossiers)} className="bg-indigo-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1" title="Imprime le formulaire papier CHF de chaque dossier de ce lot, un par page"><Printer size={12}/> Formulaires CHF du lot</button>
@@ -886,7 +923,11 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
               )}
               <div className="flex flex-wrap items-center gap-4 bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs">
                 <span className="font-bold text-amber-800">💡 Oublié à la génération ? Coche/renseigne puis réimprime ce lot pour l'appliquer :</span>
-                <label className="flex items-center gap-1 font-bold text-purple-900 cursor-pointer"><input type="checkbox" checked={appliqueRabais10} onChange={e=>setAppliqueRabais10(e.target.checked)} className="rounded" /> Rabais 10%</label>
+                {RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] ? (
+                  <span className="flex items-center gap-1 font-bold text-purple-900" title={`Rabais de ${RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% fixé au contrat avec ${lotOngSelectionne} — toujours appliqué`}>🔒 Rabais {RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% (contractuel)</span>
+                ) : (
+                  <label className="flex items-center gap-1 font-bold text-purple-900 cursor-pointer"><input type="checkbox" checked={appliqueRabais10} onChange={e=>setAppliqueRabais10(e.target.checked)} className="rounded" /> Rabais 10%</label>
+                )}
                 <div className="flex items-center gap-1"><span className="font-semibold text-gray-500">Dons:</span><input type="number" min="0" value={montantDonIntrants} onChange={e=>setMontantDonIntrants(e.target.value)} placeholder="0" className="border rounded p-1 w-24 font-mono font-bold text-right text-red-700 outline-none" /></div>
               </div>
               {dossiersEnAttenteDeLot.length > 0 && (
