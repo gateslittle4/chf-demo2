@@ -902,7 +902,11 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
               <div className="divide-y">
                 {lotsDuPartenaire.map(lot => (
                   <div key={lot.numero} className="flex justify-between items-center py-2 text-xs">
-                    <span className="font-bold text-gray-700">Lot {lot.numero}{lot.moisLot && ` — ${formaterMoisFr(lot.moisLot)}`} — {lot.dossiers.length} dossier(s) — {formatGourdes(lot.total)} Gdes{RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] && <span className="ml-1 text-purple-700" title={`Rabais de ${RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% fixé au contrat — toujours appliqué`}>🔒 {RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% → {formatGourdes(lot.total * (1 - RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] / 100))} Gdes</span>}{lot.verrouille && <span className="ml-1 text-red-700" title="Lot approuvé et verrouillé">🔒</span>}</span>
+                    <span className="font-bold text-gray-700 flex items-center flex-wrap gap-1">Lot {lot.numero} {lot.moisLot ? (
+                      <span className="bg-blue-100 text-blue-800 font-black px-2 py-0.5 rounded-full">{formaterMoisFr(lot.moisLot)}</span>
+                    ) : (
+                      <span className="bg-gray-200 text-gray-500 font-bold px-2 py-0.5 rounded-full" title="Aucun mois assigné à ce lot">Mois non défini</span>
+                    )} — {lot.dossiers.length} dossier(s) — {formatGourdes(lot.total)} Gdes{RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] && <span className="text-purple-700" title={`Rabais de ${RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% fixé au contrat — toujours appliqué`}>🔒 {RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% → {formatGourdes(lot.total * (1 - RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] / 100))} Gdes</span>}{lot.verrouille && <span className="text-red-700" title="Lot approuvé et verrouillé">🔒</span>}</span>
                     <div className="flex gap-2">
                       <button onClick={() => setLotFocusedNumero(lot.numero)} className="text-blue-600 font-bold underline">Voir</button>
                       <button onClick={() => reimprimerLot(lotOngSelectionne, lot.numero)} className="text-purple-700 font-bold underline">🔄 Réimprimer</button>
@@ -916,7 +920,11 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
           {lotFocused && (
             <div className="space-y-2">
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 border-b pb-1">
-                <h3 className="font-black text-gray-700 text-xs uppercase">📦 Lot {lotFocused.numero} — {lotOngSelectionne}{lotFocused.moisLot && ` — ${formaterMoisFr(lotFocused.moisLot)}`} — {lotFocused.dossiers.length} dossier{lotFocused.dossiers.length > 1 ? 's' : ''} — {formatGourdes(lotFocused.total)} Gdes{RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] ? (
+                <h3 className="font-black text-gray-700 text-xs uppercase">📦 Lot {lotFocused.numero} — {lotOngSelectionne} {lotFocused.moisLot ? (
+                  <span className="ml-1 bg-blue-100 text-blue-800 font-black px-2 py-0.5 rounded-full">{formaterMoisFr(lotFocused.moisLot)}</span>
+                ) : (
+                  <span className="ml-1 bg-gray-200 text-gray-500 font-bold px-2 py-0.5 rounded-full" title="Aucun mois assigné à ce lot">Mois non défini</span>
+                )} — {lotFocused.dossiers.length} dossier{lotFocused.dossiers.length > 1 ? 's' : ''} — {formatGourdes(lotFocused.total)} Gdes{RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] ? (
                   <span className="ml-1 text-purple-700" title={`Rabais de ${RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% fixé au contrat — toujours appliqué`}>🔒 {RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% → {formatGourdes(lotFocused.total * (1 - RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] / 100))} Gdes</span>
                 ) : (appliqueRabais10 && <span className="ml-1 text-purple-700" title="Rabais 10% coché ci-dessous">Rabais 10% → {formatGourdes(lotFocused.total * 0.9)} Gdes</span>)}{lotFocused.verrouille && <span className="ml-1 text-red-700" title="Lot approuvé et verrouillé — aucun nouveau dossier ne peut y être ajouté">🔒 Verrouillé</span>}</h3>
                 <div className="flex flex-wrap gap-2 items-center">
