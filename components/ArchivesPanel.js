@@ -270,7 +270,8 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       numero: n,
       dossiers: trierAvecRegroupementMereBebe(parNumero[n], verifications),
       total: parNumero[n].reduce((s, v) => s + (v.totalGlobal || 0), 0),
-      moisLot: parNumero[n][0]?.moisLot || null
+      moisLot: parNumero[n][0]?.moisLot || null,
+      verrouille: !!parNumero[n][0]?.lotVerrouille
     }));
   }, [verifications, lotOngSelectionne]);
 
@@ -639,9 +640,11 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
   // lots à la fois (il faut d'abord le retirer de l'un avant de pouvoir l'ajouter à l'autre).
   const ajouterDossierAuLot = async (idDossier, numeroLot, ongCible) => {
     const dossier = verifications.find(v => v.id === idDossier);
+    const dossierDuLotExistant = verifications.find(v => v.ongPartenaire === ongCible && v.numeroLot === numeroLot);
+    if (dossierDuLotExistant?.lotVerrouille) { showToast(`🔒 Le Lot ${numeroLot} est verrouillé (déjà approuvé) — impossible d'y ajouter un nouveau dossier.`, "error"); return; }
     // Hérite du mois déjà assigné au lot existant (celui d'un autre dossier déjà dedans), pour rester
     // cohérent -- ce dossier rejoint un lot déjà figé, pas question de lui donner un autre mois.
-    const moisLotExistant = verifications.find(v => v.ongPartenaire === ongCible && v.numeroLot === numeroLot)?.moisLot || null;
+    const moisLotExistant = dossierDuLotExistant?.moisLot || null;
     setVerifications(prev => prev.map(v => v.id === idDossier ? { ...v, numeroLot, moisLot: moisLotExistant, verrouilleFacture: true } : v));
     try {
       await chf.updateEpisode(idDossier, toEpisodeApi({ numeroLot, moisLot: moisLotExistant, verrouilleFacture: true }));
@@ -650,6 +653,20 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       if (error.isOfflineQueue) showToast("📴 Changement enregistré hors ligne", "info");
       else showToast("Erreur: " + error.message, "error");
     }
+  };
+
+  // Verrouille/déverrouille un lot déjà approuvé par le partenaire : une fois verrouillé, on ne peut
+  // plus y ajouter de nouveau dossier (le bouton "Ajouter un dossier libre" disparaît pour ce lot),
+  // pour ne jamais faire dévier un lot de ce qui a réellement été envoyé et approuvé.
+  const toggleVerrouLot = async (numeroLot, ongCible, verrouille) => {
+    const idsLot = verifications.filter(v => v.ongPartenaire === ongCible && v.numeroLot === numeroLot).map(v => v.id);
+    setVerifications(prev => prev.map(v => idsLot.includes(v.id) ? { ...v, lotVerrouille: verrouille } : v));
+    let echecs = 0;
+    await Promise.all(idsLot.map(async (id) => {
+      try { await chf.updateEpisode(id, toEpisodeApi({ lotVerrouille: verrouille })); }
+      catch (e) { if (!e.isOfflineQueue) echecs++; }
+    }));
+    showToast(`${verrouille ? '🔒 Lot verrouillé' : '🔓 Lot déverrouillé'}${echecs > 0 ? ` — ⚠️ ${echecs} dossier(s) non enregistré(s), réessaie` : ''}`, "success");
   };
 
 
@@ -885,7 +902,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
               <div className="divide-y">
                 {lotsDuPartenaire.map(lot => (
                   <div key={lot.numero} className="flex justify-between items-center py-2 text-xs">
-                    <span className="font-bold text-gray-700">Lot {lot.numero}{lot.moisLot && ` — ${formaterMoisFr(lot.moisLot)}`} — {lot.dossiers.length} dossier(s) — {formatGourdes(lot.total)} Gdes{RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] && <span className="ml-1 text-purple-700" title={`Rabais de ${RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% fixé au contrat — toujours appliqué`}>🔒 {RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}%</span>}</span>
+                    <span className="font-bold text-gray-700">Lot {lot.numero}{lot.moisLot && ` — ${formaterMoisFr(lot.moisLot)}`} — {lot.dossiers.length} dossier(s) — {formatGourdes(lot.total)} Gdes{RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] && <span className="ml-1 text-purple-700" title={`Rabais de ${RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% fixé au contrat — toujours appliqué`}>🔒 {RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}%</span>}{lot.verrouille && <span className="ml-1 text-red-700" title="Lot approuvé et verrouillé">🔒</span>}</span>
                     <div className="flex gap-2">
                       <button onClick={() => setLotFocusedNumero(lot.numero)} className="text-blue-600 font-bold underline">Voir</button>
                       <button onClick={() => reimprimerLot(lotOngSelectionne, lot.numero)} className="text-purple-700 font-bold underline">🔄 Réimprimer</button>
@@ -899,8 +916,9 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
           {lotFocused && (
             <div className="space-y-2">
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 border-b pb-1">
-                <h3 className="font-black text-gray-700 text-xs uppercase">📦 Lot {lotFocused.numero} — {lotOngSelectionne}{lotFocused.moisLot && ` — ${formaterMoisFr(lotFocused.moisLot)}`} — {lotFocused.dossiers.length} dossier{lotFocused.dossiers.length > 1 ? 's' : ''} — {formatGourdes(lotFocused.total)} Gdes{RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] && <span className="ml-1 text-purple-700" title={`Rabais de ${RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% fixé au contrat — toujours appliqué`}>🔒 {RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}%</span>}</h3>
+                <h3 className="font-black text-gray-700 text-xs uppercase">📦 Lot {lotFocused.numero} — {lotOngSelectionne}{lotFocused.moisLot && ` — ${formaterMoisFr(lotFocused.moisLot)}`} — {lotFocused.dossiers.length} dossier{lotFocused.dossiers.length > 1 ? 's' : ''} — {formatGourdes(lotFocused.total)} Gdes{RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] && <span className="ml-1 text-purple-700" title={`Rabais de ${RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% fixé au contrat — toujours appliqué`}>🔒 {RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}%</span>}{lotFocused.verrouille && <span className="ml-1 text-red-700" title="Lot approuvé et verrouillé — aucun nouveau dossier ne peut y être ajouté">🔒 Verrouillé</span>}</h3>
                 <div className="flex flex-wrap gap-2 items-center">
+                  <button onClick={() => toggleVerrouLot(lotFocused.numero, lotOngSelectionne, !lotFocused.verrouille)} className={`${lotFocused.verrouille ? 'bg-red-700' : 'bg-gray-500'} text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1`} title={lotFocused.verrouille ? "Déverrouiller ce lot (permet à nouveau d'y ajouter un dossier)" : "Verrouiller ce lot une fois approuvé par le partenaire — empêche d'y ajouter un nouveau dossier"}>{lotFocused.verrouille ? '🔒 Verrouillé' : '🔓 Verrouiller'}</button>
                   <button onClick={() => reimprimerLot(lotOngSelectionne, lotFocused.numero)} className="bg-purple-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1"><Download size={12}/> Réimprimer ce lot</button>
                   <button onClick={() => imprimerFormulaireCHFPourLot(lotFocused.dossiers)} className="bg-indigo-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1" title="Imprime le formulaire papier CHF de chaque dossier de ce lot, un par page"><Printer size={12}/> Formulaires CHF du lot</button>
                   <button onClick={() => imprimerTousLesRecusDuLot(lotFocused.dossiers)} className="bg-gray-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1" title="Imprime le reçu de chaque fiche de chaque dossier de ce lot, un par page"><Printer size={12}/> Reçus du lot</button>
@@ -931,10 +949,14 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                 <div className="flex items-center gap-1"><span className="font-semibold text-gray-500">Dons:</span><input type="number" min="0" value={montantDonIntrants} onChange={e=>setMontantDonIntrants(e.target.value)} placeholder="0" className="border rounded p-1 w-24 font-mono font-bold text-right text-red-700 outline-none" /></div>
               </div>
               {dossiersEnAttenteDeLot.length > 0 && (
-                <div className="flex items-center gap-2 bg-gray-50 border border-dashed rounded-lg p-2">
-                  <select value={dossierAAjouterAuLot} onChange={e => setDossierAAjouterAuLot(e.target.value)} className="border rounded p-1.5 text-xs bg-white flex-1 outline-none"><option value="">-- Ajouter un dossier libre à ce lot --</option>{dossiersEnAttenteDeLot.map(v => <option key={v.id} value={v.id}>{v.nomPatient} — {formatGourdes(v.totalGlobal||0)} Gdes</option>)}</select>
-                  <button onClick={() => { if (dossierAAjouterAuLot) { ajouterDossierAuLot(dossierAAjouterAuLot, lotFocused.numero, lotOngSelectionne); setDossierAAjouterAuLot(""); } }} disabled={!dossierAAjouterAuLot} className="bg-emerald-700 text-white font-bold px-2 py-1.5 rounded text-[10px] disabled:opacity-30 whitespace-nowrap">➕ Ajouter</button>
-                </div>
+                lotFocused.verrouille ? (
+                  <p className="text-[10px] text-red-700 bg-red-50 border border-red-200 rounded-lg p-2">🔒 Ce lot est verrouillé (déjà approuvé) — déverrouille-le d'abord pour pouvoir y ajouter un dossier.</p>
+                ) : (
+                  <div className="flex items-center gap-2 bg-gray-50 border border-dashed rounded-lg p-2">
+                    <select value={dossierAAjouterAuLot} onChange={e => setDossierAAjouterAuLot(e.target.value)} className="border rounded p-1.5 text-xs bg-white flex-1 outline-none"><option value="">-- Ajouter un dossier libre à ce lot --</option>{dossiersEnAttenteDeLot.map(v => <option key={v.id} value={v.id}>{v.nomPatient} — {formatGourdes(v.totalGlobal||0)} Gdes</option>)}</select>
+                    <button onClick={() => { if (dossierAAjouterAuLot) { ajouterDossierAuLot(dossierAAjouterAuLot, lotFocused.numero, lotOngSelectionne); setDossierAAjouterAuLot(""); } }} disabled={!dossierAAjouterAuLot} className="bg-emerald-700 text-white font-bold px-2 py-1.5 rounded text-[10px] disabled:opacity-30 whitespace-nowrap">➕ Ajouter</button>
+                  </div>
+                )
               )}
               <div className="divide-y max-h-[640px] overflow-y-auto">
                 {dossiersLotAffiches.length === 0 && <p className="text-gray-400 text-center py-3">Aucun dossier ne correspond à ce filtre/recherche.</p>}
