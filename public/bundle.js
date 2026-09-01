@@ -3318,6 +3318,28 @@
           const moisAuto = moisMajoritaireDossiers(dossiersEnAttenteDeLot);
           if (moisAuto) setMoisLotChoisi(moisAuto);
         }, [dossiersEnAttenteDeLot]);
+        useEffect(() => {
+          const lotsSansMois = lotsDuPartenaire.filter((l) => !l.moisLot);
+          if (lotsSansMois.length === 0) return;
+          const moisParId = {};
+          lotsSansMois.forEach((lot) => {
+            const moisCalcule = moisMajoritaireDossiers(lot.dossiers);
+            if (moisCalcule) lot.dossiers.forEach((d) => {
+              moisParId[d.id] = moisCalcule;
+            });
+          });
+          const idsARemplir = Object.keys(moisParId);
+          if (idsARemplir.length === 0) return;
+          setVerifications((prev) => prev.map((v) => moisParId[v.id] ? { ...v, moisLot: moisParId[v.id] } : v));
+          (async () => {
+            await Promise.all(idsARemplir.map(async (id) => {
+              try {
+                await chf.updateEpisode(id, toEpisodeApi({ moisLot: moisParId[id] }));
+              } catch (e) {
+              }
+            }));
+          })();
+        }, [lotsDuPartenaire]);
         const dossiersOrphelinsVerrouilles = useMemo(() => {
           if (!lotOngSelectionne) return [];
           return verifications.filter((v) => v.ongPartenaire === lotOngSelectionne && (v.status || "archived") === "archived" && v.numeroLot == null && v.verrouilleFacture);
@@ -3428,7 +3450,7 @@
           radio: "Radiographie"
         };
         const genererFichierExcelPourLot = async (ongCible, idsDossiers, numeroLot, moisLot) => {
-          var _a2, _b;
+          var _a2;
           try {
             let listeDossiersONG = trierAvecRegroupementMereBebe(verifications.filter((v) => idsDossiers.includes(v.id)), verifications);
             if (listeDossiersONG.length === 0) {
@@ -3611,42 +3633,7 @@
                 if (!e.isOfflineQueue) echecsVerrou++;
               }
             }));
-            let nbLotsRetroRemplis = 0;
-            if (moisLotFinal) {
-              const lotsAnterieurs = {};
-              verifications.forEach((v) => {
-                if (v.ongPartenaire === ongCible && v.numeroLot != null && v.numeroLot < numeroLot) {
-                  if (!lotsAnterieurs[v.numeroLot]) lotsAnterieurs[v.numeroLot] = [];
-                  lotsAnterieurs[v.numeroLot].push(v);
-                }
-              });
-              const numerosAnterieurs = Object.keys(lotsAnterieurs).map(Number).sort((a, b) => b - a);
-              let moisCascade = moisLotFinal;
-              const moisParId = {};
-              for (const n of numerosAnterieurs) {
-                const dossiersLot = lotsAnterieurs[n];
-                if ((_b = dossiersLot[0]) == null ? void 0 : _b.moisLot) break;
-                const [annee, mois] = moisCascade.split("-").map(Number);
-                const dCascade = new Date(annee, mois - 1, 1);
-                dCascade.setMonth(dCascade.getMonth() - 1);
-                moisCascade = `${dCascade.getFullYear()}-${String(dCascade.getMonth() + 1).padStart(2, "0")}`;
-                dossiersLot.forEach((v) => {
-                  moisParId[v.id] = moisCascade;
-                });
-                nbLotsRetroRemplis++;
-              }
-              const idsARetroRemplir = Object.keys(moisParId);
-              if (idsARetroRemplir.length > 0) {
-                setVerifications((prev) => prev.map((v) => moisParId[v.id] ? { ...v, moisLot: moisParId[v.id] } : v));
-                await Promise.all(idsARetroRemplir.map(async (id) => {
-                  try {
-                    await chf.updateEpisode(id, toEpisodeApi({ moisLot: moisParId[id] }));
-                  } catch (e) {
-                  }
-                }));
-              }
-            }
-            showToast(`\u2705 Lot ${numeroLot} de ${ongCible} : ${listeDossiersONG.length} dossier(s), ${formatGourdes(grandTotalGeneral)} Gdes${echecsVerrou > 0 ? ` \u2014 \u26A0\uFE0F ${echecsVerrou} dossier(s) non enregistr\xE9(s), r\xE9essaie plus tard` : ""}${nbLotsRetroRemplis > 0 ? ` \u2014 \u{1F4C5} mois compl\xE9t\xE9 automatiquement sur ${nbLotsRetroRemplis} lot(s) pr\xE9c\xE9dent(s)` : ""}`, "success");
+            showToast(`\u2705 Lot ${numeroLot} de ${ongCible} : ${listeDossiersONG.length} dossier(s), ${formatGourdes(grandTotalGeneral)} Gdes${echecsVerrou > 0 ? ` \u2014 \u26A0\uFE0F ${echecsVerrou} dossier(s) non enregistr\xE9(s), r\xE9essaie plus tard` : ""}`, "success");
             setAppliqueRabais10(!!RABAIS_CONTRACTUEL_PAR_ONG[ongCible]);
             setMontantDonIntrants("");
           } catch (error) {

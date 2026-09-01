@@ -301,6 +301,27 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     if (moisAuto) setMoisLotChoisi(moisAuto);
   }, [dossiersEnAttenteDeLot]);
 
+  // Rétro-remplit automatiquement le mois des lots déjà envoyés qui n'en ont pas encore un (générés
+  // avant l'ajout de ce champ) : calcule, pour CE lot précisément, le mois où sont datés le plus de
+  // ses propres dossiers, et l'applique. Ne touche jamais un lot qui a déjà un mois défini.
+  useEffect(() => {
+    const lotsSansMois = lotsDuPartenaire.filter(l => !l.moisLot);
+    if (lotsSansMois.length === 0) return;
+    const moisParId = {};
+    lotsSansMois.forEach(lot => {
+      const moisCalcule = moisMajoritaireDossiers(lot.dossiers);
+      if (moisCalcule) lot.dossiers.forEach(d => { moisParId[d.id] = moisCalcule; });
+    });
+    const idsARemplir = Object.keys(moisParId);
+    if (idsARemplir.length === 0) return;
+    setVerifications(prev => prev.map(v => moisParId[v.id] ? { ...v, moisLot: moisParId[v.id] } : v));
+    (async () => {
+      await Promise.all(idsARemplir.map(async (id) => {
+        try { await chf.updateEpisode(id, toEpisodeApi({ moisLot: moisParId[id] })); } catch (e) { /* file d'attente hors-ligne gère le rattrapage */ }
+      }));
+    })();
+  }, [lotsDuPartenaire]);
+
   // Dossiers déjà envoyés à ce partenaire AVANT la mise en place des lots (verrouillés par l'ancien
   // système, mais sans numéro de lot) — il faut les rattacher rétroactivement à un lot pour que la
   // numérotation soit cohérente avec ce qui a déjà été réellement envoyé.
@@ -577,41 +598,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
         catch (e) { if (!e.isOfflineQueue) echecsVerrou++; }
       }));
 
-      // Étape G bis : rétro-remplit automatiquement le mois des lots précédents de ce partenaire qui
-      // n'en ont pas encore un, en cascade (mois - 1, - 2, ...) à partir du mois de ce lot-ci. S'arrête
-      // dès qu'un lot antérieur a déjà un mois défini — jamais d'écrasement d'une valeur existante.
-      let nbLotsRetroRemplis = 0;
-      if (moisLotFinal) {
-        const lotsAnterieurs = {};
-        verifications.forEach(v => {
-          if (v.ongPartenaire === ongCible && v.numeroLot != null && v.numeroLot < numeroLot) {
-            if (!lotsAnterieurs[v.numeroLot]) lotsAnterieurs[v.numeroLot] = [];
-            lotsAnterieurs[v.numeroLot].push(v);
-          }
-        });
-        const numerosAnterieurs = Object.keys(lotsAnterieurs).map(Number).sort((a, b) => b - a);
-        let moisCascade = moisLotFinal;
-        const moisParId = {};
-        for (const n of numerosAnterieurs) {
-          const dossiersLot = lotsAnterieurs[n];
-          if (dossiersLot[0]?.moisLot) break;
-          const [annee, mois] = moisCascade.split('-').map(Number);
-          const dCascade = new Date(annee, mois - 1, 1);
-          dCascade.setMonth(dCascade.getMonth() - 1);
-          moisCascade = `${dCascade.getFullYear()}-${String(dCascade.getMonth() + 1).padStart(2, '0')}`;
-          dossiersLot.forEach(v => { moisParId[v.id] = moisCascade; });
-          nbLotsRetroRemplis++;
-        }
-        const idsARetroRemplir = Object.keys(moisParId);
-        if (idsARetroRemplir.length > 0) {
-          setVerifications(prev => prev.map(v => moisParId[v.id] ? { ...v, moisLot: moisParId[v.id] } : v));
-          await Promise.all(idsARetroRemplir.map(async (id) => {
-            try { await chf.updateEpisode(id, toEpisodeApi({ moisLot: moisParId[id] })); } catch (e) { /* file d'attente hors-ligne gère le rattrapage */ }
-          }));
-        }
-      }
-
-      showToast(`✅ Lot ${numeroLot} de ${ongCible} : ${listeDossiersONG.length} dossier(s), ${formatGourdes(grandTotalGeneral)} Gdes${echecsVerrou > 0 ? ` — ⚠️ ${echecsVerrou} dossier(s) non enregistré(s), réessaie plus tard` : ''}${nbLotsRetroRemplis > 0 ? ` — 📅 mois complété automatiquement sur ${nbLotsRetroRemplis} lot(s) précédent(s)` : ''}`, "success");
+      showToast(`✅ Lot ${numeroLot} de ${ongCible} : ${listeDossiersONG.length} dossier(s), ${formatGourdes(grandTotalGeneral)} Gdes${echecsVerrou > 0 ? ` — ⚠️ ${echecsVerrou} dossier(s) non enregistré(s), réessaie plus tard` : ''}`, "success");
       setAppliqueRabais10(!!RABAIS_CONTRACTUEL_PAR_ONG[ongCible]);
       setMontantDonIntrants("");
     } catch (error) {
