@@ -175,7 +175,7 @@ function GrilleEditionPanel({ titre, items, setItems, collectionName, showToast 
 
       {nombreEnAttente > 0 && (
         <div className="flex items-center justify-between gap-2 bg-indigo-50 border border-indigo-300 rounded-xl p-3">
-          <span className="text-indigo-800 font-bold">🕓 {nombreEnAttente} nouveau(x) prix en attente (visibles seulement dans le Simulateur pour l'instant)</span>
+          <span className="text-indigo-800 font-bold">🕓 {nombreEnAttente} nouveau(x) prix en attente — utilisables dès maintenant via le bouton "Nouveau prix" du Calculateur ou du Simulateur</span>
           <button onClick={appliquerNouveauxPrix} className="bg-indigo-700 text-white font-bold px-3 py-1.5 rounded whitespace-nowrap">🔄 Appliquer tous les nouveaux prix</button>
         </div>
       )}
