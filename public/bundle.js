@@ -3067,6 +3067,17 @@
         const nom = new Date(Number(annee), Number(mois) - 1, 1).toLocaleString("fr-FR", { month: "long" });
         return `${nom.charAt(0).toUpperCase()}${nom.slice(1)} ${annee}`;
       };
+      var moisMajoritaireDossiers = (dossiers) => {
+        const compteParMois = {};
+        (dossiers || []).forEach((d) => {
+          const date = d.dateEntreePourTri;
+          if (!date || date === "9999-12-31") return;
+          const mois = date.slice(0, 7);
+          compteParMois[mois] = (compteParMois[mois] || 0) + 1;
+        });
+        const moisTries = Object.entries(compteParMois).sort((a, b) => b[1] - a[1]);
+        return moisTries.length > 0 ? moisTries[0][0] : null;
+      };
       var cumulCategoriesDossier = (v) => {
         const totaux = {};
         (v.fiches || []).forEach((f) => {
@@ -3303,6 +3314,10 @@
           if (!lotOngSelectionne) return [];
           return verifications.filter((v) => v.ongPartenaire === lotOngSelectionne && (v.status || "archived") === "archived" && v.numeroLot == null && !v.verrouilleFacture);
         }, [verifications, lotOngSelectionne]);
+        useEffect(() => {
+          const moisAuto = moisMajoritaireDossiers(dossiersEnAttenteDeLot);
+          if (moisAuto) setMoisLotChoisi(moisAuto);
+        }, [dossiersEnAttenteDeLot]);
         const dossiersOrphelinsVerrouilles = useMemo(() => {
           if (!lotOngSelectionne) return [];
           return verifications.filter((v) => v.ongPartenaire === lotOngSelectionne && (v.status || "archived") === "archived" && v.numeroLot == null && v.verrouilleFacture);

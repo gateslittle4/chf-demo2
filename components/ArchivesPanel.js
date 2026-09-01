@@ -20,6 +20,20 @@ const formaterMoisFr = (moisLot) => {
   return `${nom.charAt(0).toUpperCase()}${nom.slice(1)} ${annee}`;
 };
 
+// Détermine le mois à mettre sur un lot : celui où sont datées le plus de transactions (dossiers,
+// via leur date d'entrée) parmi les dossiers de ce lot -- pas un choix arbitraire.
+const moisMajoritaireDossiers = (dossiers) => {
+  const compteParMois = {};
+  (dossiers || []).forEach(d => {
+    const date = d.dateEntreePourTri;
+    if (!date || date === '9999-12-31') return;
+    const mois = date.slice(0, 7);
+    compteParMois[mois] = (compteParMois[mois] || 0) + 1;
+  });
+  const moisTries = Object.entries(compteParMois).sort((a, b) => b[1] - a[1]);
+  return moisTries.length > 0 ? moisTries[0][0] : null;
+};
+
 // Cumule le breakdown de toutes les fiches d'un dossier, toutes catégories confondues (clés brutes)
 const cumulCategoriesDossier = (v) => {
   const totaux = {};
@@ -279,6 +293,13 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     if (!lotOngSelectionne) return [];
     return verifications.filter(v => v.ongPartenaire === lotOngSelectionne && (v.status || 'archived') === 'archived' && v.numeroLot == null && !v.verrouilleFacture);
   }, [verifications, lotOngSelectionne]);
+
+  // Le mois du lot suit automatiquement le mois où sont datés le plus de dossiers en attente --
+  // pas besoin de le choisir à la main, mais reste modifiable si besoin de corriger.
+  useEffect(() => {
+    const moisAuto = moisMajoritaireDossiers(dossiersEnAttenteDeLot);
+    if (moisAuto) setMoisLotChoisi(moisAuto);
+  }, [dossiersEnAttenteDeLot]);
 
   // Dossiers déjà envoyés à ce partenaire AVANT la mise en place des lots (verrouillés par l'ancien
   // système, mais sans numéro de lot) — il faut les rattacher rétroactivement à un lot pour que la
