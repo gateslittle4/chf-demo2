@@ -1,7 +1,7 @@
 // components/Simulateur.js
 const React = window.React;
 const { useState, useMemo, useRef } = React;
-const { CONFIG_LITS, CATEGORIES_LISTE } = require('../utils/constants');
+const { CONFIG_LITS, prixLit, CATEGORIES_LISTE } = require('../utils/constants');
 const { formatGourdes, formatDH } = require('../utils/helpers');
 const { X } = require('../utils/icons');
 
@@ -60,9 +60,9 @@ function Simulateur({ medicaments, actes, showToast }) {
   }, [categorie, medicaments, actes, lettreActive, lettresDisponibles, sousCategorieActeActive]);
 
   const j1 = useMemo(() => { if (!dateEntree1 || !dateSortie1) return 0; const d=(new Date(dateSortie1)-new Date(dateEntree1))/86400000; if(d<0){setDateSortie1(""); return 0;} return Math.max(0, Math.floor(d)); }, [dateEntree1,dateSortie1]);
-  const totalE1 = j1 * CONFIG_LITS[typeLit1].prix;
+  const totalE1 = j1 * prixLit(typeLit1, tarifChoisi);
   const j2 = useMemo(() => { if (!multiPeriode || !dateEntree2 || !dateSortie2) return 0; const d=(new Date(dateSortie2)-new Date(dateEntree2))/86400000; return Math.max(0, Math.floor(d)); }, [multiPeriode,dateEntree2,dateSortie2]);
-  const totalE2 = multiPeriode ? j2 * CONFIG_LITS[typeLit2].prix : 0;
+  const totalE2 = multiPeriode ? j2 * prixLit(typeLit2, tarifChoisi) : 0;
   const totalGeneralExeat = totalE1 + totalE2;
   const totalChirSpec = useMemo(() => { const p = parseFloat(prixChirSpec); return isNaN(p) ? 0 : p; }, [hasChirSpec, prixChirSpec]);
 
@@ -96,7 +96,7 @@ function Simulateur({ medicaments, actes, showToast }) {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div><label className="text-[10px] font-bold text-gray-500 uppercase">Date entrée</label><input type="date" value={dateEntree1} onChange={e=>setDateEntree1(e.target.value)} className="border rounded-lg p-1.5 text-xs w-full" /></div>
             <div><label className="text-[10px] font-bold text-gray-500 uppercase">Date sortie</label><input type="date" value={dateSortie1} onChange={e=>setDateSortie1(e.target.value)} className="border rounded-lg p-1.5 text-xs w-full" /></div>
-            <div><label className="text-[10px] font-bold text-gray-500 uppercase">Type de lit</label><select value={typeLit1} onChange={e=>setTypeLit1(e.target.value)} className="border rounded-lg p-1.5 bg-white text-xs w-full"><option value="normal">Normal (500 Gdes)</option><option value="semi_prive">Semi Privé (500)</option><option value="prive">Privé (1500)</option><option value="isolette">Isolette (1250)</option><option value="incubateur">Incubateur (2500)</option></select></div>
+            <div><label className="text-[10px] font-bold text-gray-500 uppercase">Type de lit</label><select value={typeLit1} onChange={e=>setTypeLit1(e.target.value)} className="border rounded-lg p-1.5 bg-white text-xs w-full">{Object.entries(CONFIG_LITS).map(([cle, lit]) => <option key={cle} value={cle}>{lit.nom} ({formatGourdes(prixLit(cle, tarifChoisi))})</option>)}</select></div>
           </div>
           <div className="flex gap-4 pt-1 border-t border-dashed mt-2">
             <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 cursor-pointer"><input type="checkbox" checked={multiPeriode} onChange={e=>setMultiPeriode(e.target.checked)} className="rounded" /> Seconde période</label>
@@ -152,8 +152,8 @@ function Simulateur({ medicaments, actes, showToast }) {
             <table className="w-full text-xs text-left">
               <thead><tr className="bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono"><th className="p-3">Désignation</th><th className="p-3 w-20 text-center">Qté</th><th className="p-3 text-right w-24">Prix</th><th className="p-3 text-right w-24">Total</th><th className="w-8"></th></tr></thead>
               <tbody className="divide-y divide-gray-100">
-                {j1 > 0 && <tr className="bg-amber-50/20"><td className="p-3 text-amber-900">Séjour : {CONFIG_LITS[typeLit1].nom}</td><td className="p-3 text-center font-bold">{j1} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(CONFIG_LITS[typeLit1].prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE1)}</td><td></td></tr>}
-                {multiPeriode && j2 > 0 && <tr className="bg-amber-50/40"><td className="p-3 text-amber-900">Séjour P2 : {CONFIG_LITS[typeLit2].nom}</td><td className="p-3 text-center font-bold">{j2} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(CONFIG_LITS[typeLit2].prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE2)}</td><td></td></tr>}
+                {j1 > 0 && <tr className="bg-amber-50/20"><td className="p-3 text-amber-900">Séjour : {CONFIG_LITS[typeLit1].nom}</td><td className="p-3 text-center font-bold">{j1} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(prixLit(typeLit1, tarifChoisi))}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE1)}</td><td></td></tr>}
+                {multiPeriode && j2 > 0 && <tr className="bg-amber-50/40"><td className="p-3 text-amber-900">Séjour P2 : {CONFIG_LITS[typeLit2].nom}</td><td className="p-3 text-center font-bold">{j2} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(prixLit(typeLit2, tarifChoisi))}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE2)}</td><td></td></tr>}
                 {hasChirSpec && nomChirSpec && <tr className="bg-red-50/20"><td className="p-3 text-red-900">Chirurgie : {nomChirSpec}</td><td className="p-3 text-center">1</td><td className="p-3 text-right text-gray-400">{formatGourdes(totalChirSpec)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalChirSpec)}</td><td></td></tr>}
                 {lignes.map(l => { const decrementer = () => setLignes(p=>p.map(x=>x.id===l.id?{...x,qte:Math.max(1,x.qte-1)}:x)); const incrementer = () => setLignes(p=>p.map(x=>x.id===l.id?{...x,qte:x.qte+1}:x)); return (
                   <tr key={l.id} className="zebra-row">

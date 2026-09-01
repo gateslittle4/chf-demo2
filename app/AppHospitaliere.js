@@ -5,7 +5,7 @@ const { useState, useEffect, useMemo, useRef } = React;
 
 const { chf, toEpisodeApi, fromEpisodeApi, generateLocalId, fromPaiementApi } = require('../api/supabase');
 const { firebase, auth, db, LOG_TARGETS_KEY, LOG_DOSSIER_BROUILLON_KEY, enregistrerAudit } = require('../api/firebase');
-const { CONFIG_LITS, CATEGORIES_LISTE, LISTE_ONG } = require('../utils/constants');
+const { CONFIG_LITS, prixLit, CATEGORIES_LISTE, LISTE_ONG } = require('../utils/constants');
 const { MEDICAMENTS_PAR_DEFAUT, ACTES_PAR_DEFAUT } = require('../utils/defaultCatalog');
 const { formatGourdes, formatDH, formaterNomPropre } = require('../utils/helpers');
 const { chiffrerTexte, dechiffrerTexte } = require('../utils/crypto');
@@ -803,9 +803,9 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
   };
 
   const j1 = useMemo(() => { if (!dateEntree1 || !dateSortie1) return 0; const d = (new Date(dateSortie1) - new Date(dateEntree1)) / 86400000; if (d < 0) { setDateSortie1(""); return 0; } return Math.max(0, Math.floor(d)); }, [dateEntree1, dateSortie1]);
-  const totalE1 = j1 * CONFIG_LITS[typeLit1].prix;
+  const totalE1 = j1 * prixLit(typeLit1, tarifChoisi);
   const j2 = useMemo(() => { if (!multiPeriode || !dateEntree2 || !dateSortie2) return 0; const d = (new Date(dateSortie2) - new Date(dateEntree2)) / 86400000; return Math.max(0, Math.floor(d)); }, [multiPeriode, dateEntree2, dateSortie2]);
-  const totalE2 = multiPeriode ? j2 * CONFIG_LITS[typeLit2].prix : 0;
+  const totalE2 = multiPeriode ? j2 * prixLit(typeLit2, tarifChoisi) : 0;
   const totalGeneralExeat = totalE1 + totalE2;
   const totalChirSpec = useMemo(() => { const p = parseFloat(prixChirSpec); return isNaN(p) ? 0 : p; }, [hasChirSpec, prixChirSpec]);
 
