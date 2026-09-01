@@ -2,9 +2,9 @@
 const LISTE_ONG = ["MSF-H", "MSF-F", "ALIMA", "AVSI", "GRID MISSION", "WAY TO HEALTH", "TEAM TASSY"];
 
 const CONFIG_LITS = {
-  normal: { nom: "Lit normal", prix: 250 },
+  normal: { nom: "Lit normal", prix: 500 },
   semi_prive: { nom: "Salle Semi Privé", prix: 500 },
-  prive: { nom: "Salle Privé", prix: 750 },
+  prive: { nom: "Salle Privé", prix: 1500 },
   isolette: { nom: "Lit Isolette", prix: 1250 },
   incubateur: { nom: "Incubateur", prix: 2500 }
 };
