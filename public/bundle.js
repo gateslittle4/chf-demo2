@@ -99,7 +99,14 @@
               if (method === "GET") throw error;
               console.warn("\u{1F534} Hors ligne, mise en file d'attente:", endpoint, data);
               this.pendingQueue.push({ endpoint, method, data, timestamp: Date.now(), localId: meta.localId || null });
-              localStorage.setItem("pending_ops", JSON.stringify(this.pendingQueue));
+              try {
+                localStorage.setItem("pending_ops", JSON.stringify(this.pendingQueue));
+              } catch (e) {
+                this.pendingQueue.pop();
+                const pleinError = new Error("M\xE9moire du navigateur pleine : cette op\xE9ration n'a PAS \xE9t\xE9 enregistr\xE9e. Ferme et rouvre l'app, puis recommence -- ne continue pas \xE0 encaisser avant.");
+                pleinError.quotaDepasse = true;
+                throw pleinError;
+              }
               const offlineError = new Error("Hors ligne. Op\xE9ration en attente.");
               offlineError.isOfflineQueue = true;
               throw offlineError;
@@ -126,7 +133,11 @@
         // Retire de la file une création jamais synchronisée (ex: dossier ouvert hors-ligne puis annulé avant le retour d'internet)
         removePendingByLocalId(localId) {
           this.pendingQueue = this.pendingQueue.filter((op) => op.localId !== localId);
-          localStorage.setItem("pending_ops", JSON.stringify(this.pendingQueue));
+          try {
+            localStorage.setItem("pending_ops", JSON.stringify(this.pendingQueue));
+          } catch (e) {
+            console.warn("M\xE9moire du navigateur pleine, retrait non persist\xE9 (redeviendra visible apr\xE8s un rechargement) :", e.message);
+          }
         }
         // IDs locaux (dossiers créés/archivés hors ligne) encore en attente de synchronisation -- pour ne
         // JAMAIS écraser leur version optimiste en mémoire par un rechargement serveur qui ne les connaît
@@ -179,7 +190,11 @@
               if (op.localId && !(result && result.id)) throw new Error("R\xE9ponse de cr\xE9ation sans id \u2014 nouvelle tentative");
               if (op.localId && result && result.id) {
                 this.localIdMap[op.localId] = result.id;
-                localStorage.setItem("local_id_map", JSON.stringify(this.localIdMap));
+                try {
+                  localStorage.setItem("local_id_map", JSON.stringify(this.localIdMap));
+                } catch (e) {
+                  console.warn("M\xE9moire du navigateur pleine, correspondance ID non persist\xE9e :", e.message);
+                }
                 window.dispatchEvent(new CustomEvent("chf:synced", { detail: { localId: op.localId, realId: result.id, endpoint: op.endpoint } }));
               }
             } catch (e) {
@@ -187,7 +202,11 @@
               this.pendingQueue.push(op);
             }
           }
-          localStorage.setItem("pending_ops", JSON.stringify(this.pendingQueue));
+          try {
+            localStorage.setItem("pending_ops", JSON.stringify(this.pendingQueue));
+          } catch (e) {
+            console.warn("M\xE9moire du navigateur pleine, file apr\xE8s sync non persist\xE9e :", e.message);
+          }
           console.log("\u2705 Sync termin\xE9e.");
         }
         async getEpisodes() {

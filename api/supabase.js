@@ -67,7 +67,19 @@ class CHF_API {
         if (method === 'GET') throw error;
         console.warn('🔴 Hors ligne, mise en file d\'attente:', endpoint, data);
         this.pendingQueue.push({ endpoint, method, data, timestamp: Date.now(), localId: meta.localId || null });
-        localStorage.setItem('pending_ops', JSON.stringify(this.pendingQueue));
+        try {
+          localStorage.setItem('pending_ops', JSON.stringify(this.pendingQueue));
+        } catch (e) {
+          // Mémoire locale du navigateur pleine (~5 Mo/site, limite du navigateur, pas de l'app) --
+          // setItem() n'écrit rien quand il échoue, donc cette opération n'est PAS réellement en
+          // attente : on la retire de la file en mémoire pour ne pas laisser croire qu'elle l'est
+          // (sans ça, l'app affichait la QuotaExceededError brute du navigateur au lieu de prévenir
+          // clairement que l'opération n'a pas été enregistrée).
+          this.pendingQueue.pop();
+          const pleinError = new Error("Mémoire du navigateur pleine : cette opération n'a PAS été enregistrée. Ferme et rouvre l'app, puis recommence -- ne continue pas à encaisser avant.");
+          pleinError.quotaDepasse = true;
+          throw pleinError;
+        }
         const offlineError = new Error('Hors ligne. Opération en attente.');
         offlineError.isOfflineQueue = true;
         throw offlineError;
@@ -95,7 +107,8 @@ class CHF_API {
   // Retire de la file une création jamais synchronisée (ex: dossier ouvert hors-ligne puis annulé avant le retour d'internet)
   removePendingByLocalId(localId) {
     this.pendingQueue = this.pendingQueue.filter(op => op.localId !== localId);
-    localStorage.setItem('pending_ops', JSON.stringify(this.pendingQueue));
+    try { localStorage.setItem('pending_ops', JSON.stringify(this.pendingQueue)); }
+    catch (e) { console.warn('Mémoire du navigateur pleine, retrait non persisté (redeviendra visible après un rechargement) :', e.message); }
   }
 
   // IDs locaux (dossiers créés/archivés hors ligne) encore en attente de synchronisation -- pour ne
@@ -167,14 +180,16 @@ class CHF_API {
         if (op.localId && !(result && result.id)) throw new Error('Réponse de création sans id — nouvelle tentative');
         if (op.localId && result && result.id) {
           this.localIdMap[op.localId] = result.id;
-          localStorage.setItem('local_id_map', JSON.stringify(this.localIdMap));
+          try { localStorage.setItem('local_id_map', JSON.stringify(this.localIdMap)); }
+          catch (e) { console.warn('Mémoire du navigateur pleine, correspondance ID non persistée :', e.message); }
           // Prévient l'app qu'un ID temporaire local a maintenant un vrai ID serveur
           window.dispatchEvent(new CustomEvent('chf:synced', { detail: { localId: op.localId, realId: result.id, endpoint: op.endpoint } }));
         }
       }
       catch (e) { console.warn('Échec sync, réessaiera plus tard:', e.message); this.pendingQueue.push(op); }
     }
-    localStorage.setItem('pending_ops', JSON.stringify(this.pendingQueue));
+    try { localStorage.setItem('pending_ops', JSON.stringify(this.pendingQueue)); }
+    catch (e) { console.warn('Mémoire du navigateur pleine, file après sync non persistée :', e.message); }
     console.log('✅ Sync terminée.');
   }
 
