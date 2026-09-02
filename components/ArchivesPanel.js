@@ -351,7 +351,6 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       const urlTelechargement = URL.createObjectURL(blob);
       const lien = document.createElement('a');
       lien.href = urlTelechargement;
-      const now = new Date();
       lien.download = `Lot${numeroLot}_${ongCible.replace(/\s+/g, '_')}_${now.toLocaleDateString('fr-FR').replace(/\//g,'-')}.xlsx`;
       document.body.appendChild(lien);
       lien.click();
