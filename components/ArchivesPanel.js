@@ -223,12 +223,12 @@ const periodesSejourDossier = (dossier) => {
   return dates;
 };
 
-// "Date D'admission" du formulaire : la date d'ouverture du dossier si une seule période (ou aucune,
-// ex. simple achat/consultation) ; sinon la liste complète des périodes, comme fait déjà ailleurs dans
-// l'app pour periodeSejourString (ex : "du 10/08 au 15/08 et du 16/08 au 20/08").
+// "Date D'admission" du formulaire : la ou les période(s) d'entrée-sortie du séjour ("du 10/08 au
+// 15/08", ou "du 10/08 au 15/08 et du 16/08 au 20/08" si plusieurs) ; seule la date d'ouverture du
+// dossier sert de repli quand il n'y a aucun séjour du tout (ex. simple achat/consultation).
 const dateAdmissionFormulaireCHF = (dossier) => {
   const periodes = periodesSejourDossier(dossier);
-  if (periodes.length < 2) return dossier.dateHeure || '';
+  if (periodes.length === 0) return dossier.dateHeure || '';
   return periodes.map(d => d.in === d.out
     ? d.in.split('-').reverse().slice(0, 2).join('/')
     : `du ${d.in.split('-').reverse().slice(0, 2).join('/')} au ${d.out.split('-').reverse().slice(0, 2).join('/')}`

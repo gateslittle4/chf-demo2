@@ -3264,7 +3264,7 @@
       };
       var dateAdmissionFormulaireCHF = (dossier) => {
         const periodes = periodesSejourDossier(dossier);
-        if (periodes.length < 2) return dossier.dateHeure || "";
+        if (periodes.length === 0) return dossier.dateHeure || "";
         return periodes.map(
           (d) => d.in === d.out ? d.in.split("-").reverse().slice(0, 2).join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`
         ).join(" et ");
