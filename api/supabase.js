@@ -27,6 +27,11 @@ class CHF_API {
     // personnelle restée active tout ce temps), cet événement ne se produit jamais — donc on
     // retente aussi périodiquement, sans attendre un signal du navigateur.
     setInterval(() => this.syncPending(), 30000);
+    // Tente une synchronisation dès l'ouverture de l'app si des opérations étaient déjà en attente
+    // d'une session précédente (page rechargée/rouverte après une coupure) — sans ça, il fallait
+    // attendre jusqu'à 30s (le prochain passage de l'intervalle ci-dessus) avant le premier essai,
+    // pendant lesquelles un rechargement des données (loadData) pouvait déjà tourner.
+    if (this.pendingQueue.length > 0) this.syncPending();
   }
 
   async request(endpoint, method = 'GET', data = null, meta = {}) {
@@ -85,6 +90,23 @@ class CHF_API {
   removePendingByLocalId(localId) {
     this.pendingQueue = this.pendingQueue.filter(op => op.localId !== localId);
     localStorage.setItem('pending_ops', JSON.stringify(this.pendingQueue));
+  }
+
+  // IDs locaux (dossiers créés/archivés hors ligne) encore en attente de synchronisation -- pour ne
+  // JAMAIS écraser leur version optimiste en mémoire par un rechargement serveur qui ne les connaît
+  // pas encore. Sans ça : dossier créé+archivé hors ligne -> visible localement -> la page se
+  // recharge (ou le polling périodique tombe) avant que la sync n'ait eu le temps d'aboutir ->
+  // l'appel serveur écrase l'état avec une liste qui ne contient pas encore ce dossier -> il
+  // "disparaît" de l'écran, même si sa création reste bien en file et finira par réussir.
+  getPendingEpisodeIds() {
+    const ids = new Set();
+    this.pendingQueue.forEach(op => {
+      if (!op.endpoint.startsWith('/episodes')) return;
+      if (op.localId) ids.add(op.localId);
+      const match = op.endpoint.match(/\/episodes\/(local-[^/]+)/);
+      if (match) ids.add(match[1]);
+    });
+    return ids;
   }
 
   async syncPending() {

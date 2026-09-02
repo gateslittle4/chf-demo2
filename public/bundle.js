@@ -72,6 +72,7 @@
             this.isOnline = false;
           });
           setInterval(() => this.syncPending(), 3e4);
+          if (this.pendingQueue.length > 0) this.syncPending();
         }
         async request(endpoint, method = "GET", data = null, meta = {}) {
           const options = { method, headers: { "Content-Type": "application/json" } };
@@ -125,6 +126,22 @@
         removePendingByLocalId(localId) {
           this.pendingQueue = this.pendingQueue.filter((op) => op.localId !== localId);
           localStorage.setItem("pending_ops", JSON.stringify(this.pendingQueue));
+        }
+        // IDs locaux (dossiers créés/archivés hors ligne) encore en attente de synchronisation -- pour ne
+        // JAMAIS écraser leur version optimiste en mémoire par un rechargement serveur qui ne les connaît
+        // pas encore. Sans ça : dossier créé+archivé hors ligne -> visible localement -> la page se
+        // recharge (ou le polling périodique tombe) avant que la sync n'ait eu le temps d'aboutir ->
+        // l'appel serveur écrase l'état avec une liste qui ne contient pas encore ce dossier -> il
+        // "disparaît" de l'écran, même si sa création reste bien en file et finira par réussir.
+        getPendingEpisodeIds() {
+          const ids = /* @__PURE__ */ new Set();
+          this.pendingQueue.forEach((op) => {
+            if (!op.endpoint.startsWith("/episodes")) return;
+            if (op.localId) ids.add(op.localId);
+            const match = op.endpoint.match(/\/episodes\/(local-[^/]+)/);
+            if (match) ids.add(match[1]);
+          });
+          return ids;
         }
         async syncPending() {
           if (this.pendingQueue.length === 0) return;
@@ -5990,7 +6007,8 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
                 chf.getCatalog("actes")
               ]);
               const episodesCamel = (episodesData || []).map((ep) => fromEpisodeApi(ep));
-              setVerifications(episodesCamel);
+              const idsEnAttente = chf.getPendingEpisodeIds();
+              setVerifications((prev) => idsEnAttente.size === 0 ? episodesCamel : [...episodesCamel, ...prev.filter((v) => idsEnAttente.has(v.id))]);
               setPaiements((paiementsData || []).map((p) => fromPaiementApi(p)));
               setMedicaments(medsData || []);
               setActes(actesData || []);

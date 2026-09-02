@@ -144,7 +144,13 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
           chf.getCatalog('actes')
         ]);
         const episodesCamel = (episodesData || []).map(ep => fromEpisodeApi(ep));
-        setVerifications(episodesCamel);
+        // Ne jamais écraser un dossier créé/archivé hors ligne et pas encore synchronisé par cette
+        // liste fraîche du serveur, qui ne le connaît pas encore -- sinon il "disparaît" de l'écran
+        // pendant la fenêtre entre l'archivage hors ligne et la fin de la sync (voir
+        // getPendingEpisodeIds), même si sa création reste bien en file et finira par réussir.
+        const idsEnAttente = chf.getPendingEpisodeIds();
+        setVerifications(prev => idsEnAttente.size === 0 ? episodesCamel
+          : [...episodesCamel, ...prev.filter(v => idsEnAttente.has(v.id))]);
         setPaiements((paiementsData || []).map(p => fromPaiementApi(p)));
         setMedicaments(medsData || []);
         setActes(actesData || []);
