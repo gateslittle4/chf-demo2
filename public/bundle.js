@@ -93,6 +93,7 @@
             return await response.json();
           } catch (error) {
             if (error.message.includes("Failed to fetch") || !navigator.onLine) {
+              if (meta.isRetry) throw error;
               console.warn("\u{1F534} Hors ligne, mise en file d'attente:", endpoint, data);
               this.pendingQueue.push({ endpoint, method, data, timestamp: Date.now(), localId: meta.localId || null });
               try {
@@ -130,7 +131,7 @@
           this.pendingQueue = [];
           for (const op of queue) {
             try {
-              const result = await this.request(op.endpoint, op.method, op.data);
+              const result = await this.request(op.endpoint, op.method, op.data, { isRetry: true });
               if (op.localId && result && result.id) {
                 window.dispatchEvent(new CustomEvent("chf:synced", { detail: { localId: op.localId, realId: result.id, endpoint: op.endpoint } }));
               }

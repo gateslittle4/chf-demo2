@@ -34,6 +34,15 @@ class CHF_API {
       return await response.json();
     } catch (error) {
       if (error.message.includes('Failed to fetch') || !navigator.onLine) {
+        // syncPending() rejoue déjà une opération DÉJÀ en file via ce même request() -- si cette
+        // relecture échoue encore (backend toujours injoignable), il ne faut PAS la remettre en file
+        // ici EN PLUS de la remise en file que fait syncPending() dans son propre catch : sans ce
+        // garde-fou, chaque échec de resynchronisation DOUBLAIT la file (remise en file ici, puis
+        // encore par syncPending), donc doublait à chaque passage de l'intervalle de 30s -- 1, 2, 4,
+        // 8... des milliers de doublons en moins d'une heure de connexion instable (incident du
+        // 02/09 : 5326 dossiers vides dupliqués pour un seul patient). On laisse simplement
+        // remonter l'erreur brute ; syncPending() se charge seul de la remise en file.
+        if (meta.isRetry) throw error;
         console.warn('🔴 Hors ligne, mise en file d\'attente:', endpoint, data);
         this.pendingQueue.push({ endpoint, method, data, timestamp: Date.now(), localId: meta.localId || null });
         try {
@@ -74,7 +83,7 @@ class CHF_API {
     this.pendingQueue = [];
     for (const op of queue) {
       try {
-        const result = await this.request(op.endpoint, op.method, op.data);
+        const result = await this.request(op.endpoint, op.method, op.data, { isRetry: true });
         if (op.localId && result && result.id) {
           // Prévient l'app qu'un ID temporaire local a maintenant un vrai ID serveur
           window.dispatchEvent(new CustomEvent('chf:synced', { detail: { localId: op.localId, realId: result.id, endpoint: op.endpoint } }));
