@@ -33,6 +33,7 @@ function CalculateurPanel({
   fichesDossier, onSupprimerFicheDossier, onMarquerProblemeFiche,
   idFicheEnCoursDEdition,  // ID de la fiche en cours d'édition (passé par le parent)
   onEditerFiche,           // NOUVELLE PROP : fonction pour charger une fiche en édition
+  idFicheApresLaquelleInserer, onInsererApres, onAnnulerInsertion, // insertion d'une fiche oubliée entre deux fiches existantes
   numeroFicheCourante,
   dateFiche, setDateFiche,
   prescritPar, setPrescritPar,
@@ -720,11 +721,18 @@ function CalculateurPanel({
                 Fiches validées {idFicheEnCoursDEdition ? '(modification en cours)' : ''}
               </span>
               <button onClick={imprimerToutesLesFichesDuDossier} className="ml-2 bg-[#1E2A24] text-white text-[9px] font-bold px-2 py-1 rounded-lg">🖨️ Imprimer les {fichesDossier.length} fiche{fichesDossier.length > 1 ? 's' : ''} d'affilée</button>
+              {idFicheApresLaquelleInserer && (
+                <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 text-indigo-800 rounded-lg px-2 py-1.5 text-[10px] font-bold">
+                  <span>↕️ La prochaine fiche enregistrée s'insérera au N°{numeroFicheCourante} (fiches suivantes renumérotées)</span>
+                  {onAnnulerInsertion && <button onClick={onAnnulerInsertion} className="underline hover:text-indigo-950">Annuler</button>}
+                </div>
+              )}
               <div className="flex flex-wrap gap-1.5">
                 {fichesDossier.map(f => {
                   const isEditing = f.id === idFicheEnCoursDEdition;
+                  const estCibleInsertion = f.id === idFicheApresLaquelleInserer;
                   return (
-                    <div key={f.id} className={`flex items-center rounded-lg font-mono text-[11px] font-bold border overflow-hidden shadow-sm ${isEditing ? 'bg-blue-100 border-blue-400' : f.probleme ? 'bg-red-100 border-red-400' : 'bg-gray-50 border-gray-200'}`}>
+                    <div key={f.id} className={`flex items-center rounded-lg font-mono text-[11px] font-bold border overflow-hidden shadow-sm ${isEditing ? 'bg-blue-100 border-blue-400' : estCibleInsertion ? 'bg-indigo-100 border-indigo-400' : f.probleme ? 'bg-red-100 border-red-400' : 'bg-gray-50 border-gray-200'}`}>
                       <button onClick={() => reimprimerFicheValidee(f)} className="pl-2.5 pr-2 py-1 hover:text-blue-700" title="Réimprimer cette fiche">
                         {f.probleme && '❓ '}🖨️ Fiche N°{f.numeroFiche} ({formatGourdes(f.totalGlobal)} Gdes)
                       </button>
@@ -746,6 +754,16 @@ function CalculateurPanel({
                           title="Modifier cette fiche"
                         >
                           ✏️
+                        </button>
+                      )}
+                      {/* Bouton INSÉRER UNE FICHE APRÈS CELLE-CI (au cas où une fiche a été oubliée) */}
+                      {onInsererApres && (
+                        <button
+                          onClick={() => onInsererApres(f.id)}
+                          className={`px-2 py-1 border-l transition-colors font-bold text-[10px] ${estCibleInsertion ? 'bg-indigo-600 text-white' : 'bg-indigo-500/10 hover:bg-indigo-600 hover:text-white text-indigo-700'}`}
+                          title="Insérer une fiche oubliée juste après celle-ci"
+                        >
+                          ➕
                         </button>
                       )}
                       {peutSupprimerFiche && (
@@ -907,7 +925,7 @@ function CalculateurPanel({
             <button onClick={imprimerFicheA4} disabled={!paiementEffectue} className={`flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>🖨️ A4</button>
             <button onClick={imprimerTicket} disabled={!paiementEffectue} className={`flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>🧾 Ticket</button>
             <button onClick={enregistrerFicheActive} disabled={!peutArchiver} className="flex-[2] bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl py-3 text-xs font-black shadow-md disabled:opacity-50">
-              {idFicheEnCoursDEdition ? '💾 Mettre à jour la Fiche' : `💾 Enregistrer la Fiche N°${numeroFicheCourante} au Dossier`}
+              {idFicheEnCoursDEdition ? '💾 Mettre à jour la Fiche' : idFicheApresLaquelleInserer ? `💾 Insérer la Fiche N°${numeroFicheCourante} au Dossier` : `💾 Enregistrer la Fiche N°${numeroFicheCourante} au Dossier`}
             </button>
           </div>
         </div>
