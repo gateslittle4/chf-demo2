@@ -97,6 +97,7 @@
           } catch (error) {
             if (error instanceof TypeError || !navigator.onLine) {
               if (method === "GET") throw error;
+              if (meta.isRetry) throw error;
               console.warn("\u{1F534} Hors ligne, mise en file d'attente:", endpoint, data);
               this.pendingQueue.push({ endpoint, method, data, timestamp: Date.now(), localId: meta.localId || null });
               try {
@@ -186,7 +187,7 @@
               continue;
             }
             try {
-              const result = await this.request(endpoint, op.method, data);
+              const result = await this.request(endpoint, op.method, data, { isRetry: true });
               if (op.localId && !(result && result.id)) throw new Error("R\xE9ponse de cr\xE9ation sans id \u2014 nouvelle tentative");
               if (op.localId && result && result.id) {
                 this.localIdMap[op.localId] = result.id;

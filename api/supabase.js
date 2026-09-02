@@ -65,6 +65,15 @@ class CHF_API {
         // compteur "opérations en attente" à chaque tentative de rechargement automatique (au
         // démarrage, toutes les 3 minutes...), même quand la personne n'avait rien fait hors ligne.
         if (method === 'GET') throw error;
+        // syncPending() rejoue déjà une opération DÉJÀ en file via ce même request() -- si cette
+        // relecture échoue encore (backend toujours injoignable), il ne faut PAS la remettre en file
+        // ici EN PLUS de la remise en file que fait syncPending() dans son propre catch : sans ce
+        // garde-fou, chaque échec de resynchronisation DOUBLAIT la file (remise en file ici, puis
+        // encore par syncPending), donc doublait à chaque passage de l'intervalle de 30s -- 1, 2, 4,
+        // 8... des milliers de doublons en moins d'une heure de connexion instable (incident du
+        // 02/09 : 5326 dossiers vides dupliqués pour un seul patient). On laisse simplement
+        // remonter l'erreur brute ; syncPending() se charge seul de la remise en file.
+        if (meta.isRetry) throw error;
         console.warn('🔴 Hors ligne, mise en file d\'attente:', endpoint, data);
         this.pendingQueue.push({ endpoint, method, data, timestamp: Date.now(), localId: meta.localId || null });
         try {
@@ -170,7 +179,7 @@ class CHF_API {
       const bloque = referenceIdLocalNonResolu(endpoint) || (data && typeof data === 'object' && Object.values(data).some(referenceIdLocalNonResolu));
       if (bloque) { this.pendingQueue.push(op); continue; }
       try {
-        const result = await this.request(endpoint, op.method, data);
+        const result = await this.request(endpoint, op.method, data, { isRetry: true });
         // Une création (op.localId défini) qui répond sans erreur HTTP mais sans id exploitable ne
         // doit jamais être abandonnée silencieusement : sans correspondance local -> réel enregistrée,
         // toute opération suivante référençant ce même id local (fiches ajoutées, archivage...) reste
