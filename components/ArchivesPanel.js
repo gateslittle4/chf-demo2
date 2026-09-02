@@ -7,6 +7,23 @@ const { Eye, Pencil, Trash2, Printer, Clock, FolderOpen, X, Download, Check } = 
 const { chf, toEpisodeApi } = require('../api/supabase');
 const { LOGO_CHF_BASE64 } = require('../utils/logoChf');
 const NOM_COMPLET_ONG = { "MSF-H": "MSF-HOLLANDE", "MSF-F": "MSF-FRANCE" }; // affiché en entier dans les rapports Excel — complète ici si d'autres partenaires sont abrégés
+
+// ExcelJS (~1 Mo) n'est chargé qu'au moment où on génère vraiment un fichier Excel de lot -- pas à
+// chaque ouverture de l'app, qui n'en a besoin que rarement. Mémorisé : un seul <script> injecté
+// même si on génère plusieurs lots dans la même session.
+let promesseExcelJS = null;
+function chargerExcelJS() {
+  if (window.ExcelJS) return Promise.resolve();
+  if (promesseExcelJS) return promesseExcelJS;
+  promesseExcelJS = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
+    script.onload = () => resolve();
+    script.onerror = () => { promesseExcelJS = null; reject(new Error("Impossible de charger le générateur Excel — vérifie ta connexion.")); };
+    document.head.appendChild(script);
+  });
+  return promesseExcelJS;
+}
 const nomCompletOng = (nom) => NOM_COMPLET_ONG[nom] || nom;
 // Rabais fixé par contrat pour certains partenaires -- toujours appliqué, jamais une case à cocher
 // à retenir (contrairement au rabais ponctuel proposé aux autres ONG). Ajouter ici si un autre
@@ -432,6 +449,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
 
   const genererFichierExcelPourLot = async (ongCible, idsDossiers, numeroLot, moisLot) => {
     try {
+      await chargerExcelJS();
       // Regroupement mère/bébé : un dossier nommé "Bb <nom de la mère>" est trié juste après le
       // dossier de sa mère (même date effective, ordre alphabétique de la "famille" sinon), même si
       // le bébé n'a pas sa propre date d'hébergement (il hérite alors de celle de sa mère pour le tri).

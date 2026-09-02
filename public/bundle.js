@@ -3083,6 +3083,22 @@
       var { chf, toEpisodeApi } = require_supabase();
       var { LOGO_CHF_BASE64 } = require_logoChf();
       var NOM_COMPLET_ONG = { "MSF-H": "MSF-HOLLANDE", "MSF-F": "MSF-FRANCE" };
+      var promesseExcelJS = null;
+      function chargerExcelJS() {
+        if (window.ExcelJS) return Promise.resolve();
+        if (promesseExcelJS) return promesseExcelJS;
+        promesseExcelJS = new Promise((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = "https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js";
+          script.onload = () => resolve();
+          script.onerror = () => {
+            promesseExcelJS = null;
+            reject(new Error("Impossible de charger le g\xE9n\xE9rateur Excel \u2014 v\xE9rifie ta connexion."));
+          };
+          document.head.appendChild(script);
+        });
+        return promesseExcelJS;
+      }
       var nomCompletOng = (nom) => NOM_COMPLET_ONG[nom] || nom;
       var RABAIS_CONTRACTUEL_PAR_ONG = { "MSF-F": 10 };
       var formaterMoisFr = (moisLot) => {
@@ -3476,6 +3492,7 @@
         const genererFichierExcelPourLot = async (ongCible, idsDossiers, numeroLot, moisLot) => {
           var _a2;
           try {
+            await chargerExcelJS();
             let listeDossiersONG = trierAvecRegroupementMereBebe(verifications.filter((v) => idsDossiers.includes(v.id)), verifications);
             if (listeDossiersONG.length === 0) {
               showToast(`Aucun dossier trouv\xE9 pour ${ongCible}`, "error");
