@@ -49,6 +49,11 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   const [telephone, setTelephone] = useState("");
   const [fichesDossier, setFichesDossier] = useState([]);
   const [idFicheEnCoursDEdition, setIdFicheEnCoursDEdition] = useState(null); // ID de la fiche en édition
+  // ID de la fiche APRÈS laquelle insérer la prochaine fiche enregistrée (null = ajout normal en fin
+  // de liste). Sert au cas où une fiche a été oubliée entre deux fiches déjà enregistrées (ex. un
+  // acte fait le même jour mais saisi après coup) : la nouvelle fiche prend le numéro qui suit
+  // immédiatement la fiche cible, et toutes les fiches suivantes sont renumérotées (+1).
+  const [idFicheApresLaquelleInserer, setIdFicheApresLaquelleInserer] = useState(null);
   const [modePreValidation, setModePreValidation] = useState(false);
   const [lignesCalcul, setLignesCalcul] = useState([]);
   const [dateEntree1, setDateEntree1] = useState("");
@@ -170,6 +175,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   const viderLeCalculateurFicheUniquement = () => {
     setLignesCalcul([]);
     setIdFicheEnCoursDEdition(null);
+    setIdFicheApresLaquelleInserer(null);
     setDateEntree1("");
     setDateSortie1("");
     setTypeLit1("normal");
@@ -190,6 +196,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
       showToast("Fiche introuvable.", "error");
       return;
     }
+    setIdFicheApresLaquelleInserer(null); // exclusif avec l'insertion
     // Restaurer l'état du calculateur à partir de rawState
     const raw = fiche.rawState || {};
     setLignesCalcul(raw.lignesCalcul || []);
@@ -221,12 +228,22 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
       // Si une fiche est en cours d'édition, on la remplace
       enregistrerFicheModifiee({ ...fiche, id: idFicheEnCoursDEdition });
     } else {
-      // Sinon on l'ajoute
-      setFichesDossier(prev => [...prev, fiche]);
+      // Sinon on l'ajoute (en fin de liste, ou insérée + renumérotée si une insertion est en cours)
+      const insertionEnCours = !!idFicheApresLaquelleInserer;
+      setFichesDossier(prev => positionnerNouvelleFiche(fiche, prev));
       viderLeCalculateurFicheUniquement();
-      showToast("Fiche enregistrée", "success");
+      showToast(insertionEnCours ? `Fiche N°${fiche.numeroFiche} insérée, fiches suivantes renumérotées` : "Fiche enregistrée", "success");
     }
   };
+
+  // Démarre le mode "insertion" : la prochaine fiche enregistrée prendra place juste après celle-ci.
+  const insererFicheApres = (idFicheCible) => {
+    setIdFicheEnCoursDEdition(null); // exclusif avec l'édition
+    setIdFicheApresLaquelleInserer(idFicheCible);
+    const cible = fichesDossier.find(f => f.id === idFicheCible);
+    showToast(`La prochaine fiche enregistrée prendra le N°${(cible?.numeroFiche || 0) + 1}, entre la Fiche N°${cible?.numeroFiche} et la suivante.`, "info");
+  };
+  const annulerInsertionFiche = () => setIdFicheApresLaquelleInserer(null);
 
   const initialiserNouveauDossier = async (nom, ong, numDossier, type, naissance, tel, serviceChoisi) => {
     const propreNom = formaterNomPropre(nom);
@@ -315,7 +332,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
         };
         const fichesFinales = idFicheEnCoursDEdition
           ? fichesDossier.map(f => f.id === idFicheEnCoursDEdition ? fiche : f)
-          : [...fichesDossier, fiche];
+          : positionnerNouvelleFiche(fiche, fichesDossier);
         setFichesDossier(fichesFinales);
         viderLeCalculateurFicheUniquement();
         callback(fichesFinales);
@@ -709,7 +726,24 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   const grandTotalGlobalFiche = useMemo(() => Object.values(totalsParService).reduce((a, b) => a + b, 0), [totalsParService]);
   const totalDossierGourdes = useMemo(() => fichesDossier.reduce((s, f) => s + f.totalGlobal, 0), [fichesDossier]);
   const cumulCategoriesDossierActif = useMemo(() => { const b = {}; CATEGORIES_LISTE.forEach(c => b[c.key] = 0); fichesDossier.forEach(f => { Object.keys(f.breakdown).forEach(k => { if (b[k] !== undefined) b[k] += f.breakdown[k]; }); }); return b; }, [fichesDossier]);
-  const numeroFicheCourante = useMemo(() => fichesDossier.length > 0 ? Math.max(...fichesDossier.map(f => f.numeroFiche), 0) + 1 : 1, [fichesDossier]);
+  const numeroFicheCourante = useMemo(() => {
+    const prochainNumeroEnFin = fichesDossier.length > 0 ? Math.max(...fichesDossier.map(f => f.numeroFiche), 0) + 1 : 1;
+    if (!idFicheApresLaquelleInserer) return prochainNumeroEnFin;
+    const ficheCible = fichesDossier.find(f => f.id === idFicheApresLaquelleInserer);
+    return ficheCible ? ficheCible.numeroFiche + 1 : prochainNumeroEnFin; // cible supprimée entretemps -> comportement normal
+  }, [fichesDossier, idFicheApresLaquelleInserer]);
+
+  // Insère `fiche` juste après la fiche ciblée par idFicheApresLaquelleInserer (numéro déjà correct,
+  // voir numeroFicheCourante ci-dessus) et décale (+1) le numéro de toutes les fiches qui suivaient
+  // déjà ce point -- ou ajoute simplement en fin de liste si aucune insertion n'est en cours.
+  const positionnerNouvelleFiche = (fiche, listeActuelle) => {
+    if (!idFicheApresLaquelleInserer) return [...listeActuelle, fiche];
+    const indexCible = listeActuelle.findIndex(f => f.id === idFicheApresLaquelleInserer);
+    if (indexCible === -1) return [...listeActuelle, fiche];
+    const decalees = listeActuelle.map(f => f.numeroFiche >= fiche.numeroFiche ? { ...f, numeroFiche: f.numeroFiche + 1 } : f);
+    decalees.splice(indexCible + 1, 0, fiche);
+    return decalees;
+  };
 
   const restituerStock = async (fiches) => {
     const aRestituer = {};
@@ -938,6 +972,9 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
               fichesDossier={fichesDossier} onSupprimerFicheDossier={supprimerFicheDossier} 
               idFicheEnCoursDEdition={idFicheEnCoursDEdition}  // <-- passé pour affichage
               onEditerFiche={editerFiche}                       // <-- nouvelle prop
+              idFicheApresLaquelleInserer={idFicheApresLaquelleInserer}
+              onInsererApres={insererFicheApres}
+              onAnnulerInsertion={annulerInsertionFiche}
               numeroFicheCourante={numeroFicheCourante}
               dateEntree1={dateEntree1} setDateEntree1={setDateEntree1} dateSortie1={dateSortie1} setDateSortie1={setDateSortie1}
               typeLit1={typeLit1} setTypeLit1={setTypeLit1} j1={j1} totalE1={totalE1}

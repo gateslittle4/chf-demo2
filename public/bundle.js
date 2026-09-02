@@ -3940,6 +3940,10 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
         // ID de la fiche en cours d'édition (passé par le parent)
         onEditerFiche,
         // NOUVELLE PROP : fonction pour charger une fiche en édition
+        idFicheApresLaquelleInserer,
+        onInsererApres,
+        onAnnulerInsertion,
+        // insertion d'une fiche oubliée entre deux fiches existantes
         numeroFicheCourante,
         dateFiche,
         setDateFiche,
@@ -4745,9 +4749,10 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
         }, className: "text-[9px] font-bold text-blue-600 underline" }, "\u270F\uFE0F Changer")) : /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5 items-center mt-1 flex-wrap" }, /* @__PURE__ */ React.createElement("select", { value: nouveauTypeEdit, onChange: (e) => setNouveauTypeEdit(e.target.value), className: "border rounded p-1 text-xs bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "ONG" }, "\u{1F3E5} Partenaire"), /* @__PURE__ */ React.createElement("option", { value: "PRIVE" }, "\u{1F4B3} Priv\xE9")), nouveauTypeEdit === "ONG" && /* @__PURE__ */ React.createElement("select", { value: nouvelOngEdit, onChange: (e) => setNouvelOngEdit(e.target.value), className: "border rounded p-1 text-xs bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- Partenaire --"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o))), /* @__PURE__ */ React.createElement("button", { onClick: () => {
           if (onChangerTypeOng) onChangerTypeOng(nouveauTypeEdit, nouveauTypeEdit === "ONG" ? nouvelOngEdit : "");
           setEditTypeOuvert(false);
-        }, className: "bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(Check, { size: 10 })), /* @__PURE__ */ React.createElement("button", { onClick: () => setEditTypeOuvert(false), className: "border text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(X, { size: 10 })))), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 flex-wrap" }, peutAnnulerDossier && /* @__PURE__ */ React.createElement("button", { onClick: onAnnulerDossier, className: "bg-red-50 text-red-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-red-200" }, "Abandonner"), peutSuspendre && /* @__PURE__ */ React.createElement("button", { onClick: onSuspendreDossier, className: "bg-amber-50 text-amber-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-amber-200 flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Clock, { size: 12 }), " Suspendre"), peutSuspendre && onReporterDossier && /* @__PURE__ */ React.createElement("button", { onClick: onReporterDossier, className: "bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-indigo-200 flex items-center gap-1" }, "\u{1F4C5} Reporter au mois suivant"), peutArchiver && /* @__PURE__ */ React.createElement("button", { onClick: onCloturerDossier, className: "bg-emerald-700 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg" }, "\u{1F3C1} Cl\xF4turer"))), fichesDossier.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm space-y-1.5" }, /* @__PURE__ */ React.createElement("span", { className: "text-[9px] uppercase font-black text-gray-400" }, "Fiches valid\xE9es ", idFicheEnCoursDEdition ? "(modification en cours)" : ""), /* @__PURE__ */ React.createElement("button", { onClick: imprimerToutesLesFichesDuDossier, className: "ml-2 bg-[#1E2A24] text-white text-[9px] font-bold px-2 py-1 rounded-lg" }, "\u{1F5A8}\uFE0F Imprimer les ", fichesDossier.length, " fiche", fichesDossier.length > 1 ? "s" : "", " d'affil\xE9e"), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-1.5" }, fichesDossier.map((f) => {
+        }, className: "bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(Check, { size: 10 })), /* @__PURE__ */ React.createElement("button", { onClick: () => setEditTypeOuvert(false), className: "border text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(X, { size: 10 })))), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 flex-wrap" }, peutAnnulerDossier && /* @__PURE__ */ React.createElement("button", { onClick: onAnnulerDossier, className: "bg-red-50 text-red-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-red-200" }, "Abandonner"), peutSuspendre && /* @__PURE__ */ React.createElement("button", { onClick: onSuspendreDossier, className: "bg-amber-50 text-amber-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-amber-200 flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Clock, { size: 12 }), " Suspendre"), peutSuspendre && onReporterDossier && /* @__PURE__ */ React.createElement("button", { onClick: onReporterDossier, className: "bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-indigo-200 flex items-center gap-1" }, "\u{1F4C5} Reporter au mois suivant"), peutArchiver && /* @__PURE__ */ React.createElement("button", { onClick: onCloturerDossier, className: "bg-emerald-700 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg" }, "\u{1F3C1} Cl\xF4turer"))), fichesDossier.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm space-y-1.5" }, /* @__PURE__ */ React.createElement("span", { className: "text-[9px] uppercase font-black text-gray-400" }, "Fiches valid\xE9es ", idFicheEnCoursDEdition ? "(modification en cours)" : ""), /* @__PURE__ */ React.createElement("button", { onClick: imprimerToutesLesFichesDuDossier, className: "ml-2 bg-[#1E2A24] text-white text-[9px] font-bold px-2 py-1 rounded-lg" }, "\u{1F5A8}\uFE0F Imprimer les ", fichesDossier.length, " fiche", fichesDossier.length > 1 ? "s" : "", " d'affil\xE9e"), idFicheApresLaquelleInserer && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 bg-indigo-50 border border-indigo-200 text-indigo-800 rounded-lg px-2 py-1.5 text-[10px] font-bold" }, /* @__PURE__ */ React.createElement("span", null, "\u2195\uFE0F La prochaine fiche enregistr\xE9e s'ins\xE9rera au N\xB0", numeroFicheCourante, " (fiches suivantes renum\xE9rot\xE9es)"), onAnnulerInsertion && /* @__PURE__ */ React.createElement("button", { onClick: onAnnulerInsertion, className: "underline hover:text-indigo-950" }, "Annuler")), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-1.5" }, fichesDossier.map((f) => {
           const isEditing = f.id === idFicheEnCoursDEdition;
-          return /* @__PURE__ */ React.createElement("div", { key: f.id, className: `flex items-center rounded-lg font-mono text-[11px] font-bold border overflow-hidden shadow-sm ${isEditing ? "bg-blue-100 border-blue-400" : f.probleme ? "bg-red-100 border-red-400" : "bg-gray-50 border-gray-200"}` }, /* @__PURE__ */ React.createElement("button", { onClick: () => reimprimerFicheValidee(f), className: "pl-2.5 pr-2 py-1 hover:text-blue-700", title: "R\xE9imprimer cette fiche" }, f.probleme && "\u2753 ", "\u{1F5A8}\uFE0F Fiche N\xB0", f.numeroFiche, " (", formatGourdes(f.totalGlobal), " Gdes)"), onMarquerProblemeFiche && /* @__PURE__ */ React.createElement(
+          const estCibleInsertion = f.id === idFicheApresLaquelleInserer;
+          return /* @__PURE__ */ React.createElement("div", { key: f.id, className: `flex items-center rounded-lg font-mono text-[11px] font-bold border overflow-hidden shadow-sm ${isEditing ? "bg-blue-100 border-blue-400" : estCibleInsertion ? "bg-indigo-100 border-indigo-400" : f.probleme ? "bg-red-100 border-red-400" : "bg-gray-50 border-gray-200"}` }, /* @__PURE__ */ React.createElement("button", { onClick: () => reimprimerFicheValidee(f), className: "pl-2.5 pr-2 py-1 hover:text-blue-700", title: "R\xE9imprimer cette fiche" }, f.probleme && "\u2753 ", "\u{1F5A8}\uFE0F Fiche N\xB0", f.numeroFiche, " (", formatGourdes(f.totalGlobal), " Gdes)"), onMarquerProblemeFiche && /* @__PURE__ */ React.createElement(
             "button",
             {
               onClick: () => onMarquerProblemeFiche(f.id),
@@ -4765,6 +4770,14 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
               title: "Modifier cette fiche"
             },
             "\u270F\uFE0F"
+          ), onInsererApres && /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              onClick: () => onInsererApres(f.id),
+              className: `px-2 py-1 border-l transition-colors font-bold text-[10px] ${estCibleInsertion ? "bg-indigo-600 text-white" : "bg-indigo-500/10 hover:bg-indigo-600 hover:text-white text-indigo-700"}`,
+              title: "Ins\xE9rer une fiche oubli\xE9e juste apr\xE8s celle-ci"
+            },
+            "\u2795"
           ), peutSupprimerFiche && /* @__PURE__ */ React.createElement("button", { onClick: () => {
             if (confirm("Supprimer cette fiche ?")) onSupprimerFicheDossier(f.id);
           }, className: "px-2 py-1 bg-gray-200/50 hover:bg-red-600 hover:text-white border-l transition-colors" }, /* @__PURE__ */ React.createElement(X, { size: 12 })));
@@ -4847,7 +4860,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           const m = totalsParService[srv.key];
           if (m === 0) return null;
           return /* @__PURE__ */ React.createElement("div", { key: srv.key, className: "grid grid-cols-3 py-0.5" }, /* @__PURE__ */ React.createElement("span", null, "\u2022 ", srv.label), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, formatGourdes(m)), /* @__PURE__ */ React.createElement("span", { className: "text-right font-bold" }, formatDH(m), " DH"));
-        })), /* @__PURE__ */ React.createElement("div", { className: "bg-[#1E2A24] text-white p-4 flex justify-between items-center font-bold text-sm font-mono" }, /* @__PURE__ */ React.createElement("span", null, "SOUS-TOTAL FICHE ", idFicheEnCoursDEdition ? "EN MODIFICATION" : `N\xB0${numeroFicheCourante}`, " :"), /* @__PURE__ */ React.createElement("span", null, formatGourdes(grandTotal), " Gdes (", formatDH(grandTotal), " DH)")), /* @__PURE__ */ React.createElement("button", { onClick: () => setDetailOuvert(false), className: "w-full py-3 text-center text-gray-500 text-xs font-bold border-t" }, "Fermer"))), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 flex-wrap" }, /* @__PURE__ */ React.createElement("button", { onClick: onViderFicheActive, className: "flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl py-3 text-xs font-bold" }, "\u{1F9F9} Vider l'\xE9cran"), /* @__PURE__ */ React.createElement("button", { onClick: imprimerFicheA4, disabled: !paiementEffectue, className: `flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}` }, "\u{1F5A8}\uFE0F A4"), /* @__PURE__ */ React.createElement("button", { onClick: imprimerTicket, disabled: !paiementEffectue, className: `flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? "bg-green-600 hover:bg-green-700 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}` }, "\u{1F9FE} Ticket"), /* @__PURE__ */ React.createElement("button", { onClick: enregistrerFicheActive, disabled: !peutArchiver, className: "flex-[2] bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl py-3 text-xs font-black shadow-md disabled:opacity-50" }, idFicheEnCoursDEdition ? "\u{1F4BE} Mettre \xE0 jour la Fiche" : `\u{1F4BE} Enregistrer la Fiche N\xB0${numeroFicheCourante} au Dossier`))));
+        })), /* @__PURE__ */ React.createElement("div", { className: "bg-[#1E2A24] text-white p-4 flex justify-between items-center font-bold text-sm font-mono" }, /* @__PURE__ */ React.createElement("span", null, "SOUS-TOTAL FICHE ", idFicheEnCoursDEdition ? "EN MODIFICATION" : `N\xB0${numeroFicheCourante}`, " :"), /* @__PURE__ */ React.createElement("span", null, formatGourdes(grandTotal), " Gdes (", formatDH(grandTotal), " DH)")), /* @__PURE__ */ React.createElement("button", { onClick: () => setDetailOuvert(false), className: "w-full py-3 text-center text-gray-500 text-xs font-bold border-t" }, "Fermer"))), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 flex-wrap" }, /* @__PURE__ */ React.createElement("button", { onClick: onViderFicheActive, className: "flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl py-3 text-xs font-bold" }, "\u{1F9F9} Vider l'\xE9cran"), /* @__PURE__ */ React.createElement("button", { onClick: imprimerFicheA4, disabled: !paiementEffectue, className: `flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}` }, "\u{1F5A8}\uFE0F A4"), /* @__PURE__ */ React.createElement("button", { onClick: imprimerTicket, disabled: !paiementEffectue, className: `flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? "bg-green-600 hover:bg-green-700 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}` }, "\u{1F9FE} Ticket"), /* @__PURE__ */ React.createElement("button", { onClick: enregistrerFicheActive, disabled: !peutArchiver, className: "flex-[2] bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl py-3 text-xs font-black shadow-md disabled:opacity-50" }, idFicheEnCoursDEdition ? "\u{1F4BE} Mettre \xE0 jour la Fiche" : idFicheApresLaquelleInserer ? `\u{1F4BE} Ins\xE9rer la Fiche N\xB0${numeroFicheCourante} au Dossier` : `\u{1F4BE} Enregistrer la Fiche N\xB0${numeroFicheCourante} au Dossier`))));
       }
       module.exports = CalculateurPanel;
     }
@@ -5535,6 +5548,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
         const [telephone, setTelephone] = useState("");
         const [fichesDossier, setFichesDossier] = useState([]);
         const [idFicheEnCoursDEdition, setIdFicheEnCoursDEdition] = useState(null);
+        const [idFicheApresLaquelleInserer, setIdFicheApresLaquelleInserer] = useState(null);
         const [modePreValidation, setModePreValidation] = useState(false);
         const [lignesCalcul, setLignesCalcul] = useState([]);
         const [dateEntree1, setDateEntree1] = useState("");
@@ -5693,6 +5707,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
         const viderLeCalculateurFicheUniquement = () => {
           setLignesCalcul([]);
           setIdFicheEnCoursDEdition(null);
+          setIdFicheApresLaquelleInserer(null);
           setDateEntree1("");
           setDateSortie1("");
           setTypeLit1("normal");
@@ -5711,6 +5726,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
             showToast("Fiche introuvable.", "error");
             return;
           }
+          setIdFicheApresLaquelleInserer(null);
           const raw = fiche.rawState || {};
           setLignesCalcul(raw.lignesCalcul || []);
           setDateEntree1(raw.dateEntree1 || "");
@@ -5736,11 +5752,19 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           if (idFicheEnCoursDEdition) {
             enregistrerFicheModifiee({ ...fiche, id: idFicheEnCoursDEdition });
           } else {
-            setFichesDossier((prev) => [...prev, fiche]);
+            const insertionEnCours = !!idFicheApresLaquelleInserer;
+            setFichesDossier((prev) => positionnerNouvelleFiche(fiche, prev));
             viderLeCalculateurFicheUniquement();
-            showToast("Fiche enregistr\xE9e", "success");
+            showToast(insertionEnCours ? `Fiche N\xB0${fiche.numeroFiche} ins\xE9r\xE9e, fiches suivantes renum\xE9rot\xE9es` : "Fiche enregistr\xE9e", "success");
           }
         };
+        const insererFicheApres = (idFicheCible) => {
+          setIdFicheEnCoursDEdition(null);
+          setIdFicheApresLaquelleInserer(idFicheCible);
+          const cible = fichesDossier.find((f) => f.id === idFicheCible);
+          showToast(`La prochaine fiche enregistr\xE9e prendra le N\xB0${((cible == null ? void 0 : cible.numeroFiche) || 0) + 1}, entre la Fiche N\xB0${cible == null ? void 0 : cible.numeroFiche} et la suivante.`, "info");
+        };
+        const annulerInsertionFiche = () => setIdFicheApresLaquelleInserer(null);
         const initialiserNouveauDossier = async (nom, ong, numDossier, type, naissance, tel, serviceChoisi) => {
           const propreNom = formaterNomPropre(nom);
           if (!propreNom || !ong && type === "ONG") {
@@ -5836,7 +5860,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
                 contientErreurs: false,
                 rawState: { lignesCalcul: [...lignesCalcul], dateEntree1, dateSortie1, typeLit1, multiPeriode, dateEntree2, dateSortie2, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
               };
-              const fichesFinales = idFicheEnCoursDEdition ? fichesDossier.map((f) => f.id === idFicheEnCoursDEdition ? fiche : f) : [...fichesDossier, fiche];
+              const fichesFinales = idFicheEnCoursDEdition ? fichesDossier.map((f) => f.id === idFicheEnCoursDEdition ? fiche : f) : positionnerNouvelleFiche(fiche, fichesDossier);
               setFichesDossier(fichesFinales);
               viderLeCalculateurFicheUniquement();
               callback(fichesFinales);
@@ -6338,7 +6362,20 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
           });
           return b;
         }, [fichesDossier]);
-        const numeroFicheCourante = useMemo(() => fichesDossier.length > 0 ? Math.max(...fichesDossier.map((f) => f.numeroFiche), 0) + 1 : 1, [fichesDossier]);
+        const numeroFicheCourante = useMemo(() => {
+          const prochainNumeroEnFin = fichesDossier.length > 0 ? Math.max(...fichesDossier.map((f) => f.numeroFiche), 0) + 1 : 1;
+          if (!idFicheApresLaquelleInserer) return prochainNumeroEnFin;
+          const ficheCible = fichesDossier.find((f) => f.id === idFicheApresLaquelleInserer);
+          return ficheCible ? ficheCible.numeroFiche + 1 : prochainNumeroEnFin;
+        }, [fichesDossier, idFicheApresLaquelleInserer]);
+        const positionnerNouvelleFiche = (fiche, listeActuelle) => {
+          if (!idFicheApresLaquelleInserer) return [...listeActuelle, fiche];
+          const indexCible = listeActuelle.findIndex((f) => f.id === idFicheApresLaquelleInserer);
+          if (indexCible === -1) return [...listeActuelle, fiche];
+          const decalees = listeActuelle.map((f) => f.numeroFiche >= fiche.numeroFiche ? { ...f, numeroFiche: f.numeroFiche + 1 } : f);
+          decalees.splice(indexCible + 1, 0, fiche);
+          return decalees;
+        };
         const restituerStock = async (fiches) => {
           const aRestituer = {};
           (fiches || []).forEach((f) => {
@@ -6535,6 +6572,9 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             onSupprimerFicheDossier: supprimerFicheDossier,
             idFicheEnCoursDEdition,
             onEditerFiche: editerFiche,
+            idFicheApresLaquelleInserer,
+            onInsererApres: insererFicheApres,
+            onAnnulerInsertion: annulerInsertionFiche,
             numeroFicheCourante,
             dateEntree1,
             setDateEntree1,
