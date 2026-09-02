@@ -816,29 +816,31 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     return { corps, ecartCategoriesHorsFormulaire, nomPatientPropre };
   };
 
+  // Tailles vérifiées par mesure réelle (rendu navigateur, pas une estimation) pour remplir la page
+  // A4 à ~93% sans déborder sur une 2e page, avec les 17 catégories + GRAND TOTAL du formulaire.
   const STYLE_FORMULAIRE_CHF = `
       @page{size:A4;margin:12mm 16mm;}
-      body{font-family:'Times New Roman',Georgia,serif;color:#000;font-size:15px;}
-      .entete{display:flex;align-items:center;justify-content:center;gap:16px;border-bottom:3px solid #000;padding-bottom:12px;margin-bottom:20px;position:relative;}
-      .entete img{width:70px;height:70px;object-fit:contain;position:absolute;right:0;top:2px;}
+      body{font-family:'Times New Roman',Georgia,serif;color:#000;font-size:14px;}
+      .entete{display:flex;align-items:center;justify-content:center;gap:16px;border-bottom:3px solid #000;padding-bottom:10px;margin-bottom:16px;position:relative;}
+      .entete img{width:62px;height:62px;object-fit:contain;position:absolute;right:0;top:2px;}
       .entete-texte{text-align:center;}
-      .entete-texte h1{font-size:28px;margin:0;letter-spacing:0.5px;font-weight:bold;}
-      .entete-texte p{margin:3px 0;font-size:13px;}
-      .entete-texte p.email{font-size:11px;color:#999;}
-      .champs{margin-bottom:20px;font-size:16px;}
-      .ligne-champs{display:flex;flex-wrap:wrap;gap:0 30px;margin-bottom:12px;}
-      .champ{display:inline-flex;align-items:baseline;gap:8px;}
+      .entete-texte h1{font-size:25px;margin:0;letter-spacing:0.5px;font-weight:bold;}
+      .entete-texte p{margin:2px 0;font-size:12px;}
+      .entete-texte p.email{font-size:10px;color:#999;}
+      .champs{margin-bottom:14px;font-size:14px;}
+      .ligne-champs{display:flex;flex-wrap:wrap;gap:0 30px;margin-bottom:8px;}
+      .champ{display:inline-flex;align-items:baseline;gap:7px;}
       .champ.large{flex:1;}
       .lbl-champ{font-weight:bold;white-space:nowrap;}
-      .val-champ{border-bottom:1px dotted #000;min-width:180px;flex:1;display:inline-block;padding:2px 4px;line-height:1.6;}
-      .champ.large .val-champ{min-width:380px;}
-      table{width:100%;border-collapse:collapse;margin-top:10px;table-layout:fixed;}
+      .val-champ{border-bottom:1px dotted #000;min-width:170px;flex:1;display:inline-block;padding:2px 3px;line-height:1.5;}
+      .champ.large .val-champ{min-width:350px;}
+      table{width:100%;border-collapse:collapse;margin-top:8px;table-layout:fixed;}
       th,td{border:1px solid #000;color:#000;}
-      td.lbl{text-align:left;width:16%;font-weight:bold;font-size:14px;padding:10px 10px;}
-      td.mnt{text-align:center;width:${(84 / NB_COLONNES_MONTANT_FORMULAIRE).toFixed(1)}%;padding:10px 4px;height:38px;}
-      .dollar{color:#555;font-size:14px;}
-      .montant{font-weight:bold;font-size:12px;white-space:nowrap;}
-      tr.grand-total td.lbl{font-size:16px;}
+      td.lbl{text-align:left;width:16%;font-weight:bold;font-size:13px;padding:9px 9px;}
+      td.mnt{text-align:center;width:${(84 / NB_COLONNES_MONTANT_FORMULAIRE).toFixed(1)}%;padding:9px 4px;}
+      .dollar{color:#555;font-size:13px;}
+      .montant{font-weight:bold;font-size:11.5px;white-space:nowrap;}
+      tr.grand-total td.lbl{font-size:15px;}
       .page-formulaire{page-break-after:always;}
       .page-formulaire:last-child{page-break-after:auto;}`;
 
