@@ -817,44 +817,44 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
   };
 
   const STYLE_FORMULAIRE_CHF = `
-      @page{size:A4;margin:8mm 14mm;}
-      body{font-family:'Times New Roman',Georgia,serif;color:#000;font-size:11px;}
-      .entete{display:flex;align-items:center;justify-content:center;gap:10px;border-bottom:2px solid #000;padding-bottom:5px;margin-bottom:8px;position:relative;}
-      .entete img{width:46px;height:46px;object-fit:contain;position:absolute;right:0;top:2px;}
+      @page{size:A4;margin:12mm 16mm;}
+      body{font-family:'Times New Roman',Georgia,serif;color:#000;font-size:15px;}
+      .entete{display:flex;align-items:center;justify-content:center;gap:16px;border-bottom:3px solid #000;padding-bottom:12px;margin-bottom:20px;position:relative;}
+      .entete img{width:70px;height:70px;object-fit:contain;position:absolute;right:0;top:2px;}
       .entete-texte{text-align:center;}
-      .entete-texte h1{font-size:20px;margin:0;letter-spacing:0.5px;font-weight:bold;}
-      .entete-texte p{margin:1px 0;font-size:10px;}
-      .entete-texte p.email{font-size:8px;color:#999;}
-      .champs{margin-bottom:8px;font-size:12px;}
-      .ligne-champs{display:flex;flex-wrap:wrap;gap:0 30px;margin-bottom:5px;}
-      .champ{display:inline-flex;align-items:baseline;gap:6px;}
+      .entete-texte h1{font-size:28px;margin:0;letter-spacing:0.5px;font-weight:bold;}
+      .entete-texte p{margin:3px 0;font-size:13px;}
+      .entete-texte p.email{font-size:11px;color:#999;}
+      .champs{margin-bottom:20px;font-size:16px;}
+      .ligne-champs{display:flex;flex-wrap:wrap;gap:0 30px;margin-bottom:12px;}
+      .champ{display:inline-flex;align-items:baseline;gap:8px;}
       .champ.large{flex:1;}
       .lbl-champ{font-weight:bold;white-space:nowrap;}
-      .val-champ{border-bottom:1px dotted #000;min-width:150px;flex:1;display:inline-block;padding:0 2px;line-height:1.3;}
-      .champ.large .val-champ{min-width:300px;}
-      table{width:100%;border-collapse:collapse;margin-top:4px;table-layout:fixed;}
+      .val-champ{border-bottom:1px dotted #000;min-width:180px;flex:1;display:inline-block;padding:2px 4px;line-height:1.6;}
+      .champ.large .val-champ{min-width:380px;}
+      table{width:100%;border-collapse:collapse;margin-top:10px;table-layout:fixed;}
       th,td{border:1px solid #000;color:#000;}
-      td.lbl{text-align:left;width:16%;font-weight:bold;font-size:10px;padding:3px 6px;}
-      td.mnt{text-align:center;width:${(84 / NB_COLONNES_MONTANT_FORMULAIRE).toFixed(1)}%;padding:3px 2px;height:16px;}
-      .dollar{color:#555;font-size:11px;}
-      .montant{font-weight:bold;font-size:9px;white-space:nowrap;}
-      tr.grand-total td.lbl{font-size:11px;}
+      td.lbl{text-align:left;width:16%;font-weight:bold;font-size:14px;padding:10px 10px;}
+      td.mnt{text-align:center;width:${(84 / NB_COLONNES_MONTANT_FORMULAIRE).toFixed(1)}%;padding:10px 4px;height:38px;}
+      .dollar{color:#555;font-size:14px;}
+      .montant{font-weight:bold;font-size:12px;white-space:nowrap;}
+      tr.grand-total td.lbl{font-size:16px;}
       .page-formulaire{page-break-after:always;}
       .page-formulaire:last-child{page-break-after:auto;}`;
 
   const imprimerFormulaireCHF = (dossier) => {
     const { corps, ecartCategoriesHorsFormulaire, nomPatientPropre } = genererCorpsFormulaireCHF(dossier);
     if (ecartCategoriesHorsFormulaire !== 0) {
-      showToast(`⚠️ Ce formulaire ne couvre pas toutes les catégories facturées à ${dossier.nomPatient} : ${formatGourdes(Math.abs(ecartCategoriesHorsFormulaire))} Gdes de plus dans le dossier complet (ex. Radiographie / Visite) — vérifie l'onglet Dossiers pour le détail.`, "info");
+      showToast(`⚠️ Ce Rapport Dioumitrie ne couvre pas toutes les catégories facturées à ${dossier.nomPatient} : ${formatGourdes(Math.abs(ecartCategoriesHorsFormulaire))} Gdes de plus dans le dossier complet (ex. Radiographie / Visite) — vérifie l'onglet Dossiers pour le détail.`, "info");
     }
-    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Formulaire CHF - ${echapperHTML(nomPatientPropre)}</title><style>${STYLE_FORMULAIRE_CHF}</style></head><body>${corps}</body></html>`;
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Rapport Dioumitrie - ${echapperHTML(nomPatientPropre)}</title><style>${STYLE_FORMULAIRE_CHF}</style></head><body>${corps}</body></html>`;
     const win = window.open('', '_blank', 'width=850,height=1100');
     if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
     win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 500);
   };
 
-  // Imprime le formulaire papier CHF de TOUS les dossiers d'un lot d'affilee, un par page --
-  // pratique pour preparer tous les formulaires d'un coup avant l'envoi du lot.
+  // Imprime le Rapport Dioumitrie de TOUS les dossiers d'un lot d'affilee, un par page --
+  // pratique pour preparer tous les rapports d'un coup avant l'envoi du lot.
   const imprimerFormulaireCHFPourLot = (dossiers) => {
     if (!dossiers || dossiers.length === 0) { showToast("Aucun dossier dans ce lot.", "error"); return; }
     const dossiersIncomplets = [];
@@ -864,9 +864,9 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       return `<div class="page-formulaire">${corps}</div>`;
     }).join('');
     if (dossiersIncomplets.length > 0) {
-      showToast(`⚠️ ${dossiersIncomplets.length} formulaire(s) ne couvrent pas toutes les catégories facturées (ex. Radiographie / Visite) : ${dossiersIncomplets.join(', ')}`, "info");
+      showToast(`⚠️ ${dossiersIncomplets.length} Rapport(s) Dioumitrie ne couvrent pas toutes les catégories facturées (ex. Radiographie / Visite) : ${dossiersIncomplets.join(', ')}`, "info");
     }
-    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Formulaires CHF - Lot (${dossiers.length} dossiers)</title><style>${STYLE_FORMULAIRE_CHF}</style></head><body>${pages}</body></html>`;
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Rapports Dioumitrie - Lot (${dossiers.length} dossiers)</title><style>${STYLE_FORMULAIRE_CHF}</style></head><body>${pages}</body></html>`;
     const win = window.open('', '_blank', 'width=850,height=1100');
     if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
     win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 500);
@@ -990,7 +990,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                 <div className="flex flex-wrap gap-2 items-center">
                   <button onClick={() => toggleVerrouLot(lotFocused.numero, lotOngSelectionne, !lotFocused.verrouille)} className={`${lotFocused.verrouille ? 'bg-red-700' : 'bg-gray-500'} text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1`} title={lotFocused.verrouille ? "Déverrouiller ce lot (permet à nouveau d'y ajouter un dossier)" : "Verrouiller ce lot une fois approuvé par le partenaire — empêche d'y ajouter un nouveau dossier"}>{lotFocused.verrouille ? '🔒 Verrouillé' : '🔓 Verrouiller'}</button>
                   <button onClick={() => reimprimerLot(lotOngSelectionne, lotFocused.numero)} className="bg-purple-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1"><Download size={12}/> Réimprimer ce lot</button>
-                  <button onClick={() => imprimerFormulaireCHFPourLot(lotFocused.dossiers)} className="bg-indigo-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1" title="Imprime le formulaire papier CHF de chaque dossier de ce lot, un par page"><Printer size={12}/> Formulaires CHF du lot</button>
+                  <button onClick={() => imprimerFormulaireCHFPourLot(lotFocused.dossiers)} className="bg-indigo-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1" title="Imprime le Rapport Dioumitrie de chaque dossier de ce lot, un par page"><Printer size={12}/> Rapports Dioumitrie du lot</button>
                   <button onClick={() => imprimerTousLesRecusDuLot(lotFocused.dossiers)} className="bg-gray-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1" title="Imprime le reçu de chaque fiche de chaque dossier de ce lot, un par page"><Printer size={12}/> Reçus du lot</button>
                   <button onClick={() => setLotFocusedNumero(null)}><X size={14}/></button>
                 </div>
@@ -1121,7 +1121,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                       }} className="text-amber-700 p-1 bg-amber-50 rounded" title="Modifier / corriger"><Pencil size={13}/></button>}
                       {peutSupprimer && <button onClick={()=>onSupprimer(v.id)} disabled={v.verrouilleFacture} className="text-gray-300 hover:text-red-600 p-1 disabled:opacity-20"><Trash2 size={13}/></button>}
                       <button onClick={()=>imprimerArchive(v)} className="text-gray-600 p-1 bg-gray-50 rounded" title="Imprimer"><Printer size={13}/></button>
-                      <button onClick={()=>imprimerFormulaireCHF(v)} className="text-indigo-700 p-1 bg-indigo-50 rounded" title="Imprimer le formulaire papier CHF"><Printer size={13}/></button>
+                      <button onClick={()=>imprimerFormulaireCHF(v)} className="text-indigo-700 p-1 bg-indigo-50 rounded" title="Imprimer le Rapport Dioumitrie"><Printer size={13}/></button>
                       {isSuspendu && peutRouvrir && <button onClick={()=>rouvrirDossierSuspendu(v)} className="text-emerald-600 p-1 bg-emerald-50 rounded" title="Rouvrir"><FolderOpen size={13}/></button>}
                     </td>
                   </tr>
@@ -1142,7 +1142,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
 
       {focusedVerif && (
         <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-md space-y-4">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 border-b pb-1"><h3 className="font-bold text-blue-900 text-xs uppercase">🔍 {focusedVerif.nomPatient}</h3><div className="flex flex-wrap gap-2 items-center"><button onClick={() => imprimerArchive(focusedVerif)} className="bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1"><Printer size={12}/> Imprimer dossier</button><button onClick={() => imprimerFormulaireCHF(focusedVerif)} className="bg-indigo-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1"><Printer size={12}/> Formulaire papier CHF</button><button onClick={() => setFocusedVerif(null)}><X size={14}/></button></div></div>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 border-b pb-1"><h3 className="font-bold text-blue-900 text-xs uppercase">🔍 {focusedVerif.nomPatient}</h3><div className="flex flex-wrap gap-2 items-center"><button onClick={() => imprimerArchive(focusedVerif)} className="bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1"><Printer size={12}/> Imprimer dossier</button><button onClick={() => imprimerFormulaireCHF(focusedVerif)} className="bg-indigo-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1"><Printer size={12}/> Rapport Dioumitrie</button><button onClick={() => setFocusedVerif(null)}><X size={14}/></button></div></div>
           {focusedVerif.numeroLot != null && (
             <div className="flex items-center gap-2 text-xs bg-indigo-50 border border-indigo-200 rounded-lg p-2">
               <span className="text-indigo-800">📦 Ce dossier fait partie du <strong>Lot {focusedVerif.numeroLot}</strong> de {focusedVerif.ongPartenaire}. Une correction reste possible via "Modifier/corriger" — pense à réimprimer le lot ensuite pour que le partenaire reçoive la version à jour.</span>
