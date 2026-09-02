@@ -2899,8 +2899,8 @@
         };
         const estAujourdhui = (date) => {
           if (!date || isNaN(date)) return false;
-          const now2 = /* @__PURE__ */ new Date();
-          return date.getDate() === now2.getDate() && date.getMonth() === now2.getMonth() && date.getFullYear() === now2.getFullYear();
+          const now = /* @__PURE__ */ new Date();
+          return date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
         };
         const calculerStats = (dossiers, transactions) => {
           const mois = (/* @__PURE__ */ new Date()).getMonth();
@@ -3659,6 +3659,7 @@
             const urlTelechargement = URL.createObjectURL(blob);
             const lien = document.createElement("a");
             lien.href = urlTelechargement;
+            const now = /* @__PURE__ */ new Date();
             lien.download = `Lot${numeroLot}_${ongCible.replace(/\s+/g, "_")}_${now.toLocaleDateString("fr-FR").replace(/\//g, "-")}.xlsx`;
             document.body.appendChild(lien);
             lien.click();
