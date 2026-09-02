@@ -175,6 +175,7 @@
             }
             try {
               const result = await this.request(endpoint, op.method, data);
+              if (op.localId && !(result && result.id)) throw new Error("R\xE9ponse de cr\xE9ation sans id \u2014 nouvelle tentative");
               if (op.localId && result && result.id) {
                 this.localIdMap[op.localId] = result.id;
                 localStorage.setItem("local_id_map", JSON.stringify(this.localIdMap));

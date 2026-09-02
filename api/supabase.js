@@ -152,6 +152,13 @@ class CHF_API {
       if (bloque) { this.pendingQueue.push(op); continue; }
       try {
         const result = await this.request(endpoint, op.method, data);
+        // Une création (op.localId défini) qui répond sans erreur HTTP mais sans id exploitable ne
+        // doit jamais être abandonnée silencieusement : sans correspondance local -> réel enregistrée,
+        // toute opération suivante référençant ce même id local (fiches ajoutées, archivage...) reste
+        // bloquée pour toujours dans la file, sans qu'on ne le sache jamais (voir incident du
+        // 1er septembre : un dossier créé + archivé hors ligne resté coincé, sa création introuvable
+        // aussi bien dans la file que dans local_id_map).
+        if (op.localId && !(result && result.id)) throw new Error('Réponse de création sans id — nouvelle tentative');
         if (op.localId && result && result.id) {
           this.localIdMap[op.localId] = result.id;
           localStorage.setItem('local_id_map', JSON.stringify(this.localIdMap));
