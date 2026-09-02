@@ -59,6 +59,12 @@ class CHF_API {
       // type de l'erreur à la place, qui lui est constant. Une erreur HTTP (ligne 37 ci-dessus) est
       // un Error normal, pas un TypeError, donc elle continue de remonter comme une vraie erreur.
       if (error instanceof TypeError || !navigator.onLine) {
+        // Seules les écritures (créer/modifier/supprimer) doivent attendre un retour de connexion --
+        // une lecture (GET) ratée hors ligne n'a rien à "rejouer" plus tard (le prochain chargement de
+        // données en fera une fraîche de toute façon). La mettre en file gonflait inutilement le
+        // compteur "opérations en attente" à chaque tentative de rechargement automatique (au
+        // démarrage, toutes les 3 minutes...), même quand la personne n'avait rien fait hors ligne.
+        if (method === 'GET') throw error;
         console.warn('🔴 Hors ligne, mise en file d\'attente:', endpoint, data);
         this.pendingQueue.push({ endpoint, method, data, timestamp: Date.now(), localId: meta.localId || null });
         localStorage.setItem('pending_ops', JSON.stringify(this.pendingQueue));

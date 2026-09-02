@@ -96,6 +96,7 @@
             return await response.json();
           } catch (error) {
             if (error instanceof TypeError || !navigator.onLine) {
+              if (method === "GET") throw error;
               console.warn("\u{1F534} Hors ligne, mise en file d'attente:", endpoint, data);
               this.pendingQueue.push({ endpoint, method, data, timestamp: Date.now(), localId: meta.localId || null });
               localStorage.setItem("pending_ops", JSON.stringify(this.pendingQueue));
