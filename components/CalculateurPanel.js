@@ -34,6 +34,7 @@ function CalculateurPanel({
   idFicheEnCoursDEdition,  // ID de la fiche en cours d'édition (passé par le parent)
   onEditerFiche,           // NOUVELLE PROP : fonction pour charger une fiche en édition
   idFicheApresLaquelleInserer, onInsererApres, onAnnulerInsertion, // insertion d'une fiche oubliée entre deux fiches existantes
+  onInsererAuDebut, estInsertionAuDebut, // insertion d'une fiche oubliée tout au début (avant la 1ère)
   numeroFicheCourante,
   dateFiche, setDateFiche,
   prescritPar, setPrescritPar,
@@ -728,6 +729,15 @@ function CalculateurPanel({
                 </div>
               )}
               <div className="flex flex-wrap gap-1.5">
+                {onInsererAuDebut && (
+                  <button
+                    onClick={onInsererAuDebut}
+                    className={`flex items-center justify-center rounded-lg font-mono text-[11px] font-bold border px-2 py-1 shadow-sm transition-colors ${estInsertionAuDebut ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-indigo-500/10 border-indigo-200 hover:bg-indigo-600 hover:text-white text-indigo-700'}`}
+                    title="Insérer une fiche oubliée tout au début, avant la Fiche N°1"
+                  >
+                    ➕ Au début
+                  </button>
+                )}
                 {fichesDossier.map(f => {
                   const isEditing = f.id === idFicheEnCoursDEdition;
                   const estCibleInsertion = f.id === idFicheApresLaquelleInserer;
