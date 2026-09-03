@@ -6280,15 +6280,15 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           }
         };
         const insererFicheApres = (idFicheCible) => {
-          setIdFicheEnCoursDEdition(null);
-          setIdFicheApresLaquelleInserer(idFicheCible);
           const cible = fichesDossier.find((f) => f.id === idFicheCible);
-          showToast(`La prochaine fiche enregistr\xE9e prendra le N\xB0${((cible == null ? void 0 : cible.numeroFiche) || 0) + 1}, entre la Fiche N\xB0${cible == null ? void 0 : cible.numeroFiche} et la suivante.`, "info");
+          viderLeCalculateurFicheUniquement();
+          setIdFicheApresLaquelleInserer(idFicheCible);
+          showToast(`Nouvelle fiche vide \u2014 elle prendra le N\xB0${((cible == null ? void 0 : cible.numeroFiche) || 0) + 1}, entre la Fiche N\xB0${cible == null ? void 0 : cible.numeroFiche} et la suivante.`, "info");
         };
         const insererFicheAuDebut = () => {
-          setIdFicheEnCoursDEdition(null);
+          viderLeCalculateurFicheUniquement();
           setIdFicheApresLaquelleInserer(DEBUT_LISTE);
-          showToast("La prochaine fiche enregistr\xE9e deviendra la Fiche N\xB01 \u2014 toutes les autres seront renum\xE9rot\xE9es.", "info");
+          showToast("Nouvelle fiche vide \u2014 elle deviendra la Fiche N\xB01, toutes les autres seront renum\xE9rot\xE9es.", "info");
         };
         const annulerInsertionFiche = () => setIdFicheApresLaquelleInserer(null);
         const initialiserNouveauDossier = async (nom, ong, numDossier, type, naissance, tel, serviceChoisi) => executerUneSeuleFois("ouvrirDossier", async () => {

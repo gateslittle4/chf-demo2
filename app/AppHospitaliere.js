@@ -347,18 +347,20 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
     }
   };
 
-  // Démarre le mode "insertion" : la prochaine fiche enregistrée prendra place juste après celle-ci.
+  // Démarre le mode "insertion" : vide d'abord le calculateur (une fiche neuve et vide apparaît,
+  // prête à remplir) puis fixe la cible d'insertion -- l'ordre compte : viderLeCalculateurFicheUniquement
+  // remet aussi idFicheApresLaquelleInserer à null, donc on la fixe seulement APRÈS ce vidage.
   const insererFicheApres = (idFicheCible) => {
-    setIdFicheEnCoursDEdition(null); // exclusif avec l'édition
-    setIdFicheApresLaquelleInserer(idFicheCible);
     const cible = fichesDossier.find(f => f.id === idFicheCible);
-    showToast(`La prochaine fiche enregistrée prendra le N°${(cible?.numeroFiche || 0) + 1}, entre la Fiche N°${cible?.numeroFiche} et la suivante.`, "info");
+    viderLeCalculateurFicheUniquement();
+    setIdFicheApresLaquelleInserer(idFicheCible);
+    showToast(`Nouvelle fiche vide — elle prendra le N°${(cible?.numeroFiche || 0) + 1}, entre la Fiche N°${cible?.numeroFiche} et la suivante.`, "info");
   };
-  // Démarre le mode "insertion tout au début" : la prochaine fiche enregistrée devient la Fiche N°1.
+  // Démarre le mode "insertion tout au début" : vide d'abord le calculateur (même logique que ci-dessus).
   const insererFicheAuDebut = () => {
-    setIdFicheEnCoursDEdition(null); // exclusif avec l'édition
+    viderLeCalculateurFicheUniquement();
     setIdFicheApresLaquelleInserer(DEBUT_LISTE);
-    showToast("La prochaine fiche enregistrée deviendra la Fiche N°1 — toutes les autres seront renumérotées.", "info");
+    showToast("Nouvelle fiche vide — elle deviendra la Fiche N°1, toutes les autres seront renumérotées.", "info");
   };
   const annulerInsertionFiche = () => setIdFicheApresLaquelleInserer(null);
 
