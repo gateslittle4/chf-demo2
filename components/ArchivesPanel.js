@@ -694,11 +694,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                   <tr key={v.id} className={isSuspendu ? 'bg-amber-50/60 border-l-4 border-amber-400' : isReporte ? 'bg-indigo-50/60 border-l-4 border-indigo-400' : (v.contientErreurs?'bg-red-50/40 border-l-4 border-red-500':'hover:bg-gray-50/50')}>
                     <td className="p-2 text-gray-500">{v.dateHeure}</td>
                     <td className="p-2 text-gray-500 whitespace-nowrap">
-                      {v.numeroLot != null
-                        ? <span>Lot {v.numeroLot}</span>
-                        : (v.typePatient || 'ONG') === 'ONG'
-                          ? <span className="text-amber-600 font-bold" title="Pas encore inclus dans un lot envoyé au partenaire">— sans lot</span>
-                          : <span className="text-gray-300">—</span>}
+                      {v.numeroLot != null && <span>Lot {v.numeroLot}</span>}
                     </td>
                     <td className="p-2 font-bold font-sans flex items-center gap-1">
                       {v.verrouilleFacture && <span>🔒</span>}
