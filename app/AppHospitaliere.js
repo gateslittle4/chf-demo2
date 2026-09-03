@@ -54,6 +54,9 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   // acte fait le même jour mais saisi après coup) : la nouvelle fiche prend le numéro qui suit
   // immédiatement la fiche cible, et toutes les fiches suivantes sont renumérotées (+1).
   const [idFicheApresLaquelleInserer, setIdFicheApresLaquelleInserer] = useState(null);
+  // Valeur spéciale de idFicheApresLaquelleInserer signifiant "insérer tout au début" (avant la
+  // première fiche), plutôt qu'après une fiche existante précise.
+  const DEBUT_LISTE = '__debut__';
   const [modePreValidation, setModePreValidation] = useState(false);
   const [lignesCalcul, setLignesCalcul] = useState([]);
   const [dateEntree1, setDateEntree1] = useState("");
@@ -242,6 +245,12 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
     setIdFicheApresLaquelleInserer(idFicheCible);
     const cible = fichesDossier.find(f => f.id === idFicheCible);
     showToast(`La prochaine fiche enregistrée prendra le N°${(cible?.numeroFiche || 0) + 1}, entre la Fiche N°${cible?.numeroFiche} et la suivante.`, "info");
+  };
+  // Démarre le mode "insertion tout au début" : la prochaine fiche enregistrée devient la Fiche N°1.
+  const insererFicheAuDebut = () => {
+    setIdFicheEnCoursDEdition(null); // exclusif avec l'édition
+    setIdFicheApresLaquelleInserer(DEBUT_LISTE);
+    showToast("La prochaine fiche enregistrée deviendra la Fiche N°1 — toutes les autres seront renumérotées.", "info");
   };
   const annulerInsertionFiche = () => setIdFicheApresLaquelleInserer(null);
 
@@ -729,15 +738,21 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
   const numeroFicheCourante = useMemo(() => {
     const prochainNumeroEnFin = fichesDossier.length > 0 ? Math.max(...fichesDossier.map(f => f.numeroFiche), 0) + 1 : 1;
     if (!idFicheApresLaquelleInserer) return prochainNumeroEnFin;
+    if (idFicheApresLaquelleInserer === DEBUT_LISTE) return 1;
     const ficheCible = fichesDossier.find(f => f.id === idFicheApresLaquelleInserer);
     return ficheCible ? ficheCible.numeroFiche + 1 : prochainNumeroEnFin; // cible supprimée entretemps -> comportement normal
   }, [fichesDossier, idFicheApresLaquelleInserer]);
 
   // Insère `fiche` juste après la fiche ciblée par idFicheApresLaquelleInserer (numéro déjà correct,
-  // voir numeroFicheCourante ci-dessus) et décale (+1) le numéro de toutes les fiches qui suivaient
-  // déjà ce point -- ou ajoute simplement en fin de liste si aucune insertion n'est en cours.
+  // voir numeroFicheCourante ci-dessus), tout au début si DEBUT_LISTE, et décale (+1) le numéro de
+  // toutes les fiches qui suivaient déjà ce point -- ou ajoute simplement en fin de liste si aucune
+  // insertion n'est en cours.
   const positionnerNouvelleFiche = (fiche, listeActuelle) => {
     if (!idFicheApresLaquelleInserer) return [...listeActuelle, fiche];
+    if (idFicheApresLaquelleInserer === DEBUT_LISTE) {
+      const decalees = listeActuelle.map(f => ({ ...f, numeroFiche: f.numeroFiche + 1 }));
+      return [fiche, ...decalees];
+    }
     const indexCible = listeActuelle.findIndex(f => f.id === idFicheApresLaquelleInserer);
     if (indexCible === -1) return [...listeActuelle, fiche];
     const decalees = listeActuelle.map(f => f.numeroFiche >= fiche.numeroFiche ? { ...f, numeroFiche: f.numeroFiche + 1 } : f);
@@ -974,6 +989,8 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
               onEditerFiche={editerFiche}                       // <-- nouvelle prop
               idFicheApresLaquelleInserer={idFicheApresLaquelleInserer}
               onInsererApres={insererFicheApres}
+              onInsererAuDebut={insererFicheAuDebut}
+              estInsertionAuDebut={idFicheApresLaquelleInserer === DEBUT_LISTE}
               onAnnulerInsertion={annulerInsertionFiche}
               numeroFicheCourante={numeroFicheCourante}
               dateEntree1={dateEntree1} setDateEntree1={setDateEntree1} dateSortie1={dateSortie1} setDateSortie1={setDateSortie1}
