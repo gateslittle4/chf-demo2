@@ -1075,7 +1075,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
         <h2 className="text-xs font-black text-gray-700 uppercase border-b pb-1">📁 Dossiers ({dossiersFiltres.length}{dossiersFiltres.length > nombreAffiche ? ` — ${nombreAffiche} affichés` : ''})</h2>
         <div className="overflow-x-auto max-h-96 overflow-y-auto">
           <table className="w-full text-left">
-            <thead className="sticky top-0 bg-white shadow-sm"><tr className="bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono"><th className="p-2">Date</th><th className="p-2">N° Dossier</th><th className="p-2">Patient</th><th className="p-2">Type</th><th className="p-2">Partenaire</th><th className="p-2 text-center">Vol.</th><th className="p-2 text-right">Total</th><th className="p-2 text-center">Statut</th><th className="p-2 text-center">Actions</th></tr></thead>
+            <thead className="sticky top-0 bg-white shadow-sm"><tr className="bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono"><th className="p-2">Date</th><th className="p-2">Lot</th><th className="p-2">Patient</th><th className="p-2">Type</th><th className="p-2">Partenaire</th><th className="p-2 text-center">Vol.</th><th className="p-2 text-right">Total</th><th className="p-2 text-center">Statut</th><th className="p-2 text-center">Actions</th></tr></thead>
             <tbody className="divide-y divide-gray-100 font-mono text-[11px]">
               {dossiersFiltres.slice(0, nombreAffiche).map(v => {
                 const statut = v.status || 'archived';
@@ -1089,7 +1089,13 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                 return (
                   <tr key={v.id} className={isSuspendu ? 'bg-amber-50/60 border-l-4 border-amber-400' : isReporte ? 'bg-indigo-50/60 border-l-4 border-indigo-400' : (v.contientErreurs?'bg-red-50/40 border-l-4 border-red-500':'hover:bg-gray-50/50')}>
                     <td className="p-2 text-gray-500">{v.dateHeure}</td>
-                    <td className="p-2 text-gray-500">{v.numDossier || '—'}</td>
+                    <td className="p-2 text-gray-500 whitespace-nowrap">
+                      {v.numeroLot != null
+                        ? <span title={v.moisLot ? formaterMoisFr(v.moisLot) : ''}>Lot {v.numeroLot}{v.moisLot ? ` (${formaterMoisFr(v.moisLot)})` : ''}</span>
+                        : (v.typePatient || 'ONG') === 'ONG'
+                          ? <span className="text-amber-600 font-bold" title="Pas encore inclus dans un lot envoyé au partenaire">— sans lot</span>
+                          : <span className="text-gray-300">—</span>}
+                    </td>
                     <td className="p-2 font-bold font-sans flex items-center gap-1">
                       {v.verrouilleFacture && <span>🔒</span>}
                       {v.noteSuspension && <span title={`📝 Note : ${v.noteSuspension}`} className="cursor-help">📝</span>}
