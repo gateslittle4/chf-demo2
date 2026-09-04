@@ -963,6 +963,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail }) {
             userRole={userRole} userDisplayName={userDisplayName}
             onNaviguer={(cible) => { setOnglet(cible); setModePreValidation(false); }}
             onOuvrirAchatExpress={() => setAchatExpressOuvert(true)}
+            showToast={showToast}
           />
         )}
         {onglet === "dashboard_direction" && (userRole === "direction" || userRole === "administrateur") && <DashboardDirectionPanel verifications={verifications} paiements={paiements} medicaments={medicaments} />}

@@ -59,10 +59,26 @@
       function generateLocalId() {
         return "local-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
       }
+      function genererOpId() {
+        return "op-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10);
+      }
+      var CLE_PENDING = "pending_ops";
+      var CLE_FAILED = "failed_ops";
+      var CLE_ID_MAP = "local_id_map";
+      var MAX_ECHECS_SERVEUR = 5;
       var CHF_API = class {
         constructor() {
-          this.pendingQueue = JSON.parse(localStorage.getItem("pending_ops") || "[]");
+          try {
+            const brutes = this._lirePendingQueue();
+            if (brutes.some((op) => !op.opId)) {
+              localStorage.setItem(CLE_PENDING, JSON.stringify(brutes.map((op) => op.opId ? op : { ...op, opId: genererOpId() })));
+            }
+          } catch (e) {
+            console.warn("Migration file d'attente impossible :", e.message);
+          }
+          this.localIdMap = JSON.parse(localStorage.getItem(CLE_ID_MAP) || "{}");
           this.isOnline = navigator.onLine;
+          this.syncEnCours = false;
           window.addEventListener("online", () => {
             this.isOnline = true;
             this.syncPending();
@@ -70,6 +86,74 @@
           window.addEventListener("offline", () => {
             this.isOnline = false;
           });
+          setInterval(() => this.syncPending(), 3e4);
+          window.addEventListener("storage", (e) => {
+            if (e.key === CLE_PENDING || e.key === CLE_FAILED) window.dispatchEvent(new CustomEvent("chf:file-changee"));
+          });
+          window.addEventListener("beforeunload", (e) => {
+            if (this.countPending() > 0) {
+              e.preventDefault();
+              e.returnValue = "";
+              return "";
+            }
+          });
+          if (this.countPending() > 0) this.syncPending();
+        }
+        // ===================== FILE D'ATTENTE : ACCÈS TOUJOURS FRAIS =====================
+        // On ne garde JAMAIS la file en mémoire : elle est relue depuis localStorage à chaque usage.
+        // Une copie en mémoire (l'ancien `this.pendingQueue`) se périme dès qu'un AUTRE onglet écrit, et
+        // la réécrire ensuite écrasait silencieusement le travail de cet autre onglet -- donc des
+        // opérations (dossiers, paiements) définitivement perdues sans que personne ne le voie.
+        _lireListe(cle) {
+          try {
+            return JSON.parse(localStorage.getItem(cle) || "[]");
+          } catch (e) {
+            console.warn(`File ${cle} illisible, trait\xE9e comme vide :`, e.message);
+            return [];
+          }
+        }
+        _lirePendingQueue() {
+          return this._lireListe(CLE_PENDING);
+        }
+        _lireFailedOps() {
+          return this._lireListe(CLE_FAILED);
+        }
+        // Lecture-modification-écriture atomique, protégée par un verrou navigateur (Web Locks) : un seul
+        // onglet à la fois peut modifier la file, même si deux le déclenchent au même instant.
+        // `modif` reçoit la liste actuelle et retourne la nouvelle.
+        async _modifierListe(cle, modif) {
+          const executer = async () => {
+            const avant = this._lireListe(cle);
+            const apres = modif(avant);
+            try {
+              localStorage.setItem(cle, JSON.stringify(apres));
+            } catch (e) {
+              const pleinError = new Error("M\xE9moire du navigateur pleine : cette op\xE9ration n'a PAS \xE9t\xE9 enregistr\xE9e. Ferme et rouvre l'app, puis recommence -- ne continue pas \xE0 encaisser avant.");
+              pleinError.quotaDepasse = true;
+              throw pleinError;
+            }
+            return apres;
+          };
+          if (navigator.locks && navigator.locks.request) return navigator.locks.request("chf-file-attente", executer);
+          return executer();
+        }
+        _modifierPendingQueue(modif) {
+          return this._modifierListe(CLE_PENDING, modif);
+        }
+        // Retire UNE opération précise de la file (par son identifiant) -- appelé dès qu'elle est confirmée
+        // par le serveur, pas à la fin de toute la boucle. Sans ça, fermer/recharger la page au milieu
+        // d'une synchronisation rejouait au prochain démarrage des opérations DÉJÀ passées : doublons.
+        _retirerDeLaFile(opId) {
+          return this._modifierPendingQueue((file) => file.filter((op) => op.opId !== opId));
+        }
+        // Met une opération en quarantaine : le serveur l'a explicitement refusée, la rejouer à
+        // l'identique ne réussira jamais. Rien n'est effacé -- l'opération complète est conservée pour
+        // pouvoir être réessayée ou exportée ; elle sort juste de la boucle de retentatives silencieuse.
+        async _mettreEnQuarantaine(op, raison) {
+          await this._modifierListe(CLE_FAILED, (liste) => [...liste, { ...op, raisonEchec: raison, dateEchec: Date.now() }]);
+          await this._retirerDeLaFile(op.opId);
+          window.dispatchEvent(new CustomEvent("chf:echec-permanent", { detail: { op, raison } }));
+          console.error("\u26D4 Op\xE9ration mise en quarantaine (refus\xE9e par le serveur) :", raison, op);
         }
         async request(endpoint, method = "GET", data = null, meta = {}) {
           const options = { method, headers: { "Content-Type": "application/json" } };
@@ -86,24 +170,32 @@
           try {
             const response = await fetch(`${API_BASE}${endpoint}`, options);
             if (!response.ok) {
-              const err = await response.json();
-              throw new Error(err.error || `Erreur serveur (${response.status})`);
+              let messageServeur = `Erreur serveur (${response.status})`;
+              try {
+                const err = await response.json();
+                if (err && err.error) messageServeur = err.error;
+              } catch (_) {
+              }
+              const httpError = new Error(messageServeur);
+              httpError.status = response.status;
+              throw httpError;
             }
             if (method === "DELETE") return { success: true };
             return await response.json();
           } catch (error) {
-            if (error.message.includes("Failed to fetch") || !navigator.onLine) {
+            if (error instanceof TypeError || !navigator.onLine) {
+              if (method === "GET") throw error;
               if (meta.isRetry) throw error;
               console.warn("\u{1F534} Hors ligne, mise en file d'attente:", endpoint, data);
-              this.pendingQueue.push({ endpoint, method, data, timestamp: Date.now(), localId: meta.localId || null });
-              try {
-                localStorage.setItem("pending_ops", JSON.stringify(this.pendingQueue));
-              } catch (e) {
-                this.pendingQueue.pop();
-                const pleinError = new Error("M\xE9moire du navigateur pleine : cette op\xE9ration n'a PAS \xE9t\xE9 enregistr\xE9e. Ferme et rouvre l'app, puis recommence -- ne continue pas \xE0 encaisser avant.");
-                pleinError.quotaDepasse = true;
-                throw pleinError;
-              }
+              await this._modifierPendingQueue((file) => [...file, {
+                opId: genererOpId(),
+                endpoint,
+                method,
+                data,
+                timestamp: Date.now(),
+                localId: meta.localId || null,
+                echecsServeur: 0
+              }]);
               const offlineError = new Error("Hors ligne. Op\xE9ration en attente.");
               offlineError.isOfflineQueue = true;
               throw offlineError;
@@ -113,37 +205,144 @@
         }
         // Nombre d'opérations en attente de synchronisation (utile pour un badge dans l'UI)
         countPending() {
-          return this.pendingQueue.length;
+          return this._lirePendingQueue().length;
+        }
+        // Nombre d'opérations en quarantaine (refusées par le serveur) -- à traiter par un humain.
+        countFailed() {
+          return this._lireFailedOps().length;
+        }
+        _libelleOp(op) {
+          if (op.endpoint.startsWith("/episodes")) return op.method === "POST" ? "Nouveau dossier" : op.method === "DELETE" ? "Suppression d'un dossier" : "Modification d'un dossier";
+          if (op.endpoint.startsWith("/paiements")) return "Paiement";
+          if (op.endpoint.startsWith("/catalog/medicaments")) return "Mise \xE0 jour de la pharmacie";
+          if (op.endpoint.startsWith("/catalog/actes")) return "Mise \xE0 jour des actes";
+          return op.endpoint;
+        }
+        // Détail lisible des opérations en attente (quoi + qui + quand + depuis combien de temps), pour que
+        // la personne sache ce qui n'est pas encore enregistré, plutôt qu'un simple nombre sans explication.
+        // `bloqueeDepuisLongtemps` distingue "vient d'être mis en file, c'est normal" de "coincé depuis des
+        // heures, il faut regarder" -- sans ça, une opération pouvait tourner en boucle pendant des jours
+        // sans que personne ne s'en aperçoive (incident Tresalus Mylove).
+        getPendingDetails() {
+          const maintenant = Date.now();
+          return this._lirePendingQueue().map((op) => {
+            const ageMinutes = Math.floor((maintenant - (op.timestamp || maintenant)) / 6e4);
+            return {
+              texte: this._libelleOp(op),
+              patient: op.data && (op.data.nom_patient || op.data.patient_nom) || "",
+              quand: new Date(op.timestamp).toLocaleString("fr-FR"),
+              ageMinutes,
+              bloqueeDepuisLongtemps: ageMinutes >= 15,
+              echecsServeur: op.echecsServeur || 0
+            };
+          });
+        }
+        // Détail des opérations en quarantaine, avec la raison exacte du refus par le serveur.
+        getFailedDetails() {
+          return this._lireFailedOps().map((op) => ({
+            texte: this._libelleOp(op),
+            patient: op.data && (op.data.nom_patient || op.data.patient_nom) || "",
+            quand: new Date(op.timestamp).toLocaleString("fr-FR"),
+            raison: op.raisonEchec || "Refus\xE9e par le serveur"
+          }));
+        }
+        // Remet les opérations en quarantaine dans la file normale (ex : après avoir corrigé la cause --
+        // droits de l'utilisateur, dossier manquant recréé...). Rien n'est perdu dans un sens ni dans l'autre.
+        async reessayerEchecs() {
+          const echecs = this._lireFailedOps();
+          if (echecs.length === 0) return 0;
+          await this._modifierPendingQueue((file) => [...file, ...echecs.map((op) => ({ ...op, echecsServeur: 0, raisonEchec: void 0, dateEchec: void 0 }))]);
+          await this._modifierListe(CLE_FAILED, () => []);
+          await this.syncPending();
+          return echecs.length;
+        }
+        // Sauvegarde de secours : tout ce qui n'est pas encore parti au serveur, dans un fichier que la
+        // personne garde. Dernier filet si le navigateur est réinitialisé ou l'appareil perdu -- sans ça,
+        // vider les données du site efface définitivement du travail que le serveur n'a jamais reçu.
+        exporterFileAttente() {
+          return {
+            exporteLe: (/* @__PURE__ */ new Date()).toISOString(),
+            enAttente: this._lirePendingQueue(),
+            enQuarantaine: this._lireFailedOps(),
+            correspondancesIdLocaux: this.localIdMap
+          };
         }
         // Retire de la file une création jamais synchronisée (ex: dossier ouvert hors-ligne puis annulé avant le retour d'internet)
         removePendingByLocalId(localId) {
-          this.pendingQueue = this.pendingQueue.filter((op) => op.localId !== localId);
-          try {
-            localStorage.setItem("pending_ops", JSON.stringify(this.pendingQueue));
-          } catch (e) {
-            console.warn("M\xE9moire du navigateur pleine, retrait non persist\xE9 (redeviendra visible apr\xE8s un rechargement) :", e.message);
-          }
+          return this._modifierPendingQueue((file) => file.filter((op) => op.localId !== localId)).catch((e) => console.warn("Retrait de la file impossible :", e.message));
+        }
+        // IDs locaux (dossiers créés/archivés hors ligne) encore en attente de synchronisation -- pour ne
+        // JAMAIS écraser leur version optimiste en mémoire par un rechargement serveur qui ne les connaît
+        // pas encore. Sans ça : dossier créé+archivé hors ligne -> visible localement -> la page se
+        // recharge (ou le polling périodique tombe) avant que la sync n'ait eu le temps d'aboutir ->
+        // l'appel serveur écrase l'état avec une liste qui ne contient pas encore ce dossier -> il
+        // "disparaît" de l'écran, même si sa création reste bien en file et finira par réussir.
+        getPendingEpisodeIds() {
+          const ids = /* @__PURE__ */ new Set();
+          this._lirePendingQueue().forEach((op) => {
+            if (!op.endpoint.startsWith("/episodes")) return;
+            if (op.localId) ids.add(op.localId);
+            const match = op.endpoint.match(/\/episodes\/(local-[^/]+)/);
+            if (match) ids.add(match[1]);
+          });
+          return ids;
         }
         async syncPending() {
-          if (!navigator.onLine || this.pendingQueue.length === 0) return;
-          console.log(`\u{1F504} Sync de ${this.pendingQueue.length} op\xE9rations...`);
-          const queue = [...this.pendingQueue];
-          this.pendingQueue = [];
-          for (const op of queue) {
-            try {
-              const result = await this.request(op.endpoint, op.method, op.data, { isRetry: true });
-              if (op.localId && result && result.id) {
-                window.dispatchEvent(new CustomEvent("chf:synced", { detail: { localId: op.localId, realId: result.id, endpoint: op.endpoint } }));
-              }
-            } catch (e) {
-              console.warn("\xC9chec sync, r\xE9essaiera plus tard:", e.message);
-              this.pendingQueue.push(op);
-            }
-          }
+          if (this.syncEnCours) return;
+          const queue = this._lirePendingQueue();
+          if (queue.length === 0) return;
+          this.syncEnCours = true;
+          console.log(`\u{1F504} Sync de ${queue.length} op\xE9rations...`);
           try {
-            localStorage.setItem("pending_ops", JSON.stringify(this.pendingQueue));
-          } catch (e) {
-            console.warn("M\xE9moire du navigateur pleine, file apr\xE8s sync non persist\xE9e :", e.message);
+            for (const op of queue) {
+              let endpoint = op.endpoint;
+              for (const [localId, realId] of Object.entries(this.localIdMap)) {
+                if (endpoint.includes(localId)) {
+                  endpoint = endpoint.replace(localId, realId);
+                  break;
+                }
+              }
+              let data = op.data;
+              if (data && typeof data === "object") {
+                let modifie = false;
+                const reecrit = {};
+                for (const [k, v] of Object.entries(data)) {
+                  const vr = typeof v === "string" && this.localIdMap[v] ? this.localIdMap[v] : v;
+                  reecrit[k] = vr;
+                  if (vr !== v) modifie = true;
+                }
+                if (modifie) data = reecrit;
+              }
+              const referenceIdLocalNonResolu = (s) => typeof s === "string" && s.includes("local-") && !Object.keys(this.localIdMap).some((l) => s.includes(l));
+              const bloque = referenceIdLocalNonResolu(endpoint) || data && typeof data === "object" && Object.values(data).some(referenceIdLocalNonResolu);
+              if (bloque) continue;
+              try {
+                const result = await this.request(endpoint, op.method, data, { isRetry: true });
+                if (op.localId && !(result && result.id)) throw new Error("R\xE9ponse de cr\xE9ation sans id \u2014 nouvelle tentative");
+                if (op.localId && result && result.id) {
+                  this.localIdMap[op.localId] = result.id;
+                  try {
+                    localStorage.setItem(CLE_ID_MAP, JSON.stringify(this.localIdMap));
+                  } catch (e) {
+                    console.warn("M\xE9moire du navigateur pleine, correspondance ID non persist\xE9e :", e.message);
+                  }
+                  window.dispatchEvent(new CustomEvent("chf:synced", { detail: { localId: op.localId, realId: result.id, endpoint: op.endpoint } }));
+                }
+                await this._retirerDeLaFile(op.opId);
+              } catch (e) {
+                const estReseau = e instanceof TypeError || e.isOfflineQueue || !e.status;
+                if (estReseau) {
+                  console.warn("Hors ligne, r\xE9essaiera plus tard :", e.message);
+                  continue;
+                }
+                const echecs = (op.echecsServeur || 0) + 1;
+                const definitif = e.status >= 400 && e.status < 500 && echecs >= MAX_ECHECS_SERVEUR;
+                if (definitif) await this._mettreEnQuarantaine(op, `${e.message} (refus\xE9 ${echecs} fois par le serveur)`);
+                else await this._modifierPendingQueue((file) => file.map((o) => o.opId === op.opId ? { ...o, echecsServeur: echecs, dernierEchec: e.message } : o));
+              }
+            }
+          } finally {
+            this.syncEnCours = false;
           }
           console.log("\u2705 Sync termin\xE9e.");
         }
@@ -188,8 +387,13 @@
           contientErreurs: "contient_erreurs",
           verrouilleFacture: "verrouille_facture",
           dateSuspension: "date_suspension",
+          noteSuspension: "note_suspension",
           updatedAt: "updated_at",
-          serviceChoisi: "service_choisi"
+          serviceChoisi: "service_choisi",
+          numeroLot: "numero_lot",
+          moisReport: "mois_report",
+          moisLot: "mois_lot",
+          lotVerrouille: "lot_verrouille"
         };
         const result = {};
         for (const [k, v] of Object.entries(data)) result[map[k] || k] = v;
@@ -211,8 +415,13 @@
           contient_erreurs: "contientErreurs",
           verrouille_facture: "verrouilleFacture",
           date_suspension: "dateSuspension",
+          note_suspension: "noteSuspension",
           updated_at: "updatedAt",
-          service_choisi: "serviceChoisi"
+          service_choisi: "serviceChoisi",
+          numero_lot: "numeroLot",
+          mois_report: "moisReport",
+          mois_lot: "moisLot",
+          lot_verrouille: "lotVerrouille"
         };
         const result = {};
         for (const [k, v] of Object.entries(data)) result[map[k] || k] = v;
@@ -5093,10 +5302,35 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
       var { formatGourdes } = require_helpers();
       function AccueilPanel({ verifications, paiements, medicaments, userRole, userDisplayName, onNaviguer, onOuvrirAchatExpress, showToast }) {
         const [enAttente, setEnAttente] = useState(0);
+        const [enQuarantaine, setEnQuarantaine] = useState(0);
+        const [rafraichir, setRafraichir] = useState(0);
         useEffect(() => {
-          const interval = setInterval(() => setEnAttente(chf.countPending()), 2e3);
-          return () => clearInterval(interval);
+          const relire = () => {
+            setEnAttente(chf.countPending());
+            setEnQuarantaine(chf.countFailed());
+            setRafraichir((n) => n + 1);
+          };
+          relire();
+          const interval = setInterval(relire, 2e3);
+          window.addEventListener("chf:file-changee", relire);
+          window.addEventListener("chf:echec-permanent", relire);
+          return () => {
+            clearInterval(interval);
+            window.removeEventListener("chf:file-changee", relire);
+            window.removeEventListener("chf:echec-permanent", relire);
+          };
         }, []);
+        const telechargerSauvegardeSecours = () => {
+          const contenu = JSON.stringify(chf.exporterFileAttente(), null, 2);
+          const lien = document.createElement("a");
+          lien.href = URL.createObjectURL(new Blob([contenu], { type: "application/json" }));
+          lien.download = `CHF_non_synchronise_${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`;
+          document.body.appendChild(lien);
+          lien.click();
+          document.body.removeChild(lien);
+          setTimeout(() => URL.revokeObjectURL(lien.href), 1e3);
+          showToast == null ? void 0 : showToast("Sauvegarde de secours t\xE9l\xE9charg\xE9e \u2014 garde ce fichier tant que tout n'est pas synchronis\xE9.", "success");
+        };
         const resume = useMemo(() => {
           const today = /* @__PURE__ */ new Date();
           const estAujourdhui = (dateHeureFr) => {
@@ -5113,10 +5347,17 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
         const stockCritique = useMemo(() => medicaments.filter((m) => (m.quantite || 0) <= (m.seuilAlerte || 5)), [medicaments]);
         const peutVendre = userRole === "comptable" || userRole === "direction" || userRole === "administrateur";
         const peutGererStock = userRole === "administrateur" || userRole === "direction";
-        return /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "bg-[#1E2A24] text-white p-4 rounded-xl shadow-sm" }, /* @__PURE__ */ React.createElement("p", { className: "text-[10px] uppercase tracking-widest text-[#9FB8A8]" }, "Bienvenue"), /* @__PURE__ */ React.createElement("h2", { className: "text-lg font-black" }, userDisplayName), /* @__PURE__ */ React.createElement("p", { className: "text-xs text-[#9FB8A8]" }, (/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" }))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h3", { className: "text-xs font-black text-gray-500 uppercase mb-2" }, "Raccourcis"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-4 gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => onNaviguer("calcul"), className: "bg-white border rounded-xl p-3 text-center shadow-sm hover:shadow-md transition" }, /* @__PURE__ */ React.createElement("div", { className: "text-xl" }, "\u{1F195}"), /* @__PURE__ */ React.createElement("div", { className: "text-[10px] font-bold mt-1" }, "Nouveau Dossier")), peutVendre && /* @__PURE__ */ React.createElement("button", { onClick: onOuvrirAchatExpress, className: "bg-white border rounded-xl p-3 text-center shadow-sm hover:shadow-md transition" }, /* @__PURE__ */ React.createElement("div", { className: "text-xl" }, "\u26A1"), /* @__PURE__ */ React.createElement("div", { className: "text-[10px] font-bold mt-1" }, "Achat Express")), /* @__PURE__ */ React.createElement("button", { onClick: () => onNaviguer("verifie"), className: "bg-white border rounded-xl p-3 text-center shadow-sm hover:shadow-md transition" }, /* @__PURE__ */ React.createElement("div", { className: "text-xl" }, "\u{1F4C1}"), /* @__PURE__ */ React.createElement("div", { className: "text-[10px] font-bold mt-1" }, "Archives")), peutGererStock && /* @__PURE__ */ React.createElement("button", { onClick: () => onNaviguer("stock"), className: "bg-white border rounded-xl p-3 text-center shadow-sm hover:shadow-md transition" }, /* @__PURE__ */ React.createElement("div", { className: "text-xl" }, "\u{1F4E6}"), /* @__PURE__ */ React.createElement("div", { className: "text-[10px] font-bold mt-1" }, "Stock")))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h3", { className: "text-xs font-black text-gray-500 uppercase mb-2" }, "R\xE9sum\xE9 du jour"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-4 gap-3" }, /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "CA aujourd'hui"), /* @__PURE__ */ React.createElement("p", { className: "text-lg font-black text-emerald-700" }, formatGourdes(resume.caJour), " Gdes")), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Consultations"), /* @__PURE__ */ React.createElement("p", { className: "text-lg font-black text-purple-600" }, resume.consultationsJour)), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Dossiers actifs"), /* @__PURE__ */ React.createElement("p", { className: "text-lg font-black text-blue-600" }, resume.dossiersActifs)), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Suspendus"), /* @__PURE__ */ React.createElement("p", { className: "text-lg font-black text-amber-600" }, resume.dossiersSuspendus)))), (stockCritique.length > 0 || enAttente > 0) && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h3", { className: "text-xs font-black text-gray-500 uppercase mb-2" }, "Alertes"), /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, stockCritique.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "bg-red-50 border border-red-200 rounded-xl p-3 flex justify-between items-center text-xs" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-red-700" }, "\u26A0\uFE0F ", stockCritique.length, " article(s) en stock critique"), peutGererStock && /* @__PURE__ */ React.createElement("button", { onClick: () => onNaviguer("stock"), className: "text-red-700 underline font-bold" }, "Voir")), enAttente > 0 && /* @__PURE__ */ React.createElement("div", { className: "bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-center" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-amber-700" }, "\u23F3 ", enAttente, " op\xE9ration(s) en attente de synchronisation"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
-          chf.syncPending();
-          showToast == null ? void 0 : showToast("Nouvelle tentative en cours...", "info");
-        }, className: "text-amber-800 font-bold underline whitespace-nowrap" }, "\u{1F504} R\xE9essayer maintenant")), /* @__PURE__ */ React.createElement("div", { className: "divide-y divide-amber-200/60" }, chf.getPendingDetails().map((d, i) => /* @__PURE__ */ React.createElement("div", { key: i, className: "flex justify-between py-1 text-amber-800" }, /* @__PURE__ */ React.createElement("span", null, d.texte), /* @__PURE__ */ React.createElement("span", { className: "text-amber-600" }, d.quand)))), /* @__PURE__ */ React.createElement("p", { className: "text-[10px] text-amber-600" }, "Ces changements sont d\xE9j\xE0 enregistr\xE9s sur cet appareil \u2014 ils partiront vers le serveur d\xE8s qu'une connexion fonctionne. R\xE9essaie manuellement si \xE7a persiste apr\xE8s plusieurs minutes.")))));
+        return /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "bg-[#1E2A24] text-white p-4 rounded-xl shadow-sm" }, /* @__PURE__ */ React.createElement("p", { className: "text-[10px] uppercase tracking-widest text-[#9FB8A8]" }, "Bienvenue"), /* @__PURE__ */ React.createElement("h2", { className: "text-lg font-black" }, userDisplayName), /* @__PURE__ */ React.createElement("p", { className: "text-xs text-[#9FB8A8]" }, (/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" }))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h3", { className: "text-xs font-black text-gray-500 uppercase mb-2" }, "Raccourcis"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-4 gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => onNaviguer("calcul"), className: "bg-white border rounded-xl p-3 text-center shadow-sm hover:shadow-md transition" }, /* @__PURE__ */ React.createElement("div", { className: "text-xl" }, "\u{1F195}"), /* @__PURE__ */ React.createElement("div", { className: "text-[10px] font-bold mt-1" }, "Nouveau Dossier")), peutVendre && /* @__PURE__ */ React.createElement("button", { onClick: onOuvrirAchatExpress, className: "bg-white border rounded-xl p-3 text-center shadow-sm hover:shadow-md transition" }, /* @__PURE__ */ React.createElement("div", { className: "text-xl" }, "\u26A1"), /* @__PURE__ */ React.createElement("div", { className: "text-[10px] font-bold mt-1" }, "Achat Express")), /* @__PURE__ */ React.createElement("button", { onClick: () => onNaviguer("verifie"), className: "bg-white border rounded-xl p-3 text-center shadow-sm hover:shadow-md transition" }, /* @__PURE__ */ React.createElement("div", { className: "text-xl" }, "\u{1F4C1}"), /* @__PURE__ */ React.createElement("div", { className: "text-[10px] font-bold mt-1" }, "Archives")), peutGererStock && /* @__PURE__ */ React.createElement("button", { onClick: () => onNaviguer("stock"), className: "bg-white border rounded-xl p-3 text-center shadow-sm hover:shadow-md transition" }, /* @__PURE__ */ React.createElement("div", { className: "text-xl" }, "\u{1F4E6}"), /* @__PURE__ */ React.createElement("div", { className: "text-[10px] font-bold mt-1" }, "Stock")))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h3", { className: "text-xs font-black text-gray-500 uppercase mb-2" }, "R\xE9sum\xE9 du jour"), /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-2 sm:grid-cols-4 gap-3" }, /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "CA aujourd'hui"), /* @__PURE__ */ React.createElement("p", { className: "text-lg font-black text-emerald-700" }, formatGourdes(resume.caJour), " Gdes")), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Consultations"), /* @__PURE__ */ React.createElement("p", { className: "text-lg font-black text-purple-600" }, resume.consultationsJour)), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Dossiers actifs"), /* @__PURE__ */ React.createElement("p", { className: "text-lg font-black text-blue-600" }, resume.dossiersActifs)), /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm text-center" }, /* @__PURE__ */ React.createElement("span", { className: "text-[10px] uppercase font-bold text-gray-400" }, "Suspendus"), /* @__PURE__ */ React.createElement("p", { className: "text-lg font-black text-amber-600" }, resume.dossiersSuspendus)))), (stockCritique.length > 0 || enAttente > 0 || enQuarantaine > 0) && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h3", { className: "text-xs font-black text-gray-500 uppercase mb-2" }, "Alertes"), /* @__PURE__ */ React.createElement("div", { className: "space-y-2" }, stockCritique.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "bg-red-50 border border-red-200 rounded-xl p-3 flex justify-between items-center text-xs" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-red-700" }, "\u26A0\uFE0F ", stockCritique.length, " article(s) en stock critique"), peutGererStock && /* @__PURE__ */ React.createElement("button", { onClick: () => onNaviguer("stock"), className: "text-red-700 underline font-bold" }, "Voir")), enAttente > 0 && (() => {
+          const details = chf.getPendingDetails();
+          const bloquees = details.filter((d) => d.bloqueeDepuisLongtemps);
+          return /* @__PURE__ */ React.createElement("div", { className: `rounded-xl p-3 text-xs space-y-2 border ${bloquees.length > 0 ? "bg-orange-50 border-orange-300" : "bg-amber-50 border-amber-200"}` }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-center gap-2 flex-wrap" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-amber-700" }, "\u23F3 ", enAttente, " op\xE9ration(s) en attente de synchronisation"), /* @__PURE__ */ React.createElement("span", { className: "flex gap-3 whitespace-nowrap" }, /* @__PURE__ */ React.createElement("button", { onClick: () => {
+            chf.syncPending();
+            showToast == null ? void 0 : showToast("Nouvelle tentative en cours...", "info");
+          }, className: "text-amber-800 font-bold underline" }, "\u{1F504} R\xE9essayer maintenant"), /* @__PURE__ */ React.createElement("button", { onClick: telechargerSauvegardeSecours, className: "text-amber-800 font-bold underline" }, "\u{1F4BE} Sauvegarde de secours"))), bloquees.length > 0 && /* @__PURE__ */ React.createElement("p", { className: "bg-orange-100 border border-orange-300 rounded-lg p-2 font-bold text-orange-800" }, "\u26A0\uFE0F ", bloquees.length, " op\xE9ration(s) bloqu\xE9e(s) depuis plus de 15 minutes. V\xE9rifie la connexion de cet appareil, puis clique sur \xAB R\xE9essayer maintenant \xBB. T\xE9l\xE9charge la sauvegarde de secours avant de fermer l'app ou de vider le navigateur."), /* @__PURE__ */ React.createElement("div", { className: "divide-y divide-amber-200/60" }, details.map((d, i) => /* @__PURE__ */ React.createElement("div", { key: i, className: "flex justify-between py-1 gap-2" }, /* @__PURE__ */ React.createElement("span", { className: d.bloqueeDepuisLongtemps ? "text-orange-800 font-bold" : "text-amber-800" }, d.bloqueeDepuisLongtemps && "\u26A0\uFE0F ", d.texte, d.patient ? ` \u2014 ${d.patient}` : ""), /* @__PURE__ */ React.createElement("span", { className: `whitespace-nowrap ${d.bloqueeDepuisLongtemps ? "text-orange-700" : "text-amber-600"}` }, d.ageMinutes >= 60 ? `depuis ${Math.floor(d.ageMinutes / 60)}h` : `depuis ${d.ageMinutes} min`)))), /* @__PURE__ */ React.createElement("p", { className: "text-[10px] text-amber-600" }, "Ces changements sont enregistr\xE9s sur CET appareil uniquement \u2014 ils partiront vers le serveur d\xE8s qu'une connexion fonctionne. Ne vide pas les donn\xE9es du navigateur tant que ce compteur n'est pas \xE0 z\xE9ro."));
+        })(), enQuarantaine > 0 && /* @__PURE__ */ React.createElement("div", { className: "bg-red-50 border border-red-300 rounded-xl p-3 text-xs space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "flex justify-between items-center gap-2 flex-wrap" }, /* @__PURE__ */ React.createElement("span", { className: "font-black text-red-700" }, "\u26D4 ", enQuarantaine, " op\xE9ration(s) refus\xE9e(s) par le serveur"), /* @__PURE__ */ React.createElement("span", { className: "flex gap-3 whitespace-nowrap" }, /* @__PURE__ */ React.createElement("button", { onClick: async () => {
+          const n = await chf.reessayerEchecs();
+          showToast == null ? void 0 : showToast(`${n} op\xE9ration(s) remise(s) en file.`, "info");
+        }, className: "text-red-800 font-bold underline" }, "\u{1F504} R\xE9essayer"), /* @__PURE__ */ React.createElement("button", { onClick: telechargerSauvegardeSecours, className: "text-red-800 font-bold underline" }, "\u{1F4BE} Sauvegarde"))), /* @__PURE__ */ React.createElement("div", { className: "divide-y divide-red-200/60" }, chf.getFailedDetails().map((d, i) => /* @__PURE__ */ React.createElement("div", { key: i, className: "py-1 text-red-800" }, /* @__PURE__ */ React.createElement("div", { className: "font-bold" }, d.texte, d.patient ? ` \u2014 ${d.patient}` : ""), /* @__PURE__ */ React.createElement("div", { className: "text-[10px] text-red-600" }, d.raison, " \u2014 saisi le ", d.quand)))), /* @__PURE__ */ React.createElement("p", { className: "text-[10px] text-red-600" }, "Rien n'est perdu : ces op\xE9rations sont conserv\xE9es ici. Le serveur les a refus\xE9es (droits insuffisants, donn\xE9es invalides...). Corrige la cause puis clique sur \xAB R\xE9essayer \xBB, ou signale-le \xE0 l'administrateur.")))));
       }
       module.exports = AccueilPanel;
     }
@@ -6571,7 +6812,8 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
               setOnglet(cible);
               setModePreValidation(false);
             },
-            onOuvrirAchatExpress: () => setAchatExpressOuvert(true)
+            onOuvrirAchatExpress: () => setAchatExpressOuvert(true),
+            showToast
           }
         ), onglet === "dashboard_direction" && (userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(DashboardDirectionPanel, { verifications, paiements, medicaments }), onglet === "dashboard_caisse" && (userRole === "comptable" || userRole === "direction" || userRole === "administrateur") && /* @__PURE__ */ React.createElement(DashboardCaissePanel, { verifications, paiements, userDisplayName, listeOng: listeOngNoms, showToast }), onglet === "calcul" && modePreValidation && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-6 rounded-xl border border-emerald-400 shadow-xl space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "text-center border-b pb-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-emerald-800 font-bold uppercase text-[11px]" }, "Contr\xF4le final"), /* @__PURE__ */ React.createElement("h3", { className: "text-lg font-black" }, "\u{1F4CB} Totaux analytiques"), /* @__PURE__ */ React.createElement("p", { className: "text-xs text-gray-500" }, nomPatient, " | ", selectedOng)), /* @__PURE__ */ React.createElement("div", { className: "bg-gray-50 p-4 rounded-xl border shadow-inner space-y-2" }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 font-bold font-mono text-xs border-b pb-2 mb-2" }, /* @__PURE__ */ React.createElement("span", null, "CAT\xC9GORIE"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "Gdes"), /* @__PURE__ */ React.createElement("span", { className: "text-right text-emerald-800" }, "DH")), CATEGORIES_LISTE.map((cat) => {
           const m = cumulCategoriesDossierActif[cat.key];
