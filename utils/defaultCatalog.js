@@ -1743,7 +1743,13 @@ const ACTES_PAR_DEFAUT = [
     "id": "a33",
     "nom": "Délivrance Placentaire Artificielle",
     "prix": 2000,
-    "sub": "chirurgie"
+    "sub": "deliverance"
+  },
+  {
+    "id": "a281",
+    "nom": "Délivrance",
+    "prix": 0,
+    "sub": "deliverance"
   },
   {
     "id": "a13",

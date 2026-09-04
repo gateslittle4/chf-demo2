@@ -478,6 +478,7 @@
         { key: "oxygene", label: "Oxyg\xE8ne" },
         { key: "curetage", label: "Curetage" },
         { key: "accouchement", label: "Accouchement" },
+        { key: "deliverance", label: "D\xE9livrance" },
         { key: "sono", label: "Sonographie" },
         { key: "cesarienne", label: "C\xE9sarienne" },
         { key: "chirurgie", label: "Chirurgie" },
@@ -2250,7 +2251,13 @@
           "id": "a33",
           "nom": "D\xE9livrance Placentaire Artificielle",
           "prix": 2e3,
-          "sub": "chirurgie"
+          "sub": "deliverance"
+        },
+        {
+          "id": "a281",
+          "nom": "D\xE9livrance",
+          "prix": 0,
+          "sub": "deliverance"
         },
         {
           "id": "a13",
@@ -3636,6 +3643,7 @@
           curetage: "curtage",
           chirurgie: "Chirugie",
           accouchement: "Accouch",
+          deliverance: "Delivrance",
           sono: "SONO",
           pansement: "Pansement",
           suture: "Suture",
@@ -5738,6 +5746,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
         { key: "ecg", label: "ECG", couleur: "#0891b2", portee: "acte", match: (l) => l.sub === "ecg" },
         { key: "cesarienne", label: "C\xE9sariennes", couleur: "#db2777", portee: "acte", match: (l) => l.sub === "cesarienne" },
         { key: "accouchement", label: "Accouchements", couleur: "#ea580c", portee: "acte", match: (l) => l.sub === "accouchement" },
+        { key: "deliverance", label: "D\xE9livrances", couleur: "#be185d", portee: "acte", match: (l) => l.sub === "deliverance" },
         { key: "chirurgie", label: "Chirurgie", couleur: "#dc2626", portee: "acte", match: (l) => l.sub === "chirurgie" },
         { key: "pediatrie", label: "P\xE9diatrie", couleur: "#059669", portee: "service", service: "P\xE9diatrie" },
         { key: "neonat", label: "N\xE9onatologie", couleur: "#2563eb", portee: "service", service: "N\xE9onatologie" }
@@ -5788,8 +5797,8 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
         });
         if (estNeonat) return "N\xE9onatologie";
         const totalMaternite = (dossier.fiches || []).reduce((s, f) => {
-          var _a2, _b;
-          return s + (((_a2 = f.breakdown) == null ? void 0 : _a2.accouchement) || 0) + (((_b = f.breakdown) == null ? void 0 : _b.cesarienne) || 0);
+          var _a2, _b, _c;
+          return s + (((_a2 = f.breakdown) == null ? void 0 : _a2.accouchement) || 0) + (((_b = f.breakdown) == null ? void 0 : _b.cesarienne) || 0) + (((_c = f.breakdown) == null ? void 0 : _c.deliverance) || 0);
         }, 0);
         if (totalMaternite > 0) return "Maternit\xE9";
         const NOMS_CONSULTATION = [
