@@ -6,10 +6,29 @@ const { formatGourdes } = require('../utils/helpers');
 
 function AccueilPanel({ verifications, paiements, medicaments, userRole, userDisplayName, onNaviguer, onOuvrirAchatExpress, showToast }) {
   const [enAttente, setEnAttente] = useState(0);
+  const [enQuarantaine, setEnQuarantaine] = useState(0);
+  const [rafraichir, setRafraichir] = useState(0); // force la relecture des détails de la file
   useEffect(() => {
-    const interval = setInterval(() => setEnAttente(chf.countPending()), 2000);
-    return () => clearInterval(interval);
+    const relire = () => { setEnAttente(chf.countPending()); setEnQuarantaine(chf.countFailed()); setRafraichir(n => n + 1); };
+    relire();
+    const interval = setInterval(relire, 2000);
+    // Un autre onglet qui synchronise modifie la même file : on se remet à jour immédiatement.
+    window.addEventListener('chf:file-changee', relire);
+    window.addEventListener('chf:echec-permanent', relire);
+    return () => { clearInterval(interval); window.removeEventListener('chf:file-changee', relire); window.removeEventListener('chf:echec-permanent', relire); };
   }, []);
+
+  // Sauvegarde de secours du travail pas encore parti au serveur : dernier filet si ce navigateur
+  // est réinitialisé ou l'appareil perdu (la file d'attente ne vit que sur CET appareil).
+  const telechargerSauvegardeSecours = () => {
+    const contenu = JSON.stringify(chf.exporterFileAttente(), null, 2);
+    const lien = document.createElement('a');
+    lien.href = URL.createObjectURL(new Blob([contenu], { type: 'application/json' }));
+    lien.download = `CHF_non_synchronise_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(lien); lien.click(); document.body.removeChild(lien);
+    setTimeout(() => URL.revokeObjectURL(lien.href), 1000);
+    showToast?.("Sauvegarde de secours téléchargée — garde ce fichier tant que tout n'est pas synchronisé.", "success");
+  };
 
   const resume = useMemo(() => {
     const today = new Date();
@@ -58,7 +77,7 @@ function AccueilPanel({ verifications, paiements, medicaments, userRole, userDis
         </div>
       </div>
 
-      {(stockCritique.length > 0 || enAttente > 0) && (
+      {(stockCritique.length > 0 || enAttente > 0 || enQuarantaine > 0) && (
         <div>
           <h3 className="text-xs font-black text-gray-500 uppercase mb-2">Alertes</h3>
           <div className="space-y-2">
@@ -68,20 +87,57 @@ function AccueilPanel({ verifications, paiements, medicaments, userRole, userDis
                 {peutGererStock && <button onClick={()=>onNaviguer('stock')} className="text-red-700 underline font-bold">Voir</button>}
               </div>
             )}
-            {enAttente > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-amber-700">⏳ {enAttente} opération(s) en attente de synchronisation</span>
-                  <button onClick={() => { chf.syncPending(); showToast?.("Nouvelle tentative en cours...", "info"); }} className="text-amber-800 font-bold underline whitespace-nowrap">🔄 Réessayer maintenant</button>
+            {enAttente > 0 && (() => {
+              const details = chf.getPendingDetails();
+              const bloquees = details.filter(d => d.bloqueeDepuisLongtemps);
+              return (
+                <div className={`rounded-xl p-3 text-xs space-y-2 border ${bloquees.length > 0 ? 'bg-orange-50 border-orange-300' : 'bg-amber-50 border-amber-200'}`}>
+                  <div className="flex justify-between items-center gap-2 flex-wrap">
+                    <span className="font-bold text-amber-700">⏳ {enAttente} opération(s) en attente de synchronisation</span>
+                    <span className="flex gap-3 whitespace-nowrap">
+                      <button onClick={() => { chf.syncPending(); showToast?.("Nouvelle tentative en cours...", "info"); }} className="text-amber-800 font-bold underline">🔄 Réessayer maintenant</button>
+                      <button onClick={telechargerSauvegardeSecours} className="text-amber-800 font-bold underline">💾 Sauvegarde de secours</button>
+                    </span>
+                  </div>
+                  {bloquees.length > 0 && (
+                    <p className="bg-orange-100 border border-orange-300 rounded-lg p-2 font-bold text-orange-800">
+                      ⚠️ {bloquees.length} opération(s) bloquée(s) depuis plus de 15 minutes. Vérifie la connexion de cet appareil, puis clique sur « Réessayer maintenant ». Télécharge la sauvegarde de secours avant de fermer l'app ou de vider le navigateur.
+                    </p>
+                  )}
+                  <div className="divide-y divide-amber-200/60">
+                    {details.map((d, i) => (
+                      <div key={i} className="flex justify-between py-1 gap-2">
+                        <span className={d.bloqueeDepuisLongtemps ? 'text-orange-800 font-bold' : 'text-amber-800'}>
+                          {d.bloqueeDepuisLongtemps && '⚠️ '}{d.texte}{d.patient ? ` — ${d.patient}` : ''}
+                        </span>
+                        <span className={`whitespace-nowrap ${d.bloqueeDepuisLongtemps ? 'text-orange-700' : 'text-amber-600'}`}>
+                          {d.ageMinutes >= 60 ? `depuis ${Math.floor(d.ageMinutes / 60)}h` : `depuis ${d.ageMinutes} min`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-amber-600">Ces changements sont enregistrés sur CET appareil uniquement — ils partiront vers le serveur dès qu'une connexion fonctionne. Ne vide pas les données du navigateur tant que ce compteur n'est pas à zéro.</p>
                 </div>
-                <div className="divide-y divide-amber-200/60">
-                  {chf.getPendingDetails().map((d, i) => (
-                    <div key={i} className="flex justify-between py-1 text-amber-800">
-                      <span>{d.texte}</span><span className="text-amber-600">{d.quand}</span>
+              );
+            })()}
+            {enQuarantaine > 0 && (
+              <div className="bg-red-50 border border-red-300 rounded-xl p-3 text-xs space-y-2">
+                <div className="flex justify-between items-center gap-2 flex-wrap">
+                  <span className="font-black text-red-700">⛔ {enQuarantaine} opération(s) refusée(s) par le serveur</span>
+                  <span className="flex gap-3 whitespace-nowrap">
+                    <button onClick={async () => { const n = await chf.reessayerEchecs(); showToast?.(`${n} opération(s) remise(s) en file.`, "info"); }} className="text-red-800 font-bold underline">🔄 Réessayer</button>
+                    <button onClick={telechargerSauvegardeSecours} className="text-red-800 font-bold underline">💾 Sauvegarde</button>
+                  </span>
+                </div>
+                <div className="divide-y divide-red-200/60">
+                  {chf.getFailedDetails().map((d, i) => (
+                    <div key={i} className="py-1 text-red-800">
+                      <div className="font-bold">{d.texte}{d.patient ? ` — ${d.patient}` : ''}</div>
+                      <div className="text-[10px] text-red-600">{d.raison} — saisi le {d.quand}</div>
                     </div>
                   ))}
                 </div>
-                <p className="text-[10px] text-amber-600">Ces changements sont déjà enregistrés sur cet appareil — ils partiront vers le serveur dès qu'une connexion fonctionne. Réessaie manuellement si ça persiste après plusieurs minutes.</p>
+                <p className="text-[10px] text-red-600">Rien n'est perdu : ces opérations sont conservées ici. Le serveur les a refusées (droits insuffisants, données invalides...). Corrige la cause puis clique sur « Réessayer », ou signale-le à l'administrateur.</p>
               </div>
             )}
           </div>
