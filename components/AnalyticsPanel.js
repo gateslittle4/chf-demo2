@@ -31,6 +31,7 @@ const ACTIVITES = [
   { key: 'ecg', label: 'ECG', couleur: '#0891b2', portee: 'acte', match: (l) => l.sub === 'ecg' },
   { key: 'cesarienne', label: 'Césariennes', couleur: '#db2777', portee: 'acte', match: (l) => l.sub === 'cesarienne' },
   { key: 'accouchement', label: 'Accouchements', couleur: '#ea580c', portee: 'acte', match: (l) => l.sub === 'accouchement' },
+  { key: 'deliverance', label: 'Délivrances', couleur: '#be185d', portee: 'acte', match: (l) => l.sub === 'deliverance' },
   { key: 'chirurgie', label: 'Chirurgie', couleur: '#dc2626', portee: 'acte', match: (l) => l.sub === 'chirurgie' },
   { key: 'pediatrie', label: 'Pédiatrie', couleur: '#059669', portee: 'service', service: 'Pédiatrie' },
   { key: 'neonat', label: 'Néonatologie', couleur: '#2563eb', portee: 'service', service: 'Néonatologie' },
@@ -80,7 +81,7 @@ function classifierService(dossier) {
   });
   if (estNeonat) return 'Néonatologie';
 
-  const totalMaternite = (dossier.fiches || []).reduce((s, f) => s + (f.breakdown?.accouchement || 0) + (f.breakdown?.cesarienne || 0), 0);
+  const totalMaternite = (dossier.fiches || []).reduce((s, f) => s + (f.breakdown?.accouchement || 0) + (f.breakdown?.cesarienne || 0) + (f.breakdown?.deliverance || 0), 0);
   if (totalMaternite > 0) return 'Maternité';
 
   const NOMS_CONSULTATION = [
@@ -103,7 +104,7 @@ function classifierService(dossier) {
 // ========================== CUMUL REVENU PAR CATÉGORIE (depuis breakdown réel) ==========================
 function cumulBreakdown(dossier) {
   const c = { hospit: 0, med: 0, labo: 0, service: 0, chirurgie: 0, oxygene: 0, sono: 0, ecg: 0,
-    cesarienne: 0, accouchement: 0, curetage: 0, suture: 0, pansement: 0, drainage: 0, pap: 0, visite: 0, nebulisation: 0 };
+    cesarienne: 0, accouchement: 0, deliverance: 0, curetage: 0, suture: 0, pansement: 0, drainage: 0, pap: 0, visite: 0, nebulisation: 0 };
   (dossier.fiches || []).forEach(f => { Object.keys(f.breakdown || {}).forEach(k => { if (c[k] !== undefined) c[k] += (f.breakdown[k] || 0); }); });
   return c;
 }

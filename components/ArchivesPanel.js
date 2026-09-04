@@ -199,7 +199,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
   const LABELS_EXPORT = {
     service: 'Admission', hospit: 'Lit/ Hosp', labo: 'Laboratoire', med: 'Medicaments',
     ecg: 'ECG', oxygene: 'O2', cesarienne: 'Cesarienne/Laparo', curetage: 'curtage',
-    chirurgie: 'Chirugie', accouchement: 'Accouch', sono: 'SONO', pansement: 'Pansement',
+    chirurgie: 'Chirugie', accouchement: 'Accouch', deliverance: 'Delivrance', sono: 'SONO', pansement: 'Pansement',
     suture: 'Suture', drainage: 'Drainage', pap: 'PAP Test', visite: 'Visite',
     nebulisation: 'Nebulisation', radio: 'Radiographie'
   };

@@ -17,6 +17,7 @@ const CATEGORIES_LISTE = [
   { key: "oxygene", label: "Oxygène" },
   { key: "curetage", label: "Curetage" },
   { key: "accouchement", label: "Accouchement" },
+  { key: "deliverance", label: "Délivrance" },
   { key: "sono", label: "Sonographie" },
   { key: "cesarienne", label: "Césarienne" },
   { key: "chirurgie", label: "Chirurgie" },
