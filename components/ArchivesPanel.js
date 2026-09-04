@@ -655,7 +655,9 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                   <div key={v.id} className="flex justify-between items-start py-2 text-xs font-mono gap-2">
                     <div className="flex-1 min-w-0">
                       <span className={`inline-block w-16 ${v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? 'text-gray-500' : 'text-red-500'}`}>{v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? v.dateEntreePourTri.split('-').reverse().join('/') : 'sans exeat'}</span>
-                      {v.nomPatient} <span className="text-gray-400">— {formatGourdes(v.totalGlobal||0)} Gdes <span className="text-indigo-400">({formatDH(v.totalGlobal||0)} DH)</span></span>
+                      {v.nomPatient}{' '}
+                      <span title="Nombre de fiches dans ce dossier — pour vérifier qu'aucune fiche papier n'a été oubliée" className="inline-flex items-center justify-center h-4 px-1 mr-1 bg-blue-50 text-blue-700 border border-blue-100 rounded text-[10px] font-bold align-middle">{(v.fiches||[]).length} fiche{(v.fiches||[]).length > 1 ? 's' : ''}</span>
+                      <span className="text-gray-400">— {formatGourdes(v.totalGlobal||0)} Gdes <span className="text-indigo-400">({formatDH(v.totalGlobal||0)} DH)</span></span>
                       <div className="flex flex-wrap gap-1 mt-1 pl-16">
                         {ventilationDossier(v).map(x => (
                           <span key={x.label} className="bg-indigo-50 text-indigo-700 border border-indigo-100 rounded px-1.5 py-0.5 text-[10px] whitespace-nowrap">{x.label}: {formatDH(x.montant)} DH</span>
