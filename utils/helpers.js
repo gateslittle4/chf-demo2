@@ -10,7 +10,11 @@ function formatDH(val) {
 }
 
 function formaterNomPropre(chaine) {
-  return chaine ? chaine.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) : "";
+  // \b\w ne matche que les caractères ASCII (pas les lettres accentuées) : "éliane" restait "éliane"
+  // au lieu de "Éliane". \p{L} (avec le flag u) reconnaît toute lettre Unicode ; on capitalise la
+  // première lettre du début de chaîne ou suivant un caractère non-lettre (espace, tiret, apostrophe…)
+  // pour garder le même comportement qu'avant sur "jean-paul" -> "Jean-Paul".
+  return chaine ? chaine.trim().toLowerCase().replace(/(^|[^\p{L}])(\p{L})/gu, (_, sep, lettre) => sep + lettre.toUpperCase()) : "";
 }
 
 function echapperHTML(texte) {

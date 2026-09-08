@@ -826,9 +826,17 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
         if (res.medicaments) setMedicaments(res.medicaments);
         if (res.actes) setActes(res.actes);
         if (res.verifications) {
-          for (let d of res.verifications) { await chf.createEpisode(toEpisodeApi(d)); }
-          const episodes = await chf.getEpisodes();
+          // Recrée uniquement les dossiers absents du serveur : sans cette vérification, restaurer une
+          // sauvegarde dont les dossiers ont déjà été (re)synchronisés depuis crée des doublons complets
+          // (nouvel id à chaque fois), sans aucune étape de réconciliation pour les retirer ensuite.
+          const episodesActuels = await chf.getEpisodes();
+          const idsExistants = new Set(episodesActuels.map(ep => ep.id));
+          const aRestaurer = res.verifications.filter(d => !idsExistants.has(d.id));
+          for (let d of aRestaurer) { await chf.createEpisode(toEpisodeApi(d)); }
+          const episodes = aRestaurer.length > 0 ? await chf.getEpisodes() : episodesActuels;
           setVerifications(episodes.map(ep => fromEpisodeApi(ep)));
+          const ignores = res.verifications.length - aRestaurer.length;
+          if (ignores > 0) showToast(`${ignores} dossier(s) déjà présent(s) sur le serveur, ignoré(s) (non dupliqué(s)).`, "info");
         }
         enregistrerAudit('restauration_sauvegarde', { nombreDossiers: res.verifications?.length || 0 });
         showToast("Base restaurée !", "success");

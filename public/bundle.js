@@ -88,6 +88,12 @@
           });
           setInterval(() => this.syncPending(), 3e4);
           window.addEventListener("storage", (e) => {
+            if (e.key === CLE_ID_MAP) {
+              try {
+                this.localIdMap = JSON.parse(e.newValue || "{}");
+              } catch (_) {
+              }
+            }
             if (e.key === CLE_PENDING || e.key === CLE_FAILED) window.dispatchEvent(new CustomEvent("chf:file-changee"));
           });
           window.addEventListener("beforeunload", (e) => {
@@ -251,8 +257,9 @@
         async reessayerEchecs() {
           const echecs = this._lireFailedOps();
           if (echecs.length === 0) return 0;
+          const opIds = new Set(echecs.map((op) => op.opId));
           await this._modifierPendingQueue((file) => [...file, ...echecs.map((op) => ({ ...op, echecsServeur: 0, raisonEchec: void 0, dateEchec: void 0 }))]);
-          await this._modifierListe(CLE_FAILED, () => []);
+          await this._modifierListe(CLE_FAILED, (liste) => liste.filter((op) => !opIds.has(op.opId)));
           await this.syncPending();
           return echecs.length;
         }
@@ -2377,7 +2384,7 @@
         return formatGourdes(val / 5);
       }
       function formaterNomPropre(chaine) {
-        return chaine ? chaine.trim().toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()) : "";
+        return chaine ? chaine.trim().toLowerCase().replace(/(^|[^\p{L}])(\p{L})/gu, (_, sep, lettre) => sep + lettre.toUpperCase()) : "";
       }
       function echapperHTML(texte) {
         if (!texte) return "";
@@ -5072,7 +5079,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
           setTimeout(() => win.print(), 500);
         };
         const executerEncaissement = async () => {
-          var _a, _b;
+          var _a, _b, _c;
           if (!dossierActif) {
             showToast("Aucun dossier actif.", "error");
             return;
@@ -5108,7 +5115,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
               totalGlobal: grandTotal,
               modePaiement,
               ongPartenaire: modePaiement === "ong" ? ongPartenaireFiche : "",
-              exoneration: modePaiement === "exoneration" ? { pourcentage: parseFloat(pourcentageExoneration), montantExonere, motif: motifExoneration, autorisePar: auth.currentUser.displayName } : null,
+              exoneration: modePaiement === "exoneration" ? { pourcentage: parseFloat(pourcentageExoneration), montantExonere, motif: motifExoneration, autorisePar: ((_a = auth.currentUser) == null ? void 0 : _a.displayName) || "inconnu" } : null,
               statutPaiement: modePaiement === "credit" ? "partiellement_paye" : "paye",
               montantPaye: modePaiement === "cash" ? parseFloat(montantVerse) : modePaiement === "credit" ? 0 : montantRestantApresDepots,
               solde: modePaiement === "credit" ? montantRestantApresDepots : 0,
@@ -5128,7 +5135,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
                 totalHebergement2: totalE2
               } : null,
               dateCreation: (/* @__PURE__ */ new Date()).toISOString(),
-              creePar: ((_a = auth.currentUser) == null ? void 0 : _a.displayName) || "inconnu",
+              creePar: ((_b = auth.currentUser) == null ? void 0 : _b.displayName) || "inconnu",
               rawState: { lignesCalcul: [...lignes], dateEntree1, dateSortie1, typeLit1, multiPeriode, dateEntree2, dateSortie2, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
             };
             onEnregistrerFiche(fiche);
@@ -5146,7 +5153,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
                 ongPartenaire: modePaiement === "ong" ? ongPartenaireFiche : "",
                 exoneration: modePaiement === "exoneration" ? { pourcentage: parseFloat(pourcentageExoneration), montantExonere, motif: motifExoneration } : null,
                 date: (/* @__PURE__ */ new Date()).toISOString(),
-                encaissePar: ((_b = auth.currentUser) == null ? void 0 : _b.displayName) || "inconnu",
+                encaissePar: ((_c = auth.currentUser) == null ? void 0 : _c.displayName) || "inconnu",
                 typePatient: typePatient || "ONG"
               }));
               showToast("\u2705 Fiche enregistr\xE9e avec succ\xE8s !", "success");
@@ -5560,7 +5567,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
             breakdown,
             totalGlobal: totalPanier,
             modePaiement: "cash",
-            montantPaye: verse,
+            montantPaye: totalPanier,
             solde: 0,
             dateCreation: (/* @__PURE__ */ new Date()).toISOString(),
             creePar: ((_a = auth.currentUser) == null ? void 0 : _a.displayName) || "inconnu",
@@ -5578,7 +5585,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
             dateHeure: (/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR"),
             totalGlobal: totalPanier,
             fiches: [fiche],
-            montantPaye: verse,
+            montantPaye: totalPanier,
             solde: 0
           };
           try {
@@ -7019,11 +7026,16 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
               if (res.medicaments) setMedicaments(res.medicaments);
               if (res.actes) setActes(res.actes);
               if (res.verifications) {
-                for (let d of res.verifications) {
+                const episodesActuels = await chf.getEpisodes();
+                const idsExistants = new Set(episodesActuels.map((ep) => ep.id));
+                const aRestaurer = res.verifications.filter((d) => !idsExistants.has(d.id));
+                for (let d of aRestaurer) {
                   await chf.createEpisode(toEpisodeApi(d));
                 }
-                const episodes = await chf.getEpisodes();
+                const episodes = aRestaurer.length > 0 ? await chf.getEpisodes() : episodesActuels;
                 setVerifications(episodes.map((ep) => fromEpisodeApi(ep)));
+                const ignores = res.verifications.length - aRestaurer.length;
+                if (ignores > 0) showToast(`${ignores} dossier(s) d\xE9j\xE0 pr\xE9sent(s) sur le serveur, ignor\xE9(s) (non dupliqu\xE9(s)).`, "info");
               }
               enregistrerAudit("restauration_sauvegarde", { nombreDossiers: ((_a = res.verifications) == null ? void 0 : _a.length) || 0 });
               showToast("Base restaur\xE9e !", "success");

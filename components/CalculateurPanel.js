@@ -499,7 +499,7 @@ function CalculateurPanel({
         totalGlobal: grandTotal,
         modePaiement: modePaiement,
         ongPartenaire: modePaiement === "ong" ? ongPartenaireFiche : "",
-        exoneration: modePaiement === "exoneration" ? { pourcentage: parseFloat(pourcentageExoneration), montantExonere: montantExonere, motif: motifExoneration, autorisePar: auth.currentUser.displayName } : null,
+        exoneration: modePaiement === "exoneration" ? { pourcentage: parseFloat(pourcentageExoneration), montantExonere: montantExonere, motif: motifExoneration, autorisePar: auth.currentUser?.displayName || 'inconnu' } : null,
         statutPaiement: modePaiement === "credit" ? "partiellement_paye" : "paye",
         montantPaye: modePaiement === "cash" ? parseFloat(montantVerse) : modePaiement === "credit" ? 0 : montantRestantApresDepots,
         solde: modePaiement === "credit" ? montantRestantApresDepots : 0,
