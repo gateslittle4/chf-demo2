@@ -234,15 +234,17 @@ const periodesSejourDossier = (dossier) => {
   return dates;
 };
 
-// "Date D'admission" du formulaire : la ou les période(s) d'entrée-sortie du séjour ("du 10/08 au
-// 15/08", ou "du 10/08 au 15/08 et du 16/08 au 20/08" si plusieurs) ; seule la date d'ouverture du
-// dossier sert de repli quand il n'y a aucun séjour du tout (ex. simple achat/consultation).
+// "Date D'admission" du formulaire : la ou les période(s) d'entrée-sortie du séjour ("du 10/08/2026
+// au 15/08/2026", ou "du 10/08/2026 au 16/12/2026 et du 02/01/2027 au 05/01/2027" si plusieurs) ;
+// année incluse (sinon impossible de savoir de quelle année il s'agit en relisant le rapport plus
+// tard) ; seule la date d'ouverture du dossier sert de repli quand il n'y a aucun séjour du tout
+// (ex. simple achat/consultation) -- déjà au format JJ/MM/AAAA (toLocaleDateString fr-FR).
 const dateAdmissionFormulaireCHF = (dossier) => {
   const periodes = periodesSejourDossier(dossier);
   if (periodes.length === 0) return dossier.dateHeure || '';
   return periodes.map(d => d.in === d.out
-    ? d.in.split('-').reverse().slice(0, 2).join('/')
-    : `du ${d.in.split('-').reverse().slice(0, 2).join('/')} au ${d.out.split('-').reverse().slice(0, 2).join('/')}`
+    ? d.in.split('-').reverse().join('/')
+    : `du ${d.in.split('-').reverse().join('/')} au ${d.out.split('-').reverse().join('/')}`
   ).join(' et ');
 };
 

@@ -3439,7 +3439,7 @@
         const periodes = periodesSejourDossier(dossier);
         if (periodes.length === 0) return dossier.dateHeure || "";
         return periodes.map(
-          (d) => d.in === d.out ? d.in.split("-").reverse().slice(0, 2).join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`
+          (d) => d.in === d.out ? d.in.split("-").reverse().join("/") : `du ${d.in.split("-").reverse().join("/")} au ${d.out.split("-").reverse().join("/")}`
         ).join(" et ");
       };
       function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, userRole, showToast, onChangerTypeOng, listeOng, listeOngDocs, confirmModal, setConfirmModal, lotInitialFocus, clearLotInitialFocus }) {
