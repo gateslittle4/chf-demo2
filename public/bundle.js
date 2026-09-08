@@ -3386,7 +3386,7 @@
             estBebeSansMere: bebe && !estBebeAvecMere,
             orthographeIncoherente: estBebeAvecMere && formaterNomPropre(nomMereExtrait) !== formaterNomPropre(nomMereParCle[cle]),
             cesarienneSansSono: ((cumul.cesarienne || 0) > 0 || (cumul.accouchement || 0) > 0) && !((cumul.sono || 0) > 0),
-            sansExeat: !(v.fiches || []).some((f) => f.exeat),
+            sansExeat: !(v.fiches || []).some((f) => f.exeat) && !((cumul.hospit || 0) > 0),
             sansAdmission: !estBebeAvecMere && !((cumul.service || 0) > 0),
             medicamentsSortieManquants: medicamentsSortieManquants(v),
             oxytocineSansAccouchement: dossierAOxytocine(v) && !((cumul.accouchement || 0) > 0) && !((cumul.cesarienne || 0) > 0)

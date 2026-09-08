@@ -127,7 +127,9 @@ const medicamentsSortieManquants = (dossier) => {
 //  - orthographeIncoherente : mere trouvee, mais le nom tape dans "Bb <nom>" differe (accents/espaces)
 //    du nom exact du dossier de la mere -- a harmoniser avant l'envoi du lot
 //  - cesarienneSansSono : dossier avec cesarienne/accouchement mais aucune sonographie facturee
-//  - sansExeat : dossier sans aucun sejour/exeat -- tout le monde doit en avoir un dans ce contexte
+//  - sansExeat : dossier sans aucun sejour/exeat NI hebergement facture -- un hebergement facture
+//    (cumul.hospit > 0) est en soi la preuve d'un sejour, meme si l'objet exeat n'a pas ete
+//    enregistre sur la fiche (vieilles donnees, saisie manuelle) : pas la peine de re-notifier
 //  - sansAdmission : dossier sans "Admission / Consultation" (urgence, pediatre...), sauf les bebes
 //    dont la mere est trouvee (ils sont rattaches a l'admission de leur mere)
 //  - medicamentsSortieManquants : sejour sans medicaments de sortie dans la fiche ou les 3 fiches
@@ -168,7 +170,7 @@ const trierAvecRegroupementMereBebe = (dossiersDuLot, tousLesDossiers) => {
       estBebeSansMere: bebe && !estBebeAvecMere,
       orthographeIncoherente: estBebeAvecMere && formaterNomPropre(nomMereExtrait) !== formaterNomPropre(nomMereParCle[cle]),
       cesarienneSansSono: ((cumul.cesarienne || 0) > 0 || (cumul.accouchement || 0) > 0) && !((cumul.sono || 0) > 0),
-      sansExeat: !(v.fiches || []).some(f => f.exeat),
+      sansExeat: !(v.fiches || []).some(f => f.exeat) && !((cumul.hospit || 0) > 0),
       sansAdmission: !estBebeAvecMere && !((cumul.service || 0) > 0),
       medicamentsSortieManquants: medicamentsSortieManquants(v),
       oxytocineSansAccouchement: dossierAOxytocine(v) && !((cumul.accouchement || 0) > 0) && !((cumul.cesarienne || 0) > 0)
