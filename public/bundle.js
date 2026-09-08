@@ -3402,6 +3402,7 @@
         { key: "oxygene", label: "Oxyg\xE8ne" },
         { key: "curetage", label: "Curetage" },
         { key: "accouchement", label: "Accouchement" },
+        { key: "deliverance", label: "D\xE9livrance" },
         { key: "suture", label: "Suture" },
         { key: "drainage", label: "Drainage" },
         { key: "certificat", label: "Certificat" },

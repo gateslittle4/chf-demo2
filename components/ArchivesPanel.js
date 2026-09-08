@@ -180,6 +180,10 @@ const trierAvecRegroupementMereBebe = (dossiersDuLot, tousLesDossiers) => {
 // libellés calqués sur le papier. "Certificat" n'a pas d'équivalent dans le catalogue de l'app
 // (aucune catégorie ne correspond) : sa case reste donc toujours vide, comme les champs Âge/Sexe/
 // Statut Matrimonial de l'en-tête, à remplir à la main.
+// "Délivrance" (catégorie ajoutée le 04/09, au même niveau qu'Accouchement/Césarienne) n'existait pas
+// quand ce formulaire a été calqué sur le papier original -- ajoutée ici en tant que ligne à part
+// entière (juste après Accouchement), sinon son montant tombait hors formulaire et déclenchait à tort
+// l'avertissement "catégories non couvertes" pour tout dossier avec un acte de ce type.
 const LIGNES_FORMULAIRE_CHF = [
   { key: 'service', label: 'Services' },
   { key: 'hospit', label: 'Lit Hospit.' },
@@ -189,6 +193,7 @@ const LIGNES_FORMULAIRE_CHF = [
   { key: 'oxygene', label: 'Oxygène' },
   { key: 'curetage', label: 'Curetage' },
   { key: 'accouchement', label: 'Accouchement' },
+  { key: 'deliverance', label: 'Délivrance' },
   { key: 'suture', label: 'Suture' },
   { key: 'drainage', label: 'Drainage' },
   { key: 'certificat', label: 'Certificat' },
