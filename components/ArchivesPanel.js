@@ -182,14 +182,18 @@ const trierAvecRegroupementMereBebe = (dossiersDuLot, tousLesDossiers) => {
 // libellés calqués sur le papier. "Certificat" n'a pas d'équivalent dans le catalogue de l'app
 // (aucune catégorie ne correspond) : sa case reste donc toujours vide, comme les champs Âge/Sexe/
 // Statut Matrimonial de l'en-tête, à remplir à la main.
-// "Délivrance" (catégorie ajoutée le 04/09, au même niveau qu'Accouchement/Césarienne) n'existait pas
-// quand ce formulaire a été calqué sur le papier original -- ajoutée ici en tant que ligne à part
-// entière (juste après Accouchement), sinon son montant tombait hors formulaire et déclenchait à tort
-// l'avertissement "catégories non couvertes" pour tout dossier avec un acte de ce type.
+// Toutes les catégories du catalogue (CATEGORIES_LISTE) ont maintenant leur ligne ici, y compris
+// "Délivrance", "Radiographie" et "Visite" qui n'existaient pas ou avaient été oubliées quand ce
+// formulaire a été calqué sur le papier original -- sans leur ligne, leur montant tombait hors
+// formulaire et déclenchait à tort l'avertissement "catégories non couvertes". Le calcul d'écart
+// (ecartCategoriesHorsFormulaire) reste en place comme filet de sécurité pour toute future catégorie
+// ajoutée au catalogue sans être ajoutée ici.
 const LIGNES_FORMULAIRE_CHF = [
   { key: 'service', label: 'Services' },
+  { key: 'visite', label: 'Visite' },
   { key: 'hospit', label: 'Lit Hospit.' },
   { key: 'labo', label: 'Laboratoire' },
+  { key: 'radio', label: 'Radiographie' },
   { key: 'med', label: 'Médicaments' },
   { key: 'nebulisation', label: 'Nébulisation' },
   { key: 'oxygene', label: 'Oxygène' },
@@ -855,7 +859,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
   const imprimerFormulaireCHF = (dossier) => {
     const { corps, ecartCategoriesHorsFormulaire, nomPatientPropre } = genererCorpsFormulaireCHF(dossier);
     if (ecartCategoriesHorsFormulaire !== 0) {
-      showToast(`⚠️ Ce Rapport Dioumitrie ne couvre pas toutes les catégories facturées à ${dossier.nomPatient} : ${formatGourdes(Math.abs(ecartCategoriesHorsFormulaire))} Gdes de plus dans le dossier complet (ex. Radiographie / Visite) — vérifie l'onglet Dossiers pour le détail.`, "info");
+      showToast(`⚠️ Ce Rapport Dioumitrie ne couvre pas toutes les catégories facturées à ${dossier.nomPatient} : ${formatGourdes(Math.abs(ecartCategoriesHorsFormulaire))} Gdes de plus dans le dossier complet — vérifie l'onglet Dossiers pour le détail.`, "info");
     }
     const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Rapport Dioumitrie - ${echapperHTML(nomPatientPropre)}</title><style>${STYLE_FORMULAIRE_CHF}</style></head><body>${corps}</body></html>`;
     const win = window.open('', '_blank', 'width=850,height=1100');
@@ -874,7 +878,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       return `<div class="page-formulaire">${corps}</div>`;
     }).join('');
     if (dossiersIncomplets.length > 0) {
-      showToast(`⚠️ ${dossiersIncomplets.length} Rapport(s) Dioumitrie ne couvrent pas toutes les catégories facturées (ex. Radiographie / Visite) : ${dossiersIncomplets.join(', ')}`, "info");
+      showToast(`⚠️ ${dossiersIncomplets.length} Rapport(s) Dioumitrie ne couvrent pas toutes les catégories facturées : ${dossiersIncomplets.join(', ')}`, "info");
     }
     const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Rapports Dioumitrie - Lot (${dossiers.length} dossiers)</title><style>${STYLE_FORMULAIRE_CHF}</style></head><body>${pages}</body></html>`;
     const win = window.open('', '_blank', 'width=850,height=1100');

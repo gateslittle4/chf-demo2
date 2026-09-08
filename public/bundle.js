@@ -3395,8 +3395,10 @@
       };
       var LIGNES_FORMULAIRE_CHF = [
         { key: "service", label: "Services" },
+        { key: "visite", label: "Visite" },
         { key: "hospit", label: "Lit Hospit." },
         { key: "labo", label: "Laboratoire" },
+        { key: "radio", label: "Radiographie" },
         { key: "med", label: "M\xE9dicaments" },
         { key: "nebulisation", label: "N\xE9bulisation" },
         { key: "oxygene", label: "Oxyg\xE8ne" },
@@ -4072,7 +4074,7 @@
         const imprimerFormulaireCHF = (dossier) => {
           const { corps, ecartCategoriesHorsFormulaire, nomPatientPropre } = genererCorpsFormulaireCHF(dossier);
           if (ecartCategoriesHorsFormulaire !== 0) {
-            showToast(`\u26A0\uFE0F Ce Rapport Dioumitrie ne couvre pas toutes les cat\xE9gories factur\xE9es \xE0 ${dossier.nomPatient} : ${formatGourdes(Math.abs(ecartCategoriesHorsFormulaire))} Gdes de plus dans le dossier complet (ex. Radiographie / Visite) \u2014 v\xE9rifie l'onglet Dossiers pour le d\xE9tail.`, "info");
+            showToast(`\u26A0\uFE0F Ce Rapport Dioumitrie ne couvre pas toutes les cat\xE9gories factur\xE9es \xE0 ${dossier.nomPatient} : ${formatGourdes(Math.abs(ecartCategoriesHorsFormulaire))} Gdes de plus dans le dossier complet \u2014 v\xE9rifie l'onglet Dossiers pour le d\xE9tail.`, "info");
           }
           const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Rapport Dioumitrie - ${echapperHTML(nomPatientPropre)}</title><style>${STYLE_FORMULAIRE_CHF}</style></head><body>${corps}</body></html>`;
           const win = window.open("", "_blank", "width=850,height=1100");
@@ -4097,7 +4099,7 @@
             return `<div class="page-formulaire">${corps}</div>`;
           }).join("");
           if (dossiersIncomplets.length > 0) {
-            showToast(`\u26A0\uFE0F ${dossiersIncomplets.length} Rapport(s) Dioumitrie ne couvrent pas toutes les cat\xE9gories factur\xE9es (ex. Radiographie / Visite) : ${dossiersIncomplets.join(", ")}`, "info");
+            showToast(`\u26A0\uFE0F ${dossiersIncomplets.length} Rapport(s) Dioumitrie ne couvrent pas toutes les cat\xE9gories factur\xE9es : ${dossiersIncomplets.join(", ")}`, "info");
           }
           const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Rapports Dioumitrie - Lot (${dossiers.length} dossiers)</title><style>${STYLE_FORMULAIRE_CHF}</style></head><body>${pages}</body></html>`;
           const win = window.open("", "_blank", "width=850,height=1100");
