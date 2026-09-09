@@ -58,6 +58,12 @@ class CHF_API {
     // file, l'autre doit le voir immédiatement (son affichage relit la file à chaque rendu, et il ne
     // doit surtout pas continuer à travailler sur une copie périmée).
     window.addEventListener('storage', (e) => {
+      // La correspondance ID local -> ID serveur doit elle aussi être relue depuis localStorage :
+      // sinon un onglet resté ouvert garde en mémoire une correspondance périmée et considère à tort
+      // que l'ID local d'un dossier synchronisé par un AUTRE onglet n'est toujours pas résolu --
+      // syncPending() saute alors indéfiniment ses opérations en attente sur ce dossier (`continue`),
+      // qui restent coincées dans la file jusqu'à un rechargement manuel de la page.
+      if (e.key === CLE_ID_MAP) { try { this.localIdMap = JSON.parse(e.newValue || '{}'); } catch (_) {} }
       if (e.key === CLE_PENDING || e.key === CLE_FAILED) window.dispatchEvent(new CustomEvent('chf:file-changee'));
     });
     // Dernier rempart contre la perte : prévient avant de fermer l'onglet s'il reste du travail non
@@ -238,8 +244,12 @@ class CHF_API {
   async reessayerEchecs() {
     const echecs = this._lireFailedOps();
     if (echecs.length === 0) return 0;
+    const opIds = new Set(echecs.map(op => op.opId));
     await this._modifierPendingQueue(file => [...file, ...echecs.map(op => ({ ...op, echecsServeur: 0, raisonEchec: undefined, dateEchec: undefined }))]);
-    await this._modifierListe(CLE_FAILED, () => []);
+    // Retire précisément les opérations qu'on vient de remettre en file (par opId), sans écraser
+    // toute la liste : une opération mise en quarantaine entre-temps par une autre synchronisation
+    // (autre onglet, intervalle des 30s) ne doit pas être effacée au passage.
+    await this._modifierListe(CLE_FAILED, liste => liste.filter(op => !opIds.has(op.opId)));
     await this.syncPending();
     return echecs.length;
   }

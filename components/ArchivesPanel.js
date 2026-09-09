@@ -127,7 +127,9 @@ const medicamentsSortieManquants = (dossier) => {
 //  - orthographeIncoherente : mere trouvee, mais le nom tape dans "Bb <nom>" differe (accents/espaces)
 //    du nom exact du dossier de la mere -- a harmoniser avant l'envoi du lot
 //  - cesarienneSansSono : dossier avec cesarienne/accouchement mais aucune sonographie facturee
-//  - sansExeat : dossier sans aucun sejour/exeat -- tout le monde doit en avoir un dans ce contexte
+//  - sansExeat : dossier sans aucun sejour/exeat NI hebergement facture -- un hebergement facture
+//    (cumul.hospit > 0) est en soi la preuve d'un sejour, meme si l'objet exeat n'a pas ete
+//    enregistre sur la fiche (vieilles donnees, saisie manuelle) : pas la peine de re-notifier
 //  - sansAdmission : dossier sans "Admission / Consultation" (urgence, pediatre...), sauf les bebes
 //    dont la mere est trouvee (ils sont rattaches a l'admission de leur mere)
 //  - medicamentsSortieManquants : sejour sans medicaments de sortie dans la fiche ou les 3 fiches
@@ -168,7 +170,7 @@ const trierAvecRegroupementMereBebe = (dossiersDuLot, tousLesDossiers) => {
       estBebeSansMere: bebe && !estBebeAvecMere,
       orthographeIncoherente: estBebeAvecMere && formaterNomPropre(nomMereExtrait) !== formaterNomPropre(nomMereParCle[cle]),
       cesarienneSansSono: ((cumul.cesarienne || 0) > 0 || (cumul.accouchement || 0) > 0) && !((cumul.sono || 0) > 0),
-      sansExeat: !(v.fiches || []).some(f => f.exeat),
+      sansExeat: !(v.fiches || []).some(f => f.exeat) && !((cumul.hospit || 0) > 0),
       sansAdmission: !estBebeAvecMere && !((cumul.service || 0) > 0),
       medicamentsSortieManquants: medicamentsSortieManquants(v),
       oxytocineSansAccouchement: dossierAOxytocine(v) && !((cumul.accouchement || 0) > 0) && !((cumul.cesarienne || 0) > 0)
@@ -180,15 +182,24 @@ const trierAvecRegroupementMereBebe = (dossiersDuLot, tousLesDossiers) => {
 // libellés calqués sur le papier. "Certificat" n'a pas d'équivalent dans le catalogue de l'app
 // (aucune catégorie ne correspond) : sa case reste donc toujours vide, comme les champs Âge/Sexe/
 // Statut Matrimonial de l'en-tête, à remplir à la main.
+// Toutes les catégories du catalogue (CATEGORIES_LISTE) ont maintenant leur ligne ici, y compris
+// "Délivrance", "Radiographie" et "Visite" qui n'existaient pas ou avaient été oubliées quand ce
+// formulaire a été calqué sur le papier original -- sans leur ligne, leur montant tombait hors
+// formulaire et déclenchait à tort l'avertissement "catégories non couvertes". Le calcul d'écart
+// (ecartCategoriesHorsFormulaire) reste en place comme filet de sécurité pour toute future catégorie
+// ajoutée au catalogue sans être ajoutée ici.
 const LIGNES_FORMULAIRE_CHF = [
   { key: 'service', label: 'Services' },
+  { key: 'visite', label: 'Visite' },
   { key: 'hospit', label: 'Lit Hospit.' },
   { key: 'labo', label: 'Laboratoire' },
+  { key: 'radio', label: 'Radiographie' },
   { key: 'med', label: 'Médicaments' },
   { key: 'nebulisation', label: 'Nébulisation' },
   { key: 'oxygene', label: 'Oxygène' },
   { key: 'curetage', label: 'Curetage' },
   { key: 'accouchement', label: 'Accouchement' },
+  { key: 'deliverance', label: 'Délivrance' },
   { key: 'suture', label: 'Suture' },
   { key: 'drainage', label: 'Drainage' },
   { key: 'certificat', label: 'Certificat' },
@@ -223,15 +234,17 @@ const periodesSejourDossier = (dossier) => {
   return dates;
 };
 
-// "Date D'admission" du formulaire : la ou les période(s) d'entrée-sortie du séjour ("du 10/08 au
-// 15/08", ou "du 10/08 au 15/08 et du 16/08 au 20/08" si plusieurs) ; seule la date d'ouverture du
-// dossier sert de repli quand il n'y a aucun séjour du tout (ex. simple achat/consultation).
+// "Date D'admission" du formulaire : la ou les période(s) d'entrée-sortie du séjour ("du 10/08/2026
+// au 15/08/2026", ou "du 10/08/2026 au 16/12/2026 et du 02/01/2027 au 05/01/2027" si plusieurs) ;
+// année incluse (sinon impossible de savoir de quelle année il s'agit en relisant le rapport plus
+// tard) ; seule la date d'ouverture du dossier sert de repli quand il n'y a aucun séjour du tout
+// (ex. simple achat/consultation) -- déjà au format JJ/MM/AAAA (toLocaleDateString fr-FR).
 const dateAdmissionFormulaireCHF = (dossier) => {
   const periodes = periodesSejourDossier(dossier);
   if (periodes.length === 0) return dossier.dateHeure || '';
   return periodes.map(d => d.in === d.out
-    ? d.in.split('-').reverse().slice(0, 2).join('/')
-    : `du ${d.in.split('-').reverse().slice(0, 2).join('/')} au ${d.out.split('-').reverse().slice(0, 2).join('/')}`
+    ? d.in.split('-').reverse().join('/')
+    : `du ${d.in.split('-').reverse().join('/')} au ${d.out.split('-').reverse().join('/')}`
   ).join(' et ');
 };
 
@@ -817,38 +830,41 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     return { corps, ecartCategoriesHorsFormulaire, nomPatientPropre };
   };
 
-  // Tailles vérifiées par mesure réelle (rendu navigateur, pas une estimation) pour remplir la page
-  // A4 à ~93% sans déborder sur une 2e page, avec les 17 catégories + GRAND TOTAL du formulaire.
+  // Tailles vérifiées par mesure réelle (headless Chromium, impression PDF -- pas une estimation) :
+  // tient sur 1 seule page A4 même dans le pire cas (les 20 catégories de LIGNES_FORMULAIRE_CHF
+  // toutes facturées en même temps sur un même dossier, ce qui n'arrive jamais en pratique).
+  // Resserré par rapport à la version originale (calée sur 17 catégories) suite à l'ajout de
+  // Délivrance/Radiographie/Visite qui faisait déborder le formulaire sur une 2e page.
   const STYLE_FORMULAIRE_CHF = `
       @page{size:A4;margin:12mm 16mm;}
       body{font-family:'Times New Roman',Georgia,serif;color:#000;font-size:14px;}
-      .entete{display:flex;align-items:center;justify-content:center;gap:16px;border-bottom:3px solid #000;padding-bottom:10px;margin-bottom:16px;position:relative;}
-      .entete img{width:62px;height:62px;object-fit:contain;position:absolute;right:0;top:2px;}
+      .entete{display:flex;align-items:center;justify-content:center;gap:16px;border-bottom:3px solid #000;padding-bottom:8px;margin-bottom:12px;position:relative;}
+      .entete img{width:56px;height:56px;object-fit:contain;position:absolute;right:0;top:2px;}
       .entete-texte{text-align:center;}
-      .entete-texte h1{font-size:25px;margin:0;letter-spacing:0.5px;font-weight:bold;}
-      .entete-texte p{margin:2px 0;font-size:12px;}
-      .entete-texte p.email{font-size:10px;color:#999;}
-      .champs{margin-bottom:14px;font-size:14px;}
-      .ligne-champs{display:flex;flex-wrap:wrap;gap:0 30px;margin-bottom:8px;}
+      .entete-texte h1{font-size:23px;margin:0;letter-spacing:0.5px;font-weight:bold;}
+      .entete-texte p{margin:1px 0;font-size:11px;}
+      .entete-texte p.email{font-size:9px;color:#999;}
+      .champs{margin-bottom:10px;font-size:13px;}
+      .ligne-champs{display:flex;flex-wrap:wrap;gap:0 30px;margin-bottom:6px;}
       .champ{display:inline-flex;align-items:baseline;gap:7px;}
       .champ.large{flex:1;}
       .lbl-champ{font-weight:bold;white-space:nowrap;}
-      .val-champ{border-bottom:1px dotted #000;min-width:170px;flex:1;display:inline-block;padding:2px 3px;line-height:1.5;}
+      .val-champ{border-bottom:1px dotted #000;min-width:170px;flex:1;display:inline-block;padding:1.5px 3px;line-height:1.4;}
       .champ.large .val-champ{min-width:350px;}
-      table{width:100%;border-collapse:collapse;margin-top:8px;table-layout:fixed;}
+      table{width:100%;border-collapse:collapse;margin-top:6px;table-layout:fixed;}
       th,td{border:1px solid #000;color:#000;}
-      td.lbl{text-align:left;width:16%;font-weight:bold;font-size:13px;padding:9px 9px;}
-      td.mnt{text-align:center;width:${(84 / NB_COLONNES_MONTANT_FORMULAIRE).toFixed(1)}%;padding:9px 4px;}
-      .dollar{color:#555;font-size:13px;}
-      .montant{font-weight:bold;font-size:11.5px;white-space:nowrap;}
-      tr.grand-total td.lbl{font-size:15px;}
+      td.lbl{text-align:left;width:16%;font-weight:bold;font-size:12.5px;padding:6.5px 9px;}
+      td.mnt{text-align:center;width:${(84 / NB_COLONNES_MONTANT_FORMULAIRE).toFixed(1)}%;padding:6.5px 4px;}
+      .dollar{color:#555;font-size:12px;}
+      .montant{font-weight:bold;font-size:11px;white-space:nowrap;}
+      tr.grand-total td.lbl{font-size:14px;}
       .page-formulaire{page-break-after:always;}
       .page-formulaire:last-child{page-break-after:auto;}`;
 
   const imprimerFormulaireCHF = (dossier) => {
     const { corps, ecartCategoriesHorsFormulaire, nomPatientPropre } = genererCorpsFormulaireCHF(dossier);
     if (ecartCategoriesHorsFormulaire !== 0) {
-      showToast(`⚠️ Ce Rapport Dioumitrie ne couvre pas toutes les catégories facturées à ${dossier.nomPatient} : ${formatGourdes(Math.abs(ecartCategoriesHorsFormulaire))} Gdes de plus dans le dossier complet (ex. Radiographie / Visite) — vérifie l'onglet Dossiers pour le détail.`, "info");
+      showToast(`⚠️ Ce Rapport Dioumitrie ne couvre pas toutes les catégories facturées à ${dossier.nomPatient} : ${formatGourdes(Math.abs(ecartCategoriesHorsFormulaire))} Gdes de plus dans le dossier complet — vérifie l'onglet Dossiers pour le détail.`, "info");
     }
     const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Rapport Dioumitrie - ${echapperHTML(nomPatientPropre)}</title><style>${STYLE_FORMULAIRE_CHF}</style></head><body>${corps}</body></html>`;
     const win = window.open('', '_blank', 'width=850,height=1100');
@@ -867,7 +883,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       return `<div class="page-formulaire">${corps}</div>`;
     }).join('');
     if (dossiersIncomplets.length > 0) {
-      showToast(`⚠️ ${dossiersIncomplets.length} Rapport(s) Dioumitrie ne couvrent pas toutes les catégories facturées (ex. Radiographie / Visite) : ${dossiersIncomplets.join(', ')}`, "info");
+      showToast(`⚠️ ${dossiersIncomplets.length} Rapport(s) Dioumitrie ne couvrent pas toutes les catégories facturées : ${dossiersIncomplets.join(', ')}`, "info");
     }
     const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Rapports Dioumitrie - Lot (${dossiers.length} dossiers)</title><style>${STYLE_FORMULAIRE_CHF}</style></head><body>${pages}</body></html>`;
     const win = window.open('', '_blank', 'width=850,height=1100');

@@ -88,6 +88,12 @@
           });
           setInterval(() => this.syncPending(), 3e4);
           window.addEventListener("storage", (e) => {
+            if (e.key === CLE_ID_MAP) {
+              try {
+                this.localIdMap = JSON.parse(e.newValue || "{}");
+              } catch (_) {
+              }
+            }
             if (e.key === CLE_PENDING || e.key === CLE_FAILED) window.dispatchEvent(new CustomEvent("chf:file-changee"));
           });
           window.addEventListener("beforeunload", (e) => {
@@ -251,8 +257,9 @@
         async reessayerEchecs() {
           const echecs = this._lireFailedOps();
           if (echecs.length === 0) return 0;
+          const opIds = new Set(echecs.map((op) => op.opId));
           await this._modifierPendingQueue((file) => [...file, ...echecs.map((op) => ({ ...op, echecsServeur: 0, raisonEchec: void 0, dateEchec: void 0 }))]);
-          await this._modifierListe(CLE_FAILED, () => []);
+          await this._modifierListe(CLE_FAILED, (liste) => liste.filter((op) => !opIds.has(op.opId)));
           await this.syncPending();
           return echecs.length;
         }
@@ -2377,7 +2384,7 @@
         return formatGourdes(val / 5);
       }
       function formaterNomPropre(chaine) {
-        return chaine ? chaine.trim().toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()) : "";
+        return chaine ? chaine.trim().toLowerCase().replace(/(^|[^\p{L}])(\p{L})/gu, (_, sep, lettre) => sep + lettre.toUpperCase()) : "";
       }
       function echapperHTML(texte) {
         if (!texte) return "";
@@ -3379,7 +3386,7 @@
             estBebeSansMere: bebe && !estBebeAvecMere,
             orthographeIncoherente: estBebeAvecMere && formaterNomPropre(nomMereExtrait) !== formaterNomPropre(nomMereParCle[cle]),
             cesarienneSansSono: ((cumul.cesarienne || 0) > 0 || (cumul.accouchement || 0) > 0) && !((cumul.sono || 0) > 0),
-            sansExeat: !(v.fiches || []).some((f) => f.exeat),
+            sansExeat: !(v.fiches || []).some((f) => f.exeat) && !((cumul.hospit || 0) > 0),
             sansAdmission: !estBebeAvecMere && !((cumul.service || 0) > 0),
             medicamentsSortieManquants: medicamentsSortieManquants(v),
             oxytocineSansAccouchement: dossierAOxytocine(v) && !((cumul.accouchement || 0) > 0) && !((cumul.cesarienne || 0) > 0)
@@ -3388,13 +3395,16 @@
       };
       var LIGNES_FORMULAIRE_CHF = [
         { key: "service", label: "Services" },
+        { key: "visite", label: "Visite" },
         { key: "hospit", label: "Lit Hospit." },
         { key: "labo", label: "Laboratoire" },
+        { key: "radio", label: "Radiographie" },
         { key: "med", label: "M\xE9dicaments" },
         { key: "nebulisation", label: "N\xE9bulisation" },
         { key: "oxygene", label: "Oxyg\xE8ne" },
         { key: "curetage", label: "Curetage" },
         { key: "accouchement", label: "Accouchement" },
+        { key: "deliverance", label: "D\xE9livrance" },
         { key: "suture", label: "Suture" },
         { key: "drainage", label: "Drainage" },
         { key: "certificat", label: "Certificat" },
@@ -3429,7 +3439,7 @@
         const periodes = periodesSejourDossier(dossier);
         if (periodes.length === 0) return dossier.dateHeure || "";
         return periodes.map(
-          (d) => d.in === d.out ? d.in.split("-").reverse().slice(0, 2).join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`
+          (d) => d.in === d.out ? d.in.split("-").reverse().join("/") : `du ${d.in.split("-").reverse().join("/")} au ${d.out.split("-").reverse().join("/")}`
         ).join(" et ");
       };
       function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, userRole, showToast, onChangerTypeOng, listeOng, listeOngDocs, confirmModal, setConfirmModal, lotInitialFocus, clearLotInitialFocus }) {
@@ -4039,32 +4049,32 @@
         const STYLE_FORMULAIRE_CHF = `
       @page{size:A4;margin:12mm 16mm;}
       body{font-family:'Times New Roman',Georgia,serif;color:#000;font-size:14px;}
-      .entete{display:flex;align-items:center;justify-content:center;gap:16px;border-bottom:3px solid #000;padding-bottom:10px;margin-bottom:16px;position:relative;}
-      .entete img{width:62px;height:62px;object-fit:contain;position:absolute;right:0;top:2px;}
+      .entete{display:flex;align-items:center;justify-content:center;gap:16px;border-bottom:3px solid #000;padding-bottom:8px;margin-bottom:12px;position:relative;}
+      .entete img{width:56px;height:56px;object-fit:contain;position:absolute;right:0;top:2px;}
       .entete-texte{text-align:center;}
-      .entete-texte h1{font-size:25px;margin:0;letter-spacing:0.5px;font-weight:bold;}
-      .entete-texte p{margin:2px 0;font-size:12px;}
-      .entete-texte p.email{font-size:10px;color:#999;}
-      .champs{margin-bottom:14px;font-size:14px;}
-      .ligne-champs{display:flex;flex-wrap:wrap;gap:0 30px;margin-bottom:8px;}
+      .entete-texte h1{font-size:23px;margin:0;letter-spacing:0.5px;font-weight:bold;}
+      .entete-texte p{margin:1px 0;font-size:11px;}
+      .entete-texte p.email{font-size:9px;color:#999;}
+      .champs{margin-bottom:10px;font-size:13px;}
+      .ligne-champs{display:flex;flex-wrap:wrap;gap:0 30px;margin-bottom:6px;}
       .champ{display:inline-flex;align-items:baseline;gap:7px;}
       .champ.large{flex:1;}
       .lbl-champ{font-weight:bold;white-space:nowrap;}
-      .val-champ{border-bottom:1px dotted #000;min-width:170px;flex:1;display:inline-block;padding:2px 3px;line-height:1.5;}
+      .val-champ{border-bottom:1px dotted #000;min-width:170px;flex:1;display:inline-block;padding:1.5px 3px;line-height:1.4;}
       .champ.large .val-champ{min-width:350px;}
-      table{width:100%;border-collapse:collapse;margin-top:8px;table-layout:fixed;}
+      table{width:100%;border-collapse:collapse;margin-top:6px;table-layout:fixed;}
       th,td{border:1px solid #000;color:#000;}
-      td.lbl{text-align:left;width:16%;font-weight:bold;font-size:13px;padding:9px 9px;}
-      td.mnt{text-align:center;width:${(84 / NB_COLONNES_MONTANT_FORMULAIRE).toFixed(1)}%;padding:9px 4px;}
-      .dollar{color:#555;font-size:13px;}
-      .montant{font-weight:bold;font-size:11.5px;white-space:nowrap;}
-      tr.grand-total td.lbl{font-size:15px;}
+      td.lbl{text-align:left;width:16%;font-weight:bold;font-size:12.5px;padding:6.5px 9px;}
+      td.mnt{text-align:center;width:${(84 / NB_COLONNES_MONTANT_FORMULAIRE).toFixed(1)}%;padding:6.5px 4px;}
+      .dollar{color:#555;font-size:12px;}
+      .montant{font-weight:bold;font-size:11px;white-space:nowrap;}
+      tr.grand-total td.lbl{font-size:14px;}
       .page-formulaire{page-break-after:always;}
       .page-formulaire:last-child{page-break-after:auto;}`;
         const imprimerFormulaireCHF = (dossier) => {
           const { corps, ecartCategoriesHorsFormulaire, nomPatientPropre } = genererCorpsFormulaireCHF(dossier);
           if (ecartCategoriesHorsFormulaire !== 0) {
-            showToast(`\u26A0\uFE0F Ce Rapport Dioumitrie ne couvre pas toutes les cat\xE9gories factur\xE9es \xE0 ${dossier.nomPatient} : ${formatGourdes(Math.abs(ecartCategoriesHorsFormulaire))} Gdes de plus dans le dossier complet (ex. Radiographie / Visite) \u2014 v\xE9rifie l'onglet Dossiers pour le d\xE9tail.`, "info");
+            showToast(`\u26A0\uFE0F Ce Rapport Dioumitrie ne couvre pas toutes les cat\xE9gories factur\xE9es \xE0 ${dossier.nomPatient} : ${formatGourdes(Math.abs(ecartCategoriesHorsFormulaire))} Gdes de plus dans le dossier complet \u2014 v\xE9rifie l'onglet Dossiers pour le d\xE9tail.`, "info");
           }
           const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Rapport Dioumitrie - ${echapperHTML(nomPatientPropre)}</title><style>${STYLE_FORMULAIRE_CHF}</style></head><body>${corps}</body></html>`;
           const win = window.open("", "_blank", "width=850,height=1100");
@@ -4089,7 +4099,7 @@
             return `<div class="page-formulaire">${corps}</div>`;
           }).join("");
           if (dossiersIncomplets.length > 0) {
-            showToast(`\u26A0\uFE0F ${dossiersIncomplets.length} Rapport(s) Dioumitrie ne couvrent pas toutes les cat\xE9gories factur\xE9es (ex. Radiographie / Visite) : ${dossiersIncomplets.join(", ")}`, "info");
+            showToast(`\u26A0\uFE0F ${dossiersIncomplets.length} Rapport(s) Dioumitrie ne couvrent pas toutes les cat\xE9gories factur\xE9es : ${dossiersIncomplets.join(", ")}`, "info");
           }
           const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Rapports Dioumitrie - Lot (${dossiers.length} dossiers)</title><style>${STYLE_FORMULAIRE_CHF}</style></head><body>${pages}</body></html>`;
           const win = window.open("", "_blank", "width=850,height=1100");
@@ -5072,7 +5082,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
           setTimeout(() => win.print(), 500);
         };
         const executerEncaissement = async () => {
-          var _a, _b;
+          var _a, _b, _c;
           if (!dossierActif) {
             showToast("Aucun dossier actif.", "error");
             return;
@@ -5108,7 +5118,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
               totalGlobal: grandTotal,
               modePaiement,
               ongPartenaire: modePaiement === "ong" ? ongPartenaireFiche : "",
-              exoneration: modePaiement === "exoneration" ? { pourcentage: parseFloat(pourcentageExoneration), montantExonere, motif: motifExoneration, autorisePar: auth.currentUser.displayName } : null,
+              exoneration: modePaiement === "exoneration" ? { pourcentage: parseFloat(pourcentageExoneration), montantExonere, motif: motifExoneration, autorisePar: ((_a = auth.currentUser) == null ? void 0 : _a.displayName) || "inconnu" } : null,
               statutPaiement: modePaiement === "credit" ? "partiellement_paye" : "paye",
               montantPaye: modePaiement === "cash" ? parseFloat(montantVerse) : modePaiement === "credit" ? 0 : montantRestantApresDepots,
               solde: modePaiement === "credit" ? montantRestantApresDepots : 0,
@@ -5128,7 +5138,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
                 totalHebergement2: totalE2
               } : null,
               dateCreation: (/* @__PURE__ */ new Date()).toISOString(),
-              creePar: ((_a = auth.currentUser) == null ? void 0 : _a.displayName) || "inconnu",
+              creePar: ((_b = auth.currentUser) == null ? void 0 : _b.displayName) || "inconnu",
               rawState: { lignesCalcul: [...lignes], dateEntree1, dateSortie1, typeLit1, multiPeriode, dateEntree2, dateSortie2, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
             };
             onEnregistrerFiche(fiche);
@@ -5146,7 +5156,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
                 ongPartenaire: modePaiement === "ong" ? ongPartenaireFiche : "",
                 exoneration: modePaiement === "exoneration" ? { pourcentage: parseFloat(pourcentageExoneration), montantExonere, motif: motifExoneration } : null,
                 date: (/* @__PURE__ */ new Date()).toISOString(),
-                encaissePar: ((_b = auth.currentUser) == null ? void 0 : _b.displayName) || "inconnu",
+                encaissePar: ((_c = auth.currentUser) == null ? void 0 : _c.displayName) || "inconnu",
                 typePatient: typePatient || "ONG"
               }));
               showToast("\u2705 Fiche enregistr\xE9e avec succ\xE8s !", "success");
@@ -5560,7 +5570,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
             breakdown,
             totalGlobal: totalPanier,
             modePaiement: "cash",
-            montantPaye: verse,
+            montantPaye: totalPanier,
             solde: 0,
             dateCreation: (/* @__PURE__ */ new Date()).toISOString(),
             creePar: ((_a = auth.currentUser) == null ? void 0 : _a.displayName) || "inconnu",
@@ -5578,7 +5588,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
             dateHeure: (/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR"),
             totalGlobal: totalPanier,
             fiches: [fiche],
-            montantPaye: verse,
+            montantPaye: totalPanier,
             solde: 0
           };
           try {
@@ -7019,11 +7029,16 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
               if (res.medicaments) setMedicaments(res.medicaments);
               if (res.actes) setActes(res.actes);
               if (res.verifications) {
-                for (let d of res.verifications) {
+                const episodesActuels = await chf.getEpisodes();
+                const idsExistants = new Set(episodesActuels.map((ep) => ep.id));
+                const aRestaurer = res.verifications.filter((d) => !idsExistants.has(d.id));
+                for (let d of aRestaurer) {
                   await chf.createEpisode(toEpisodeApi(d));
                 }
-                const episodes = await chf.getEpisodes();
+                const episodes = aRestaurer.length > 0 ? await chf.getEpisodes() : episodesActuels;
                 setVerifications(episodes.map((ep) => fromEpisodeApi(ep)));
+                const ignores = res.verifications.length - aRestaurer.length;
+                if (ignores > 0) showToast(`${ignores} dossier(s) d\xE9j\xE0 pr\xE9sent(s) sur le serveur, ignor\xE9(s) (non dupliqu\xE9(s)).`, "info");
               }
               enregistrerAudit("restauration_sauvegarde", { nombreDossiers: ((_a = res.verifications) == null ? void 0 : _a.length) || 0 });
               showToast("Base restaur\xE9e !", "success");
