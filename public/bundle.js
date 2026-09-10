@@ -5322,7 +5322,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
             setInputTelephone,
             listeOng
           }
-        ) : /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border border-emerald-300 flex justify-between items-center shadow-sm flex-wrap gap-2" }, /* @__PURE__ */ React.createElement("div", null, !editNomOuvert ? /* @__PURE__ */ React.createElement("h3", { className: "text-base font-black flex items-center gap-2" }, nomPatient, /* @__PURE__ */ React.createElement("button", { onClick: () => {
+        ) : /* @__PURE__ */ React.createElement("div", { className: "space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border border-emerald-300 shadow-sm space-y-2" }, /* @__PURE__ */ React.createElement("div", null, !editNomOuvert ? /* @__PURE__ */ React.createElement("h3", { className: "text-base font-black flex items-center gap-2" }, nomPatient, /* @__PURE__ */ React.createElement("button", { onClick: () => {
           setNouveauNomEdit(nomPatient || "");
           setEditNomOuvert(true);
         }, className: "text-[9px] font-bold text-blue-600 underline" }, "\u270F\uFE0F Changer")) : /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5 items-center flex-wrap" }, /* @__PURE__ */ React.createElement("input", { type: "text", value: nouveauNomEdit, onChange: (e) => setNouveauNomEdit(e.target.value), className: "border rounded p-1 text-xs", autoFocus: true }), /* @__PURE__ */ React.createElement("button", { onClick: () => {

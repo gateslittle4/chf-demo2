@@ -671,7 +671,7 @@ function CalculateurPanel({
         />
       ) : (
         <div className="space-y-4">
-          <div className="bg-white p-4 rounded-xl border border-emerald-300 flex justify-between items-center shadow-sm flex-wrap gap-2">
+          <div className="bg-white p-4 rounded-xl border border-emerald-300 shadow-sm space-y-2">
             <div>
               {!editNomOuvert ? (
                 <h3 className="text-base font-black flex items-center gap-2">
