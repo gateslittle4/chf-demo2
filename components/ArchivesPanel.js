@@ -6,6 +6,7 @@ const { formatGourdes, formatDH, echapperHTML, formaterNomPropre } = require('..
 const { Eye, Pencil, Trash2, Printer, Clock, FolderOpen, X, Download, Check } = require('../utils/icons');
 const { chf, toEpisodeApi } = require('../api/supabase');
 const { LOGO_CHF_BASE64 } = require('../utils/logoChf');
+const { enregistrerAudit } = require('../api/firebase');
 const NOM_COMPLET_ONG = { "MSF-H": "MSF-HOLLANDE", "MSF-F": "MSF-FRANCE" }; // affiché en entier dans les rapports Excel — complète ici si d'autres partenaires sont abrégés
 
 // ExcelJS (~1 Mo) n'est chargé qu'au moment où on génère vraiment un fichier Excel de lot -- pas à
@@ -649,7 +650,11 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       titre: `📦 Générer le Lot ${prochainNumero} pour ${ongCible} ?`,
       message: `${eligibles.length} dossier(s) seront inclus, pour un total d'environ ${formatGourdes(totalEstime)} Gdes, facturés sur ${formaterMoisFr(moisLotChoisi)}. Une fois généré, ce lot sera figé : ces dossiers ne seront plus jamais repris automatiquement dans un futur lot.`,
       confirmLabel: `📦 Générer le Lot ${prochainNumero}`,
-      onConfirm: () => { setConfirmModal(null); genererFichierExcelPourLot(ongCible, eligibles.map(v => v.id), prochainNumero, moisLotChoisi); },
+      onConfirm: () => {
+        setConfirmModal(null);
+        enregistrerAudit('generation_lot', { ongPartenaire: ongCible, numeroLot: prochainNumero, moisLot: moisLotChoisi, nombreDossiers: eligibles.length, totalEstime, dossiers: eligibles.map(v => ({ id: v.id, nomPatient: v.nomPatient, totalGlobal: v.totalGlobal || null })) });
+        genererFichierExcelPourLot(ongCible, eligibles.map(v => v.id), prochainNumero, moisLotChoisi);
+      },
       onCancel: () => setConfirmModal(null)
     });
   };
@@ -722,6 +727,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     setVerifications(prev => prev.map(v => v.id === idDossier ? { ...v, numeroLot, moisLot: moisLotExistant, verrouilleFacture: true } : v));
     try {
       await chf.updateEpisode(idDossier, toEpisodeApi({ numeroLot, moisLot: moisLotExistant, verrouilleFacture: true }));
+      enregistrerAudit('ajout_dossier_lot', { dossierId: idDossier, nomPatient: dossier?.nomPatient || null, ongPartenaire: ongCible, numeroLot, totalGlobal: dossier?.totalGlobal || null });
       showToast(`${dossier?.nomPatient || 'Dossier'} ajouté au Lot ${numeroLot}`, "success");
     } catch (error) {
       if (error.isOfflineQueue) showToast("📴 Changement enregistré hors ligne", "info");

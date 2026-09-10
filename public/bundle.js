@@ -3252,6 +3252,7 @@
       var { Eye, Pencil, Trash2, Printer, Clock, FolderOpen, X, Download, Check } = require_icons();
       var { chf, toEpisodeApi } = require_supabase();
       var { LOGO_CHF_BASE64 } = require_logoChf();
+      var { enregistrerAudit } = require_firebase();
       var NOM_COMPLET_ONG = { "MSF-H": "MSF-HOLLANDE", "MSF-F": "MSF-FRANCE" };
       var promesseExcelJS = null;
       function chargerExcelJS() {
@@ -3872,6 +3873,7 @@
             confirmLabel: `\u{1F4E6} G\xE9n\xE9rer le Lot ${prochainNumero}`,
             onConfirm: () => {
               setConfirmModal(null);
+              enregistrerAudit("generation_lot", { ongPartenaire: ongCible, numeroLot: prochainNumero, moisLot: moisLotChoisi, nombreDossiers: eligibles.length, totalEstime, dossiers: eligibles.map((v) => ({ id: v.id, nomPatient: v.nomPatient, totalGlobal: v.totalGlobal || null })) });
               genererFichierExcelPourLot(ongCible, eligibles.map((v) => v.id), prochainNumero, moisLotChoisi);
             },
             onCancel: () => setConfirmModal(null)
@@ -3941,6 +3943,7 @@
           setVerifications((prev) => prev.map((v) => v.id === idDossier ? { ...v, numeroLot, moisLot: moisLotExistant, verrouilleFacture: true } : v));
           try {
             await chf.updateEpisode(idDossier, toEpisodeApi({ numeroLot, moisLot: moisLotExistant, verrouilleFacture: true }));
+            enregistrerAudit("ajout_dossier_lot", { dossierId: idDossier, nomPatient: (dossier == null ? void 0 : dossier.nomPatient) || null, ongPartenaire: ongCible, numeroLot, totalGlobal: (dossier == null ? void 0 : dossier.totalGlobal) || null });
             showToast(`${(dossier == null ? void 0 : dossier.nomPatient) || "Dossier"} ajout\xE9 au Lot ${numeroLot}`, "success");
           } catch (error) {
             if (error.isOfflineQueue) showToast("\u{1F4F4} Changement enregistr\xE9 hors ligne", "info");
