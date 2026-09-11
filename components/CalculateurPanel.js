@@ -934,7 +934,7 @@ function CalculateurPanel({
           </div>
           {/* Actions sur le dossier entier -- placées ici (pas dans l'en-tête) pour clôturer/suspendre
               sans remonter en haut de l'écran après avoir enregistré une fiche. */}
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap justify-end">
             {peutAnnulerDossier && <button onClick={onAnnulerDossier} className="bg-red-50 text-red-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-red-200">Abandonner</button>}
             {peutSuspendre && <button onClick={onSuspendreDossier} className="bg-amber-50 text-amber-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-amber-200 flex items-center gap-1"><Clock size={12}/> Suspendre</button>}
             {peutSuspendre && onReporterDossier && <button onClick={onReporterDossier} className="bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-indigo-200 flex items-center gap-1">📅 Reporter au mois suivant</button>}
