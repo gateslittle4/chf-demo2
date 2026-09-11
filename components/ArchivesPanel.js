@@ -657,8 +657,16 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       ws.getColumn(3 + colonnesExport.length).width = 16;
       for (let i = 1; i <= 4; i++) ws.getRow(i).height = 20;
 
+      // Ancre le logo entre deux cellules (tl -> br), pas en taille pixel fixe (tl + ext) : { ext }
+      // dessine une image flottante de taille absolue positionnée seulement par son coin haut-gauche
+      // -- Excel bureau la scale correctement, mais Excel mobile/tablette (et LibreOffice, Google
+      // Sheets...) l'interprètent de façon inconsistante et l'affichent tronquée/déformée (signalé :
+      // logo correct sur laptop, tronqué sur tablette). Ancrer entre deux cellules (col/row de tl à
+      // br, ici jusqu'à la moitié de la colonne 1 et la fin des 4 lignes d'en-tête dimensionnées
+      // juste en dessous) donne le même encombrement visuel mais reste correct sur tout lecteur,
+      // puisque la taille dépend des cellules elles-mêmes plutôt que d'un pixel absolu.
       const logoId = wb.addImage({ base64: LOGO_CHF_BASE64, extension: 'png' });
-      ws.addImage(logoId, { tl: { col: 0, row: 0 }, ext: { width: 90, height: 102 } });
+      ws.addImage(logoId, { tl: { col: 0, row: 0 }, br: { col: 0.5, row: 4 } });
 
       const buffer = await wb.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
