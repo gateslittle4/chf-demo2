@@ -849,21 +849,31 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     document.body.appendChild(iframe);
 
     const imprimerUnPatient = (index) => {
-      if (index >= patients.length) { document.body.removeChild(iframe); return; }
+      if (index >= patients.length) {
+        document.body.removeChild(iframe);
+        showToast(`🖨️ ${patients.length} reçu(s) de patient envoyé(s) à l'impression.`, "success");
+        return;
+      }
       const d = patients[index];
       const fiches = [...(d.fiches || [])].sort((a, b) => (a.numeroFiche || 0) - (b.numeroFiche || 0));
       const corps = fiches.map((f, i) => genererCorpsFiche(d, f, { afficherTotalDossier: i === fiches.length - 1 })).join('<div class="separation-fiche"></div>');
       const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Reçu - ${echapperHTML(formaterNomPropre(d.nomPatient))}</title><style>${STYLE_FICHE}</style></head><body>${corps}</body></html>`;
       let dejaEnchaine = false;
-      // 'afterprint' se déclenche quand la boîte de dialogue d'impression se ferme (ou juste après
-      // l'envoi au pilote en impression silencieuse) -- filet de sécurité au cas où l'événement ne se
-      // déclenche jamais sur certaines configurations, pour ne jamais rester bloqué en plein lot.
       const passerAuSuivant = () => { if (dejaEnchaine) return; dejaEnchaine = true; imprimerUnPatient(index + 1); };
       iframe.onload = () => {
-        iframe.contentWindow.addEventListener('afterprint', passerAuSuivant, { once: true });
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-        setTimeout(passerAuSuivant, 3000);
+        // Filet de sécurité programmé D'ABORD, avant tout appel risqué ci-dessous : si print() (ou
+        // contentWindow lui-même) lève une exception sur une config donnée (imprimante occupée,
+        // dialogue déjà ouvert...), ce filet doit quand même se déclencher -- sinon la boucle
+        // s'arrête net sans erreur visible dès le premier patient qui pose problème (bug constaté :
+        // un throw AVANT ce setTimeout empêchait le filet de s'armer du tout).
+        setTimeout(passerAuSuivant, 2500);
+        try {
+          iframe.contentWindow.addEventListener('afterprint', passerAuSuivant, { once: true });
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        } catch (e) {
+          console.error('Impression du lot : échec pour', d.nomPatient, e);
+        }
       };
       iframe.srcdoc = contenu;
     };

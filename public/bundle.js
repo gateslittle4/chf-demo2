@@ -4052,6 +4052,7 @@
           const imprimerUnPatient = (index) => {
             if (index >= patients.length) {
               document.body.removeChild(iframe);
+              showToast(`\u{1F5A8}\uFE0F ${patients.length} re\xE7u(s) de patient envoy\xE9(s) \xE0 l'impression.`, "success");
               return;
             }
             const d = patients[index];
@@ -4065,10 +4066,14 @@
               imprimerUnPatient(index + 1);
             };
             iframe.onload = () => {
-              iframe.contentWindow.addEventListener("afterprint", passerAuSuivant, { once: true });
-              iframe.contentWindow.focus();
-              iframe.contentWindow.print();
-              setTimeout(passerAuSuivant, 3e3);
+              setTimeout(passerAuSuivant, 2500);
+              try {
+                iframe.contentWindow.addEventListener("afterprint", passerAuSuivant, { once: true });
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+              } catch (e) {
+                console.error("Impression du lot : \xE9chec pour", d.nomPatient, e);
+              }
             };
             iframe.srcdoc = contenu;
           };
