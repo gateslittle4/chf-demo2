@@ -209,6 +209,8 @@ const trierAvecRegroupementMereBebe = (dossiersDuLot, tousLesDossiers) => {
     const nomMereExtrait = bebe ? extraireNomMerePortion(v.nomPatient) : null;
     return {
       ...v,
+      estBebeAvecMere,
+      nomMereTrouvee: estBebeAvecMere ? mere.nomPatient : null,
       estBebeSansMere: bebe && !estBebeAvecMere,
       orthographeIncoherente: estBebeAvecMere && formaterNomPropre(nomMereExtrait) !== formaterNomPropre(mere.nomPatient),
       cesarienneSansSono: ((cumul.cesarienne || 0) > 0 || (cumul.accouchement || 0) > 0) && !((cumul.sono || 0) > 0),
@@ -1114,7 +1116,8 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                       <button onClick={() => toggleDossierComplet(v)} title={v.dossierComplet ? "Dossier marqué complet — cliquer pour annuler" : "Marquer ce dossier comme complet"} className={`inline-flex items-center justify-center w-4 h-4 rounded-full border align-middle mr-1 ${v.dossierComplet ? 'bg-emerald-500 border-emerald-600 text-white' : 'bg-white border-gray-300 text-gray-300 hover:border-emerald-400 hover:text-emerald-400'}`}>
                         <Check size={10}/>
                       </button>
-                      {v.estBebeSansMere && <span title="Bébé sans dossier de mère dans ce lot — vérifie s'il faut ouvrir une fiche d'urgence pour ce bébé" className="bg-red-100 text-red-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">🚨 Sans mère</span>}
+                      {v.estBebeAvecMere && <span title={`Rattaché au dossier de ${v.nomMereTrouvee} — pas besoin d'ouvrir de fiche Admission/Consultation pour ce bébé, il est déjà couvert par celle de sa mère`} className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">👩 Mère : {v.nomMereTrouvee}</span>}
+                      {v.estBebeSansMere && <span title="Aucun dossier de mère retrouvé dans tout l'historique — vérifie s'il faut ouvrir une fiche d'urgence pour ce bébé" className="bg-red-100 text-red-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">🚨 Sans mère</span>}
                       {v.sansExeat && <span title="Aucun séjour (exeat) sur ce dossier — vérifie s'il a été oublié" className="bg-red-100 text-red-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">🚨 Sans exeat</span>}
                       {v.orthographeIncoherente && <span title="Le nom de la mère tapé dans ce dossier bébé ne correspond pas exactement à l'orthographe du dossier de la mère (accents, espaces...) — harmonise les deux avant l'envoi du lot" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">✏️ Orthographe mère/bébé</span>}
                       {v.cesarienneSansSono && <span title="Césarienne ou accouchement facturé, mais aucune sonographie sur ce dossier — vérifie si elle a été oubliée" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">⚠️ Sono manquante</span>}
