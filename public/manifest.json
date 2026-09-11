@@ -1,0 +1,19 @@
+{
+  "name": "CHF — Centre Hospitalier de Fontaine",
+  "short_name": "CHF",
+  "description": "Système hospitalier CHF — calculateur, dossiers, archives et lots de facturation.",
+  "id": "/",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F7F5F0",
+  "theme_color": "#87578a",
+  "lang": "fr",
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "./icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

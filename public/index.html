@@ -6,6 +6,17 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://chf-backend.onrender.com https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com; frame-src 'self';">
   <title>CHF — Système Hospitalier (Supabase)</title>
 
+  <!-- Installation sur l'écran d'accueil (Android/Chrome : bouton "Installer" ; iOS/Safari :
+       "Partager" -> "Sur l'écran d'accueil"). Voir sw.js pour le service worker. -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#87578a">
+  <link rel="icon" href="./icons/favicon-32.png" type="image/png">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="CHF">
+  <meta name="mobile-web-app-capable" content="yes">
+
   <!-- Tailwind compilé à l'avance (build.js) -- remplace l'ancien CDN cdn.tailwindcss.com, non
        recommandé en production (recompile tout à chaque chargement, dépend d'un service externe). -->
   <link rel="stylesheet" href="./tailwind.css">
@@ -42,5 +53,15 @@
   <div id="root"></div>
   <!-- Bundle généré par esbuild à partir de app/AppHospitaliere.js (voir build.js) -->
   <script src="./bundle.js" defer></script>
+  <script>
+    // Enregistre le service worker après le chargement complet -- uniquement pour rendre l'app
+    // installable (voir sw.js) ; une erreur ici (navigateur trop ancien, hors ligne dès la
+    // première visite...) ne doit jamais empêcher l'app elle-même de fonctionner.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('Service worker non enregistré :', e));
+      });
+    }
+  </script>
 </body>
 </html>
