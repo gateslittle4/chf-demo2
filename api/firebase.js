@@ -28,6 +28,13 @@ const LOG_DOSSIER_BROUILLON_KEY = "chf-dossier-brouillon-v16";
 // Journal d'audit — trace permanente des actions critiques (suppression, changement de rôle, exonération...)
 // Écrit dans Firestore, collection "audit_log". Pense à restreindre cette collection en lecture/écriture
 // aux rôles autorisés dans tes règles Firestore (voir firestore.rules fourni séparément).
+//
+// Miroir vers Supabase (route POST /api/audit de chf-backend, table "audit_log") : double écriture
+// volontaire, en plus de Firestore ci-dessus (rien n'y est retiré) -- Firestore reste la source de
+// vérité, mais Supabase permet de consulter le journal sans accès Firestore séparé (voir server.js).
+// Best-effort et non bloquant : ne doit jamais faire échouer l'action qui a déclenché l'audit.
+const API_BASE = 'https://chf-backend.onrender.com/api';
+
 async function enregistrerAudit(action, details = {}) {
   try {
     await db.collection('audit_log').add({
@@ -38,8 +45,18 @@ async function enregistrerAudit(action, details = {}) {
       date: firebase.firestore.FieldValue.serverTimestamp()
     });
   } catch (e) {
-    console.warn('Journal d\'audit: échec d\'écriture', e);
+    console.warn('Journal d\'audit: échec d\'écriture (Firestore)', e);
   }
+  try {
+    if (auth.currentUser) {
+      const idToken = await auth.currentUser.getIdToken();
+      fetch(`${API_BASE}/audit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+        body: JSON.stringify({ action, details })
+      }).catch(e => console.warn('Journal d\'audit: échec d\'écriture (Supabase)', e));
+    }
+  } catch (e) { console.warn('Journal d\'audit: échec d\'écriture (Supabase)', e); }
 }
 
 module.exports = {

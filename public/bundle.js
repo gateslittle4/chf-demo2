@@ -24,6 +24,7 @@
       var LOG_VERIF_KEY = "chf-verif-storage-v16";
       var LOG_TARGETS_KEY = "chf-targets-storage-v16";
       var LOG_DOSSIER_BROUILLON_KEY = "chf-dossier-brouillon-v16";
+      var API_BASE = "https://chf-backend.onrender.com/api";
       async function enregistrerAudit(action, details = {}) {
         var _a, _b, _c;
         try {
@@ -35,7 +36,19 @@
             date: firebase.firestore.FieldValue.serverTimestamp()
           });
         } catch (e) {
-          console.warn("Journal d'audit: \xE9chec d'\xE9criture", e);
+          console.warn("Journal d'audit: \xE9chec d'\xE9criture (Firestore)", e);
+        }
+        try {
+          if (auth.currentUser) {
+            const idToken = await auth.currentUser.getIdToken();
+            fetch(`${API_BASE}/audit`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${idToken}` },
+              body: JSON.stringify({ action, details })
+            }).catch((e) => console.warn("Journal d'audit: \xE9chec d'\xE9criture (Supabase)", e));
+          }
+        } catch (e) {
+          console.warn("Journal d'audit: \xE9chec d'\xE9criture (Supabase)", e);
         }
       }
       module.exports = {
