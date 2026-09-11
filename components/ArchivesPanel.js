@@ -816,7 +816,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     return `<div class="entete"><img class="logo-entete" src="${LOGO_CHF_BASE64}" alt="Logo CHF"/><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p></div><div class="info"><span>Patient: ${echapperHTML(formaterNomPropre(dossier.nomPatient))}</span><span>${dossier.typePatient === 'ONG' ? `Partenaire : ${echapperHTML(dossier.ongPartenaire || 'N/R')}` : 'Privé'}</span></div><div class="info"><span>Fiche N°${fiche.numeroFiche}</span><span>Mode: ${echapperHTML(fiche.modePaiement || 'cash').toUpperCase()}</span></div><div class="info info-patient"><span>📞 ${echapperHTML(dossier.telephone || 'N/R')}</span><span>📁 ${echapperHTML(dossier.numDossier || 'N/R')}</span></div><div class="info info-patient"><span>Enregistré par: ${echapperHTML(fiche.creePar || 'inconnu')}</span></div>${fiche.exeat ? `<p style="font-size:10px; margin:4px 0;"><strong>Séjour:</strong> ${fiche.exeat.dateEntree.split('-').reverse().slice(0,2).join('/')} → ${fiche.exeat.dateSortie.split('-').reverse().slice(0,2).join('/')}</p>` : ''}<table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${hasLignes ? lignesHTML : fallbackHTML}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes<br/>${formatDH(fiche.totalGlobal)} DH</div>${fiche.solde && fiche.solde > 0 ? `<p style="font-size:12px; color:red;"><strong>Solde restant :</strong> ${formatGourdes(fiche.solde)} Gdes</p>` : ''}<div class="footer">Merci de votre visite !<br/>CHF Système Hospitalier – ${new Date().getFullYear()}</div>`;
   };
 
-  const STYLE_FICHE = `@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{position:relative;text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.logo-entete{position:absolute;top:0;left:0;width:38px;height:38px;object-fit:contain;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:13px;margin-bottom:6px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.info-patient{font-size:12px;margin-bottom:4px;}.page-fiche{page-break-after:always;}.page-fiche:last-child{page-break-after:auto;}.page-patient{page-break-after:always;}.page-patient:last-child{page-break-after:auto;}.separation-fiche{border-top:2px dashed #000;margin:10px 0;}`;
+  const STYLE_FICHE = `@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{position:relative;text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.logo-entete{position:absolute;top:0;left:0;width:38px;height:38px;object-fit:contain;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:13px;margin-bottom:6px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.info-patient{font-size:12px;margin-bottom:4px;}.separation-fiche{border-top:2px dashed #000;margin:10px 0;}`;
 
   const imprimerFiche = (fiche) => {
     const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N°${fiche.numeroFiche}</title><style>${STYLE_FICHE}</style></head><body>${genererCorpsFiche(focusedVerif, fiche)}</body></html>`;
@@ -825,23 +825,46 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 500);
   };
 
-  // Imprime le reçu de CHAQUE fiche de CHAQUE dossier d'un lot, en un seul clic -- mais la coupure
-  // papier (saut de page) ne se fait qu'ENTRE deux patients : les fiches d'un même patient sortent
-  // à la suite sur la même bande (séparées par un simple trait pointillé), pour que l'imprimante ne
-  // coupe pas en plein milieu du reçu d'un patient qui a plusieurs fiches.
+  // Imprime le reçu de CHAQUE fiche de CHAQUE dossier d'un lot, en un seul clic -- les fiches d'un
+  // même patient sortent à la suite sur la même bande (séparées par un simple trait pointillé).
+  //
+  // Pourquoi un iframe caché réimprimé en boucle plutôt qu'un seul document multi-pages (ancienne
+  // version, voir historique git) : un saut de page CSS (page-break-after) ne crée qu'une nouvelle
+  // PAGE à l'intérieur d'un même JOB d'impression -- la plupart des pilotes d'imprimantes tickets ne
+  // coupent le papier qu'à la fin du JOB, pas à chaque saut de page interne. Résultat rapporté : tout
+  // le lot sortait d'une traite, sans coupe entre deux patients. En imprimant chaque patient comme un
+  // job séparé (un seul patient par appel à print()), l'imprimante termine et coupe réellement après
+  // chaque patient avant de recevoir le job suivant -- la coupe automatique en fin de job est quasi
+  // universelle sur ce type d'imprimante.
   const imprimerTousLesRecusDuLot = (dossiers) => {
     if (!dossiers || dossiers.length === 0) { showToast("Aucun dossier dans ce lot.", "error"); return; }
-    const fichesTotal = dossiers.reduce((s, d) => s + (d.fiches || []).length, 0);
-    if (fichesTotal === 0) { showToast("Aucune fiche à imprimer dans ce lot.", "error"); return; }
-    const pages = dossiers.filter(d => (d.fiches || []).length > 0).map(d => {
+    const patients = dossiers.filter(d => (d.fiches || []).length > 0);
+    if (patients.length === 0) { showToast("Aucune fiche à imprimer dans ce lot.", "error"); return; }
+
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+    document.body.appendChild(iframe);
+
+    const imprimerUnPatient = (index) => {
+      if (index >= patients.length) { document.body.removeChild(iframe); return; }
+      const d = patients[index];
       const fiches = [...(d.fiches || [])].sort((a, b) => (a.numeroFiche || 0) - (b.numeroFiche || 0));
-      const corpsPatient = fiches.map(f => genererCorpsFiche(d, f)).join('<div class="separation-fiche"></div>');
-      return `<div class="page-patient">${corpsPatient}</div>`;
-    }).join('');
-    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Reçus - Lot (${fichesTotal} fiches)</title><style>${STYLE_FICHE}</style></head><body>${pages}</body></html>`;
-    const win = window.open('', '_blank', 'width=500,height=700');
-    if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
-    win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 500);
+      const corps = fiches.map(f => genererCorpsFiche(d, f)).join('<div class="separation-fiche"></div>');
+      const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Reçu - ${echapperHTML(formaterNomPropre(d.nomPatient))}</title><style>${STYLE_FICHE}</style></head><body>${corps}</body></html>`;
+      let dejaEnchaine = false;
+      // 'afterprint' se déclenche quand la boîte de dialogue d'impression se ferme (ou juste après
+      // l'envoi au pilote en impression silencieuse) -- filet de sécurité au cas où l'événement ne se
+      // déclenche jamais sur certaines configurations, pour ne jamais rester bloqué en plein lot.
+      const passerAuSuivant = () => { if (dejaEnchaine) return; dejaEnchaine = true; imprimerUnPatient(index + 1); };
+      iframe.onload = () => {
+        iframe.contentWindow.addEventListener('afterprint', passerAuSuivant, { once: true });
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+        setTimeout(passerAuSuivant, 3000);
+      };
+      iframe.srcdoc = contenu;
+    };
+    imprimerUnPatient(0);
   };
 
   // Reproduction fidele du formulaire papier d'admission du CHF (logo, en-tete, grille "Services /

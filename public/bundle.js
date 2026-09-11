@@ -4018,7 +4018,7 @@
           }).join("") : "";
           return `<div class="entete"><img class="logo-entete" src="${LOGO_CHF_BASE64}" alt="Logo CHF"/><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p></div><div class="info"><span>Patient: ${echapperHTML(formaterNomPropre(dossier.nomPatient))}</span><span>${dossier.typePatient === "ONG" ? `Partenaire : ${echapperHTML(dossier.ongPartenaire || "N/R")}` : "Priv\xE9"}</span></div><div class="info"><span>Fiche N\xB0${fiche.numeroFiche}</span><span>Mode: ${echapperHTML(fiche.modePaiement || "cash").toUpperCase()}</span></div><div class="info info-patient"><span>\u{1F4DE} ${echapperHTML(dossier.telephone || "N/R")}</span><span>\u{1F4C1} ${echapperHTML(dossier.numDossier || "N/R")}</span></div><div class="info info-patient"><span>Enregistr\xE9 par: ${echapperHTML(fiche.creePar || "inconnu")}</span></div>${fiche.exeat ? `<p style="font-size:10px; margin:4px 0;"><strong>S\xE9jour:</strong> ${fiche.exeat.dateEntree.split("-").reverse().slice(0, 2).join("/")} \u2192 ${fiche.exeat.dateSortie.split("-").reverse().slice(0, 2).join("/")}</p>` : ""}<table><thead><tr><th>D\xE9signation</th><th class="qte">Qt\xE9</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${hasLignes ? lignesHTML : fallbackHTML}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes<br/>${formatDH(fiche.totalGlobal)} DH</div>${fiche.solde && fiche.solde > 0 ? `<p style="font-size:12px; color:red;"><strong>Solde restant :</strong> ${formatGourdes(fiche.solde)} Gdes</p>` : ""}<div class="footer">Merci de votre visite !<br/>CHF Syst\xE8me Hospitalier \u2013 ${(/* @__PURE__ */ new Date()).getFullYear()}</div>`;
         };
-        const STYLE_FICHE = `@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{position:relative;text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.logo-entete{position:absolute;top:0;left:0;width:38px;height:38px;object-fit:contain;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:13px;margin-bottom:6px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.info-patient{font-size:12px;margin-bottom:4px;}.page-fiche{page-break-after:always;}.page-fiche:last-child{page-break-after:auto;}.page-patient{page-break-after:always;}.page-patient:last-child{page-break-after:auto;}.separation-fiche{border-top:2px dashed #000;margin:10px 0;}`;
+        const STYLE_FICHE = `@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{position:relative;text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.logo-entete{position:absolute;top:0;left:0;width:38px;height:38px;object-fit:contain;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:13px;margin-bottom:6px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.info-patient{font-size:12px;margin-bottom:4px;}.separation-fiche{border-top:2px dashed #000;margin:10px 0;}`;
         const imprimerFiche = (fiche) => {
           const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N\xB0${fiche.numeroFiche}</title><style>${STYLE_FICHE}</style></head><body>${genererCorpsFiche(focusedVerif, fiche)}</body></html>`;
           const win = window.open("", "_blank", "width=500,height=700");
@@ -4036,26 +4036,38 @@
             showToast("Aucun dossier dans ce lot.", "error");
             return;
           }
-          const fichesTotal = dossiers.reduce((s, d) => s + (d.fiches || []).length, 0);
-          if (fichesTotal === 0) {
+          const patients = dossiers.filter((d) => (d.fiches || []).length > 0);
+          if (patients.length === 0) {
             showToast("Aucune fiche \xE0 imprimer dans ce lot.", "error");
             return;
           }
-          const pages = dossiers.filter((d) => (d.fiches || []).length > 0).map((d) => {
+          const iframe = document.createElement("iframe");
+          iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
+          document.body.appendChild(iframe);
+          const imprimerUnPatient = (index) => {
+            if (index >= patients.length) {
+              document.body.removeChild(iframe);
+              return;
+            }
+            const d = patients[index];
             const fiches = [...d.fiches || []].sort((a, b) => (a.numeroFiche || 0) - (b.numeroFiche || 0));
-            const corpsPatient = fiches.map((f) => genererCorpsFiche(d, f)).join('<div class="separation-fiche"></div>');
-            return `<div class="page-patient">${corpsPatient}</div>`;
-          }).join("");
-          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Re\xE7us - Lot (${fichesTotal} fiches)</title><style>${STYLE_FICHE}</style></head><body>${pages}</body></html>`;
-          const win = window.open("", "_blank", "width=500,height=700");
-          if (!win) {
-            showToast("Impression bloqu\xE9e par le navigateur. R\xE9essaie en cliquant sur Imprimer \u2014 si \xE7a ne marche toujours pas, demande \xE0 quelqu'un de v\xE9rifier les r\xE9glages.", "error");
-            return;
-          }
-          win.document.write(contenu);
-          win.document.close();
-          win.focus();
-          setTimeout(() => win.print(), 500);
+            const corps = fiches.map((f) => genererCorpsFiche(d, f)).join('<div class="separation-fiche"></div>');
+            const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Re\xE7u - ${echapperHTML(formaterNomPropre(d.nomPatient))}</title><style>${STYLE_FICHE}</style></head><body>${corps}</body></html>`;
+            let dejaEnchaine = false;
+            const passerAuSuivant = () => {
+              if (dejaEnchaine) return;
+              dejaEnchaine = true;
+              imprimerUnPatient(index + 1);
+            };
+            iframe.onload = () => {
+              iframe.contentWindow.addEventListener("afterprint", passerAuSuivant, { once: true });
+              iframe.contentWindow.focus();
+              iframe.contentWindow.print();
+              setTimeout(passerAuSuivant, 3e3);
+            };
+            iframe.srcdoc = contenu;
+          };
+          imprimerUnPatient(0);
         };
         const genererCorpsFormulaireCHF = (dossier) => {
           const cumul = cumulPourFormulaireCHF(dossier);
