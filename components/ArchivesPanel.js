@@ -136,40 +136,81 @@ const medicamentsSortieManquants = (dossier) => {
 //  - medicamentsSortieManquants : sejour sans medicaments de sortie dans la fiche ou les 3 fiches
 //    avant/apres
 //  - oxytocineSansAccouchement : oxytocine facturee mais aucun accouchement/cesarienne sur le dossier
-const extraireNomMerePortion = (nom) => { const m = (nom || '').trim().match(/^(?:bb|beb[ée])\.?\s+(.+)$/i); return m ? m[1].trim() : null; };
+// \d* après bb/bébé : reconnaît aussi "Bb1"/"Bb2" (jumeaux) -- sans ça ces dossiers n'étaient jamais
+// traités comme des bébés du tout (ni rapprochement avec la mère, ni tri par sa date de séjour).
+const extraireNomMerePortion = (nom) => { const m = (nom || '').trim().match(/^(?:bb\d*|beb[ée]\d*)\.?\s+(.+)$/i); return m ? m[1].trim() : null; };
 const estUnBebe = (nom) => extraireNomMerePortion(nom) !== null;
 const cleFamilleDossier = (nom) => normaliserTexte(extraireNomMerePortion(nom) || nom);
+// Clé insensible à l'ordre des mots (ex. "Jean Pierre" / "Pierre Jean" donnent la même clé) --
+// certaines fiches inversent prénom/nom entre le dossier du bébé et celui de la mère.
+const cleMotsTries = (cleNormalisee) => cleNormalisee.split(' ').filter(Boolean).sort().join(' ');
+// Nombre de fautes de frappe tolérées selon la longueur du nom (distanceLevenshtein, définie plus
+// haut pour la recherche de patient) -- volontairement strict (1 pour un nom court, 2 au-delà de
+// 20 caractères) pour ne jamais rapprocher deux patientes différentes dans le rapprochement mère/bébé.
+const seuilFauteFrappe = (cle) => cle.length > 20 ? 2 : 1;
+
+// Construit l'index des dossiers "mère" (tout ce qui n'est pas un bébé) du pool de recherche, pour
+// résoudre ensuite la clé de chaque bébé en 3 passes, de la plus sûre à la plus tolérante :
+//  1. clé normalisée identique (accents/casse/espaces ignorés, comme avant)
+//  2. mêmes mots mais dans un ordre différent -- seulement si un SEUL dossier mère correspond à cet
+//     ensemble de mots (sinon ambigu, on ne devine pas)
+//  3. à une faute de frappe près (seuilFauteFrappe) -- seulement si un SEUL dossier mère du pool est
+//     à cette distance (sinon ambigu, on ne devine pas)
+// Un résultat ambigu ou introuvable laisse le bébé "sans mère" plutôt que de risquer un mauvais
+// rapprochement entre deux patientes différentes.
+const construireIndexMeres = (poolRecherche) => {
+  const parCle = {}; // cle exacte -> dossier mère
+  const parCleTriee = {}; // clé mots-triés -> liste des dossiers mères partageant ces mots
+  poolRecherche.forEach(v => {
+    if (estUnBebe(v.nomPatient)) return;
+    const cle = cleFamilleDossier(v.nomPatient);
+    parCle[cle] = v;
+    const cleTriee = cleMotsTries(cle);
+    (parCleTriee[cleTriee] = parCleTriee[cleTriee] || []).push(v);
+  });
+  const toutesLesCles = Object.keys(parCle);
+  const resoudre = (cleBebe) => {
+    if (parCle[cleBebe]) return parCle[cleBebe];
+    const candidatsOrdre = parCleTriee[cleMotsTries(cleBebe)];
+    if (candidatsOrdre && candidatsOrdre.length === 1) return candidatsOrdre[0];
+    const seuil = seuilFauteFrappe(cleBebe);
+    const candidatsProches = toutesLesCles.filter(c => distanceLevenshtein(c, cleBebe) <= seuil);
+    if (candidatsProches.length === 1) return parCle[candidatsProches[0]];
+    return null;
+  };
+  return { resoudre };
+};
+
 const trierAvecRegroupementMereBebe = (dossiersDuLot, tousLesDossiers) => {
   const poolRecherche = tousLesDossiers || dossiersDuLot;
-  const dateMereParCle = {};
-  const nomMereParCle = {};
-  poolRecherche.forEach(v => {
-    if (!estUnBebe(v.nomPatient)) {
-      const cle = cleFamilleDossier(v.nomPatient);
-      dateMereParCle[cle] = v.dateEntreePourTri;
-      nomMereParCle[cle] = v.nomPatient;
-    }
+  const indexMeres = construireIndexMeres(poolRecherche);
+  // Résout une fois pour toutes la mère de chaque dossier du lot (mémoïsé par id) -- réutilisé pour
+  // le tri chronologique ET pour les indicateurs plus bas, afin de toujours pointer vers la même mère.
+  const mereResolueParId = {};
+  dossiersDuLot.forEach(v => {
+    mereResolueParId[v.id] = estUnBebe(v.nomPatient) ? indexMeres.resoudre(cleFamilleDossier(v.nomPatient)) : null;
   });
   const dateEffective = (v) => {
-    const cle = cleFamilleDossier(v.nomPatient);
-    return (estUnBebe(v.nomPatient) && dateMereParCle[cle]) ? dateMereParCle[cle] : v.dateEntreePourTri;
+    const mere = mereResolueParId[v.id];
+    return mere ? mere.dateEntreePourTri : v.dateEntreePourTri;
   };
   return [...dossiersDuLot].sort((a, b) => {
     const diff = new Date(dateEffective(a)) - new Date(dateEffective(b));
     if (diff !== 0) return diff;
-    const cleA = cleFamilleDossier(a.nomPatient), cleB = cleFamilleDossier(b.nomPatient);
+    const cleA = (mereResolueParId[a.id] ? cleFamilleDossier(mereResolueParId[a.id].nomPatient) : cleFamilleDossier(a.nomPatient));
+    const cleB = (mereResolueParId[b.id] ? cleFamilleDossier(mereResolueParId[b.id].nomPatient) : cleFamilleDossier(b.nomPatient));
     if (cleA !== cleB) return cleA.localeCompare(cleB);
     return (estUnBebe(a.nomPatient) ? 1 : 0) - (estUnBebe(b.nomPatient) ? 1 : 0);
   }).map(v => {
     const bebe = estUnBebe(v.nomPatient);
-    const cle = cleFamilleDossier(v.nomPatient);
-    const estBebeAvecMere = bebe && dateMereParCle[cle] !== undefined;
+    const mere = mereResolueParId[v.id];
+    const estBebeAvecMere = bebe && !!mere;
     const cumul = cumulCategoriesDossier(v);
     const nomMereExtrait = bebe ? extraireNomMerePortion(v.nomPatient) : null;
     return {
       ...v,
       estBebeSansMere: bebe && !estBebeAvecMere,
-      orthographeIncoherente: estBebeAvecMere && formaterNomPropre(nomMereExtrait) !== formaterNomPropre(nomMereParCle[cle]),
+      orthographeIncoherente: estBebeAvecMere && formaterNomPropre(nomMereExtrait) !== formaterNomPropre(mere.nomPatient),
       cesarienneSansSono: ((cumul.cesarienne || 0) > 0 || (cumul.accouchement || 0) > 0) && !((cumul.sono || 0) > 0),
       sansExeat: !(v.fiches || []).some(f => f.exeat) && !((cumul.hospit || 0) > 0),
       sansAdmission: !estBebeAvecMere && !((cumul.service || 0) > 0),
@@ -298,6 +339,14 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
   const ventilationDossier = (v) => {
     const totaux = cumulCategoriesDossier(v);
     const items = CATEGORIES_LISTE.map(cat => ({ key: cat.key, label: cat.label, montant: totaux[cat.key] || 0 })).filter(x => x.montant > 0);
+    // Hébergement reste affiché même à 0 Gdes dès qu'il y a un séjour (exeat) sur une fiche du
+    // dossier : c'est ce badge qui indique qu'une fiche exeat existe, peu importe le montant facturé
+    // (lit gratuit, séjour à 0 jour...) -- sans lui, impossible de repérer d'un coup d'œil dans le
+    // lot qu'un séjour a bien été saisi.
+    if (!items.some(x => x.key === 'hospit') && (v.fiches || []).some(f => f.exeat)) {
+      const catHospit = CATEGORIES_LISTE.find(c => c.key === 'hospit');
+      items.push({ key: 'hospit', label: catHospit.label, montant: totaux.hospit || 0 });
+    }
     // Hébergement doit toujours apparaître en dernier dans cette liste de badges
     return items.sort((a, b) => (a.key === 'hospit' ? 1 : 0) - (b.key === 'hospit' ? 1 : 0));
   };

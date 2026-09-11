@@ -3350,42 +3350,63 @@
         });
       };
       var extraireNomMerePortion = (nom) => {
-        const m = (nom || "").trim().match(/^(?:bb|beb[ée])\.?\s+(.+)$/i);
+        const m = (nom || "").trim().match(/^(?:bb\d*|beb[ée]\d*)\.?\s+(.+)$/i);
         return m ? m[1].trim() : null;
       };
       var estUnBebe = (nom) => extraireNomMerePortion(nom) !== null;
       var cleFamilleDossier = (nom) => normaliserTexte(extraireNomMerePortion(nom) || nom);
+      var cleMotsTries = (cleNormalisee) => cleNormalisee.split(" ").filter(Boolean).sort().join(" ");
+      var seuilFauteFrappe = (cle) => cle.length > 20 ? 2 : 1;
+      var construireIndexMeres = (poolRecherche) => {
+        const parCle = {};
+        const parCleTriee = {};
+        poolRecherche.forEach((v) => {
+          if (estUnBebe(v.nomPatient)) return;
+          const cle = cleFamilleDossier(v.nomPatient);
+          parCle[cle] = v;
+          const cleTriee = cleMotsTries(cle);
+          (parCleTriee[cleTriee] = parCleTriee[cleTriee] || []).push(v);
+        });
+        const toutesLesCles = Object.keys(parCle);
+        const resoudre = (cleBebe) => {
+          if (parCle[cleBebe]) return parCle[cleBebe];
+          const candidatsOrdre = parCleTriee[cleMotsTries(cleBebe)];
+          if (candidatsOrdre && candidatsOrdre.length === 1) return candidatsOrdre[0];
+          const seuil = seuilFauteFrappe(cleBebe);
+          const candidatsProches = toutesLesCles.filter((c) => distanceLevenshtein(c, cleBebe) <= seuil);
+          if (candidatsProches.length === 1) return parCle[candidatsProches[0]];
+          return null;
+        };
+        return { resoudre };
+      };
       var trierAvecRegroupementMereBebe = (dossiersDuLot, tousLesDossiers) => {
         const poolRecherche = tousLesDossiers || dossiersDuLot;
-        const dateMereParCle = {};
-        const nomMereParCle = {};
-        poolRecherche.forEach((v) => {
-          if (!estUnBebe(v.nomPatient)) {
-            const cle = cleFamilleDossier(v.nomPatient);
-            dateMereParCle[cle] = v.dateEntreePourTri;
-            nomMereParCle[cle] = v.nomPatient;
-          }
+        const indexMeres = construireIndexMeres(poolRecherche);
+        const mereResolueParId = {};
+        dossiersDuLot.forEach((v) => {
+          mereResolueParId[v.id] = estUnBebe(v.nomPatient) ? indexMeres.resoudre(cleFamilleDossier(v.nomPatient)) : null;
         });
         const dateEffective = (v) => {
-          const cle = cleFamilleDossier(v.nomPatient);
-          return estUnBebe(v.nomPatient) && dateMereParCle[cle] ? dateMereParCle[cle] : v.dateEntreePourTri;
+          const mere = mereResolueParId[v.id];
+          return mere ? mere.dateEntreePourTri : v.dateEntreePourTri;
         };
         return [...dossiersDuLot].sort((a, b) => {
           const diff = new Date(dateEffective(a)) - new Date(dateEffective(b));
           if (diff !== 0) return diff;
-          const cleA = cleFamilleDossier(a.nomPatient), cleB = cleFamilleDossier(b.nomPatient);
+          const cleA = mereResolueParId[a.id] ? cleFamilleDossier(mereResolueParId[a.id].nomPatient) : cleFamilleDossier(a.nomPatient);
+          const cleB = mereResolueParId[b.id] ? cleFamilleDossier(mereResolueParId[b.id].nomPatient) : cleFamilleDossier(b.nomPatient);
           if (cleA !== cleB) return cleA.localeCompare(cleB);
           return (estUnBebe(a.nomPatient) ? 1 : 0) - (estUnBebe(b.nomPatient) ? 1 : 0);
         }).map((v) => {
           const bebe = estUnBebe(v.nomPatient);
-          const cle = cleFamilleDossier(v.nomPatient);
-          const estBebeAvecMere = bebe && dateMereParCle[cle] !== void 0;
+          const mere = mereResolueParId[v.id];
+          const estBebeAvecMere = bebe && !!mere;
           const cumul = cumulCategoriesDossier(v);
           const nomMereExtrait = bebe ? extraireNomMerePortion(v.nomPatient) : null;
           return {
             ...v,
             estBebeSansMere: bebe && !estBebeAvecMere,
-            orthographeIncoherente: estBebeAvecMere && formaterNomPropre(nomMereExtrait) !== formaterNomPropre(nomMereParCle[cle]),
+            orthographeIncoherente: estBebeAvecMere && formaterNomPropre(nomMereExtrait) !== formaterNomPropre(mere.nomPatient),
             cesarienneSansSono: ((cumul.cesarienne || 0) > 0 || (cumul.accouchement || 0) > 0) && !((cumul.sono || 0) > 0),
             sansExeat: !(v.fiches || []).some((f) => f.exeat) && !((cumul.hospit || 0) > 0),
             sansAdmission: !estBebeAvecMere && !((cumul.service || 0) > 0),
@@ -3502,6 +3523,10 @@
         const ventilationDossier = (v) => {
           const totaux = cumulCategoriesDossier(v);
           const items = CATEGORIES_LISTE.map((cat) => ({ key: cat.key, label: cat.label, montant: totaux[cat.key] || 0 })).filter((x) => x.montant > 0);
+          if (!items.some((x) => x.key === "hospit") && (v.fiches || []).some((f) => f.exeat)) {
+            const catHospit = CATEGORIES_LISTE.find((c) => c.key === "hospit");
+            items.push({ key: "hospit", label: catHospit.label, montant: totaux.hospit || 0 });
+          }
           return items.sort((a, b) => (a.key === "hospit" ? 1 : 0) - (b.key === "hospit" ? 1 : 0));
         };
         const lotsDuPartenaire = useMemo(() => {
