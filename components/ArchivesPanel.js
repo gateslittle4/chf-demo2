@@ -901,7 +901,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     const ecartCategoriesHorsFormulaire = Math.round((totalReelDossier - totalFormulaire) * 100) / 100;
     const personneResponsable = dossier.typePatient === 'ONG' ? (dossier.ongPartenaire || 'N/R') : 'Privé (patient/famille)';
 
-    const celluleMontant = (montant, estColonneRemplie) => (estColonneRemplie && montant > 0) ? `<span class="montant">${formatGourdes(montant)} Gdes</span>` : `<span class="dollar">Gdes</span>`;
+    const celluleMontant = (montant, estColonneRemplie) => (estColonneRemplie && montant > 0) ? `<span class="montant">$${formatDH(montant)}</span>` : `<span class="dollar">$ Haïtien</span>`;
     const ligneTableau = (label, montant) => `<tr><td class="lbl">${echapperHTML(label)}</td>${Array.from({ length: NB_COLONNES_MONTANT_FORMULAIRE }, (_, i) => `<td class="mnt">${celluleMontant(montant, i === 0 || i === NB_COLONNES_MONTANT_FORMULAIRE - 1)}</td>`).join('')}</tr>`;
 
     const lignesHTML = LIGNES_FORMULAIRE_CHF.map(l => ligneTableau(l.label, cumul[l.key])).join('');
