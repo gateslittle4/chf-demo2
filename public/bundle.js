@@ -4085,7 +4085,7 @@
           const totalReelDossier = dossier.totalGlobal || 0;
           const ecartCategoriesHorsFormulaire = Math.round((totalReelDossier - totalFormulaire) * 100) / 100;
           const personneResponsable = dossier.typePatient === "ONG" ? dossier.ongPartenaire || "N/R" : "Priv\xE9 (patient/famille)";
-          const celluleMontant = (montant, estColonneRemplie) => estColonneRemplie && montant > 0 ? `<span class="montant">$${formatGourdes(montant)}</span>` : `<span class="dollar">$</span>`;
+          const celluleMontant = (montant, estColonneRemplie) => estColonneRemplie && montant > 0 ? `<span class="montant">${formatGourdes(montant)} Gdes</span>` : `<span class="dollar">Gdes</span>`;
           const ligneTableau = (label, montant) => `<tr><td class="lbl">${echapperHTML(label)}</td>${Array.from({ length: NB_COLONNES_MONTANT_FORMULAIRE }, (_, i) => `<td class="mnt">${celluleMontant(montant, i === 0 || i === NB_COLONNES_MONTANT_FORMULAIRE - 1)}</td>`).join("")}</tr>`;
           const lignesHTML = LIGNES_FORMULAIRE_CHF.map((l) => ligneTableau(l.label, cumul[l.key])).join("");
           const ligneGrandTotal = `<tr class="grand-total"><td class="lbl">GRAND TOTAL</td>${Array.from({ length: NB_COLONNES_MONTANT_FORMULAIRE }, (_, i) => `<td class="mnt">${celluleMontant(totalFormulaire, i === 0 || i === NB_COLONNES_MONTANT_FORMULAIRE - 1)}</td>`).join("")}</tr>`;
