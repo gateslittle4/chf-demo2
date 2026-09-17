@@ -3867,8 +3867,12 @@
             });
             ws.getColumn(3 + colonnesExport.length).width = 16;
             for (let i = 1; i <= 4; i++) ws.getRow(i).height = 20;
+            const MDW_CALIBRI_11 = 7;
+            const largeurColonne1Px = (256 * ws.getColumn(1).width + Math.trunc(128 / MDW_CALIBRI_11)) / 256 * MDW_CALIBRI_11;
+            const hauteurEnTetePx = [1, 2, 3, 4].reduce((total, i) => total + ws.getRow(i).height, 0) * (4 / 3);
+            const RATIO_LARGEUR_HAUTEUR_LOGO = 264 / 300;
             const logoId = wb.addImage({ base64: LOGO_CHF_BASE64, extension: "png" });
-            ws.addImage(logoId, { tl: { col: 0, row: 0 }, br: { col: 0.5, row: 4 } });
+            ws.addImage(logoId, { tl: { col: 0, row: 0 }, br: { col: hauteurEnTetePx * RATIO_LARGEUR_HAUTEUR_LOGO / largeurColonne1Px, row: 4 } });
             const buffer = await wb.xlsx.writeBuffer();
             const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
             const urlTelechargement = URL.createObjectURL(blob);

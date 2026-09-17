@@ -662,11 +662,21 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       // -- Excel bureau la scale correctement, mais Excel mobile/tablette (et LibreOffice, Google
       // Sheets...) l'interprètent de façon inconsistante et l'affichent tronquée/déformée (signalé :
       // logo correct sur laptop, tronqué sur tablette). Ancrer entre deux cellules (col/row de tl à
-      // br, ici jusqu'à la moitié de la colonne 1 et la fin des 4 lignes d'en-tête dimensionnées
-      // juste en dessous) donne le même encombrement visuel mais reste correct sur tout lecteur,
-      // puisque la taille dépend des cellules elles-mêmes plutôt que d'un pixel absolu.
+      // br, jusqu'à la fin des 4 lignes d'en-tête dimensionnées juste en dessous) donne le même
+      // encombrement visuel mais reste correct sur tout lecteur, puisque la taille dépend des
+      // cellules elles-mêmes plutôt que d'un pixel absolu.
+      //
+      // La largeur de la colonne 1 (col 0) ne suit PAS le même ratio px/unité que la hauteur des
+      // lignes -- une fraction de colonne fixe ("col: 0.5") écrasait donc légèrement le logo
+      // (rond visiblement ovale) dès que la largeur de colonne 1 ou la hauteur des lignes d'en-tête
+      // changeait. On calcule ici la fraction de colonne exacte à partir des dimensions réelles du
+      // PNG (264x300, mesurées une fois) pour que le rendu ne dépende plus d'un ratio à l'oeil.
+      const MDW_CALIBRI_11 = 7; // largeur du chiffre le plus large, police par défaut du classeur (aucune police custom définie) -- cf. formule OOXML largeur colonne -> pixels
+      const largeurColonne1Px = ((256 * ws.getColumn(1).width + Math.trunc(128 / MDW_CALIBRI_11)) / 256) * MDW_CALIBRI_11;
+      const hauteurEnTetePx = [1, 2, 3, 4].reduce((total, i) => total + ws.getRow(i).height, 0) * (4 / 3); // pt -> px (96 dpi)
+      const RATIO_LARGEUR_HAUTEUR_LOGO = 264 / 300;
       const logoId = wb.addImage({ base64: LOGO_CHF_BASE64, extension: 'png' });
-      ws.addImage(logoId, { tl: { col: 0, row: 0 }, br: { col: 0.5, row: 4 } });
+      ws.addImage(logoId, { tl: { col: 0, row: 0 }, br: { col: (hauteurEnTetePx * RATIO_LARGEUR_HAUTEUR_LOGO) / largeurColonne1Px, row: 4 } });
 
       const buffer = await wb.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
