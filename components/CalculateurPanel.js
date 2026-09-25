@@ -74,10 +74,20 @@ function CalculateurPanel({
   const [selection, setSelection] = useState(null);
   const [quantite, setQuantite] = useState("1");
 
+  // Si une seule des deux dates (entrée/sortie) est renseignée -- cas fréquent : admission et
+  // sortie le même jour, la personne ne remplit qu'un seul champ -- traité comme si les deux
+  // étaient identiques (séjour d'un jour, 0 nuit facturée : même résultat que si on avait tapé
+  // deux fois la même date). Utilisé pour construire exeat/rawState et les impressions plus bas ;
+  // les <input> eux-mêmes restent liés à dateEntree1/dateSortie1 bruts (ce que la personne a tapé).
+  const dateEntree1Eff = dateEntree1 || dateSortie1;
+  const dateSortie1Eff = dateSortie1 || dateEntree1;
+  const dateEntree2Eff = dateEntree2 || dateSortie2;
+  const dateSortie2Eff = dateSortie2 || dateEntree2;
+
   // Nombre d'éléments distincts tapés dans la fiche en cours (médicaments/actes + hébergement +
   // chirurgie spéciale s'il y en a) -- PAS la somme des quantités -- pour comparer facilement au
   // nombre de lignes écrites à la main sur la fiche papier.
-  const nombreElementsFiche = lignes.length + (dateEntree1 && dateSortie1 ? 1 : 0) + (multiPeriode && dateEntree2 && dateSortie2 ? 1 : 0) + (hasChirSpec && nomChirSpec ? 1 : 0);
+  const nombreElementsFiche = lignes.length + (dateEntree1 || dateSortie1 ? 1 : 0) + (multiPeriode && (dateEntree2 || dateSortie2) ? 1 : 0) + (hasChirSpec && nomChirSpec ? 1 : 0);
 
   const [montantVerse, setMontantVerse] = useState("");
   const [modePaiement, setModePaiement] = useState("cash");
@@ -391,8 +401,8 @@ function CalculateurPanel({
       numDossier: numDossierPatient || 'N/R',
       lignes: lignes || [],
       grandTotal: grandTotal || 0,
-      dateEntree1, dateSortie1, totalE1, totalE2, j1, j2, typeLit1, typeLit2,
-      multiPeriode, dateEntree2, dateSortie2,
+      dateEntree1: dateEntree1Eff, dateSortie1: dateSortie1Eff, totalE1, totalE2, j1, j2, typeLit1, typeLit2,
+      multiPeriode, dateEntree2: dateEntree2Eff, dateSortie2: dateSortie2Eff,
       hasChirSpec, nomChirSpec, totalChirSpec,
       telephone: telephone || 'N/R',
       dateNaissance: dateNaissance || 'N/R',
@@ -415,8 +425,8 @@ function CalculateurPanel({
       numDossier: numDossierPatient || 'N/R',
       lignes: lignes || [],
       grandTotal: grandTotal || 0,
-      dateEntree1, dateSortie1, totalE1, totalE2, j1, j2, typeLit1, typeLit2,
-      multiPeriode, dateEntree2, dateSortie2,
+      dateEntree1: dateEntree1Eff, dateSortie1: dateSortie1Eff, totalE1, totalE2, j1, j2, typeLit1, typeLit2,
+      multiPeriode, dateEntree2: dateEntree2Eff, dateSortie2: dateSortie2Eff,
       hasChirSpec, nomChirSpec, totalChirSpec,
       telephone: telephone || 'N/R',
       dateNaissance: dateNaissance || 'N/R',
@@ -504,15 +514,15 @@ function CalculateurPanel({
         statutPaiement: modePaiement === "credit" ? "partiellement_paye" : "paye",
         montantPaye: modePaiement === "cash" ? parseFloat(montantVerse) : modePaiement === "credit" ? 0 : montantRestantApresDepots,
         solde: modePaiement === "credit" ? montantRestantApresDepots : 0,
-        exeat: dateEntree1 && dateSortie1 ? {
-          dateEntree: dateEntree1, dateSortie: dateSortie1, nbJours: j1, typeLit: typeLit1,
+        exeat: (dateEntree1 || dateSortie1) ? {
+          dateEntree: dateEntree1Eff, dateSortie: dateSortie1Eff, nbJours: j1, typeLit: typeLit1,
           prixParJour: prixLit(typeLit1, tarifChoisi), totalHebergement: totalE1,
-          multiPeriode: multiPeriode, dateEntree2: dateEntree2, dateSortie2: dateSortie2,
+          multiPeriode: multiPeriode, dateEntree2: dateEntree2Eff, dateSortie2: dateSortie2Eff,
           typeLit2: typeLit2, nbJours2: j2, prixParJour2: prixLit(typeLit2, tarifChoisi), totalHebergement2: totalE2
         } : null,
         dateCreation: new Date().toISOString(),
         creePar: auth.currentUser?.displayName || 'inconnu',
-        rawState: { lignesCalcul: [...lignes], dateEntree1, dateSortie1, typeLit1, multiPeriode, dateEntree2, dateSortie2, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
+        rawState: { lignesCalcul: [...lignes], dateEntree1: dateEntree1Eff, dateSortie1: dateSortie1Eff, typeLit1, multiPeriode, dateEntree2: dateEntree2Eff, dateSortie2: dateSortie2Eff, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
       };
       onEnregistrerFiche(fiche); // vide déjà le calculateur via le parent
       let montantPaiement = 0;
@@ -575,23 +585,23 @@ function CalculateurPanel({
   if (modeSimulation) return <div className="bg-blue-50 p-4">🧮 Mode simulation</div>;
 
   const enregistrerFicheActive = () => {
-    if (lignes.length === 0 && j1 === 0 && !hasChirSpec && !dateEntree1) { showToast("Fiche vide", "error"); return; }
+    if (lignes.length === 0 && j1 === 0 && !hasChirSpec && !dateEntree1 && !dateSortie1) { showToast("Fiche vide", "error"); return; }
     // On crée l'objet fiche (si idFicheEnCoursDEdition, on l'utilise pour remplacer)
     const fiche = {
       id: idFicheEnCoursDEdition || "fiche-" + Date.now(),
       numeroFiche: idFicheEnCoursDEdition ? fichesDossier.find(f => f.id === idFicheEnCoursDEdition)?.numeroFiche || numeroFicheCourante : numeroFicheCourante,
       breakdown: { ...totalsParService },
       totalGlobal: grandTotal,
-      exeat: dateEntree1 && dateSortie1 ? {
-        dateEntree: dateEntree1, dateSortie: dateSortie1, nbJours: j1, typeLit: typeLit1,
+      exeat: (dateEntree1 || dateSortie1) ? {
+        dateEntree: dateEntree1Eff, dateSortie: dateSortie1Eff, nbJours: j1, typeLit: typeLit1,
         prixParJour: prixLit(typeLit1, tarifChoisi), totalHebergement: totalE1,
-        multiPeriode: multiPeriode, dateEntree2: dateEntree2, dateSortie2: dateSortie2,
+        multiPeriode: multiPeriode, dateEntree2: dateEntree2Eff, dateSortie2: dateSortie2Eff,
         typeLit2: typeLit2, nbJours2: j2, prixParJour2: prixLit(typeLit2, tarifChoisi), totalHebergement2: totalE2
       } : null,
       dateCreation: new Date(dateFiche + 'T12:00:00').toISOString(),
       creePar: auth.currentUser?.displayName || 'inconnu',
       prescritPar: prescritPar.trim() || '',
-      rawState: { lignesCalcul: [...lignes], dateEntree1, dateSortie1, typeLit1, multiPeriode, dateEntree2, dateSortie2, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
+      rawState: { lignesCalcul: [...lignes], dateEntree1: dateEntree1Eff, dateSortie1: dateSortie1Eff, typeLit1, multiPeriode, dateEntree2: dateEntree2Eff, dateSortie2: dateSortie2Eff, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
     };
     onEnregistrerFiche(fiche);
     // Le parent (AppHospitaliere) gère la mise à jour ou l'ajout et vide le calculateur
@@ -861,8 +871,8 @@ function CalculateurPanel({
               <table className="w-full text-xs text-left table-fixed">
                 <thead className="sticky top-0"><tr className="bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono"><th className="p-3 w-[46%]">Désignation</th><th className="p-3 w-[14%] text-center">Qté</th><th className="p-3 text-right w-[17%]">Prix</th><th className="p-3 text-right w-[17%]">Total</th><th className="w-[6%]"></th></tr></thead>
                 <tbody className="divide-y divide-gray-100">
-                  {dateEntree1 && dateSortie1 && <tr className="bg-amber-50/20"><td className="p-3 text-amber-900">Séjour : {CONFIG_LITS[typeLit1].nom}</td><td className="p-3 text-center font-bold">{j1} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(prixLit(typeLit1, tarifChoisi))}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE1)}</td><td></td></tr>}
-                  {multiPeriode && dateEntree2 && dateSortie2 && <tr className="bg-amber-50/40"><td className="p-3 text-amber-900">Séjour P2 : {CONFIG_LITS[typeLit2].nom}</td><td className="p-3 text-center font-bold">{j2} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(prixLit(typeLit2, tarifChoisi))}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE2)}</td><td></td></tr>}
+                  {(dateEntree1 || dateSortie1) && <tr className="bg-amber-50/20"><td className="p-3 text-amber-900">Séjour : {CONFIG_LITS[typeLit1].nom}</td><td className="p-3 text-center font-bold">{j1} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(prixLit(typeLit1, tarifChoisi))}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE1)}</td><td></td></tr>}
+                  {multiPeriode && (dateEntree2 || dateSortie2) && <tr className="bg-amber-50/40"><td className="p-3 text-amber-900">Séjour P2 : {CONFIG_LITS[typeLit2].nom}</td><td className="p-3 text-center font-bold">{j2} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(prixLit(typeLit2, tarifChoisi))}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE2)}</td><td></td></tr>}
                   {hasChirSpec && nomChirSpec && <tr className="bg-red-50/20"><td className="p-3 text-red-900">Chirurgie : {nomChirSpec}</td><td className="p-3 text-center">1</td><td className="p-3 text-right text-gray-400">{formatGourdes(totalChirSpec)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalChirSpec)}</td><td></td></tr>}
                   {lignes.map(l => { const decrementer = () => setLignes(p=>p.map(x=>x.id===l.id?{...x,qte:Math.max(1,x.qte-1)}:x)); const incrementer = () => setLignes(p=>p.map(x=>x.id===l.id?{...x,qte:x.qte+1}:x)); return <tr key={l.id} className="zebra-row"><td className="p-3 text-gray-800"><span className={`text-[8px] font-bold uppercase px-1 rounded mr-1 ${l.type==='med'?'bg-emerald-50 text-emerald-700':'bg-blue-50 text-blue-700'}`}>{l.type==='med'?'Pharma':'Acte'}</span>{l.nom}</td><td className="p-3 text-center"><div className="flex items-center justify-center gap-1"><button onMouseDown={()=>demarrerRepetition(decrementer)} onMouseUp={arreterRepetition} onMouseLeave={arreterRepetition} onTouchStart={(e)=>{e.preventDefault(); demarrerRepetition(decrementer);}} onTouchEnd={(e)=>{e.preventDefault(); arreterRepetition();}} onTouchCancel={arreterRepetition} className="w-7 h-7 bg-gray-100 active:bg-gray-300 rounded-lg font-bold text-gray-700 select-none">−</button><span className="font-mono font-bold w-6 text-center">{l.qte}</span><button onMouseDown={()=>demarrerRepetition(incrementer)} onMouseUp={arreterRepetition} onMouseLeave={arreterRepetition} onTouchStart={(e)=>{e.preventDefault(); demarrerRepetition(incrementer);}} onTouchEnd={(e)=>{e.preventDefault(); arreterRepetition();}} onTouchCancel={arreterRepetition} className="w-7 h-7 bg-gray-100 active:bg-gray-300 rounded-lg font-bold text-gray-700 select-none">+</button></div></td><td className="p-3 text-right text-gray-400">{formatGourdes(l.prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(l.qte * l.prix)}</td><td className="text-center">{peutSupprimerFiche && <button onClick={()=>setLignes(p=>p.filter(x=>x.id!==l.id))} className="text-gray-300 hover:text-red-600"><X size={12}/></button>}</td></tr>; })}
                 </tbody>
@@ -906,11 +916,11 @@ function CalculateurPanel({
                 <table className="w-full text-xs text-left table-fixed">
                   <thead><tr className="bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono"><th className="p-3 w-[40%]">Désignation</th><th className="p-3 w-[22%] text-center">Qté</th><th className="p-3 text-right w-[19%]">Prix</th><th className="p-3 text-right w-[19%]">Total</th><th className="w-8"></th></tr></thead>
                   <tbody className="divide-y divide-gray-100">
-                    {dateEntree1 && dateSortie1 && <tr className="bg-amber-50/20"><td className="p-3 text-amber-900">Séjour : {CONFIG_LITS[typeLit1].nom}</td><td className="p-3 text-center font-bold">{j1} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(CONFIG_LITS[typeLit1].prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE1)}</td><td></td></tr>}
-                    {multiPeriode && dateEntree2 && dateSortie2 && <tr className="bg-amber-50/40"><td className="p-3 text-amber-900">Séjour P2 : {CONFIG_LITS[typeLit2].nom}</td><td className="p-3 text-center font-bold">{j2} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(CONFIG_LITS[typeLit2].prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE2)}</td><td></td></tr>}
+                    {(dateEntree1 || dateSortie1) && <tr className="bg-amber-50/20"><td className="p-3 text-amber-900">Séjour : {CONFIG_LITS[typeLit1].nom}</td><td className="p-3 text-center font-bold">{j1} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(CONFIG_LITS[typeLit1].prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE1)}</td><td></td></tr>}
+                    {multiPeriode && (dateEntree2 || dateSortie2) && <tr className="bg-amber-50/40"><td className="p-3 text-amber-900">Séjour P2 : {CONFIG_LITS[typeLit2].nom}</td><td className="p-3 text-center font-bold">{j2} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(CONFIG_LITS[typeLit2].prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE2)}</td><td></td></tr>}
                     {hasChirSpec && nomChirSpec && <tr className="bg-red-50/20"><td className="p-3 text-red-900">Chirurgie : {nomChirSpec}</td><td className="p-3 text-center">1</td><td className="p-3 text-right text-gray-400">{formatGourdes(totalChirSpec)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalChirSpec)}</td><td></td></tr>}
                     {lignes.map(l => { const decrementer = () => setLignes(p=>p.map(x=>x.id===l.id?{...x,qte:Math.max(1,x.qte-1)}:x)); const incrementer = () => setLignes(p=>p.map(x=>x.id===l.id?{...x,qte:x.qte+1}:x)); return <tr key={l.id} className="zebra-row"><td className="p-3 text-gray-800"><span className={`text-[8px] font-bold uppercase px-1 rounded mr-1 ${l.type==='med'?'bg-emerald-50 text-emerald-700':'bg-blue-50 text-blue-700'}`}>{l.type==='med'?'Pharma':'Acte'}</span>{l.nom}</td><td className="p-3 text-center"><div className="flex items-center justify-center gap-1"><button onMouseDown={()=>demarrerRepetition(decrementer)} onMouseUp={arreterRepetition} onMouseLeave={arreterRepetition} onTouchStart={(e)=>{e.preventDefault(); demarrerRepetition(decrementer);}} onTouchEnd={(e)=>{e.preventDefault(); arreterRepetition();}} onTouchCancel={arreterRepetition} className="w-8 h-8 bg-gray-100 active:bg-gray-300 rounded-lg font-bold text-gray-700 select-none">−</button><span className="font-mono font-bold w-6 text-center">{l.qte}</span><button onMouseDown={()=>demarrerRepetition(incrementer)} onMouseUp={arreterRepetition} onMouseLeave={arreterRepetition} onTouchStart={(e)=>{e.preventDefault(); demarrerRepetition(incrementer);}} onTouchEnd={(e)=>{e.preventDefault(); arreterRepetition();}} onTouchCancel={arreterRepetition} className="w-8 h-8 bg-gray-100 active:bg-gray-300 rounded-lg font-bold text-gray-700 select-none">+</button></div></td><td className="p-3 text-right text-gray-400">{formatGourdes(l.prix)}</td><td className="p-3 text-right font-bold">{formatGourdes(l.qte * l.prix)}</td><td className="text-center">{peutSupprimerFiche && <button onClick={()=>setLignes(p=>p.filter(x=>x.id!==l.id))} className="text-gray-300 hover:text-red-600"><X size={12}/></button>}</td></tr>; })}
-                    {lignes.length === 0 && !dateEntree1 && !hasChirSpec && <tr><td colSpan={5} className="p-6 text-center text-gray-400">Fiche vide pour l'instant.</td></tr>}
+                    {lignes.length === 0 && !dateEntree1 && !dateSortie1 && !hasChirSpec && <tr><td colSpan={5} className="p-6 text-center text-gray-400">Fiche vide pour l'instant.</td></tr>}
                   </tbody>
                 </table>
                 <div className="p-4 bg-gray-50 border-t border-b text-[11px] text-gray-600 font-mono space-y-1">
