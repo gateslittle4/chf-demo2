@@ -269,11 +269,18 @@ const cumulPourFormulaireCHF = (dossier) => {
 
 // Toutes les périodes d'hébergement du dossier (une par fiche ayant une période 1, + une de plus si
 // la fiche a une 2e période) — pour gérer le cas d'un patient admis/hospitalisé à plusieurs reprises.
+// Si une seule des deux dates (entrée/sortie) est renseignée -- cas fréquent : admission et sortie
+// le même jour -- l'autre est traitée comme identique (séjour d'un jour), exactement comme au moment
+// de la saisie (voir dateEntree1Eff/dateSortie1Eff dans CalculateurPanel.js). Appliqué aussi ici, à
+// la lecture, pour corriger l'affichage des dossiers enregistrés avant ce correctif (23/09-25/09 :
+// stockés avec une seule date, sans l'avoir re-remplie depuis) sans avoir à toucher la base.
 const periodesSejourDossier = (dossier) => {
   const dates = [];
   (dossier.fiches || []).forEach(f => {
-    if (f.rawState?.dateEntree1) dates.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
-    if (f.rawState?.multiPeriode && f.rawState?.dateEntree2) dates.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
+    const e1 = f.rawState?.dateEntree1, s1 = f.rawState?.dateSortie1;
+    if (e1 || s1) dates.push({ in: e1 || s1, out: s1 || e1 });
+    const e2 = f.rawState?.dateEntree2, s2 = f.rawState?.dateSortie2;
+    if (f.rawState?.multiPeriode && (e2 || s2)) dates.push({ in: e2 || s2, out: s2 || e2 });
   });
   return dates;
 };
@@ -289,6 +296,20 @@ const dateAdmissionFormulaireCHF = (dossier) => {
   return periodes.map(d => d.in === d.out
     ? d.in.split('-').reverse().join('/')
     : `du ${d.in.split('-').reverse().join('/')} au ${d.out.split('-').reverse().join('/')}`
+  ).join(' et ');
+};
+
+// Même texte que dateAdmissionFormulaireCHF mais sans l'année (JJ/MM) -- format utilisé dans la
+// colonne "Date" de l'Excel du lot, où l'année est déjà donnée une seule fois en en-tête
+// ("DATE D'ADMISSION : OCTOBRE 2026"). Recalculé à chaque génération du fichier à partir des fiches
+// elles-mêmes (jamais depuis une valeur figée) : un dossier archivé avec l'ancien code, puis
+// réimprimé après ce correctif, affiche la bonne date sans qu'on ait besoin de le retoucher.
+const periodeSejourTexteCourt = (dossier) => {
+  const periodes = periodesSejourDossier(dossier);
+  if (periodes.length === 0) return '';
+  return periodes.map(d => d.in === d.out
+    ? d.in.split('-').reverse().slice(0, 2).join('/')
+    : `du ${d.in.split('-').reverse().slice(0, 2).join('/')} au ${d.out.split('-').reverse().slice(0, 2).join('/')}`
   ).join(' et ');
 };
 
@@ -611,7 +632,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
         });
 
         appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.celluleStandard); ws.getCell(r, 1).value = formaterNomPropre(doc.nomPatient);
-        appliquerStyle(ws.getCell(r, 2), EXCEL_STYLES.celluleStandard); ws.getCell(r, 2).value = doc.periodeSejourString || doc.dateHeure || "—";
+        appliquerStyle(ws.getCell(r, 2), EXCEL_STYLES.celluleStandard); ws.getCell(r, 2).value = periodeSejourTexteCourt(doc) || doc.dateHeure || "—";
         colonnesExport.forEach((c, i) => {
           totalsParColonne[c.key] += totalsPatient[c.key] || 0;
           const cell = ws.getCell(r, 3 + i);

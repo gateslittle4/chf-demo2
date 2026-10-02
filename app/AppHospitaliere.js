@@ -475,7 +475,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
     // silencieusement — sinon son 🔒 disparaît et le bouton Supprimer se réactive dans Archives.
     const verrouilleFactureExistante = verifications.find(v => v.id === dossierId)?.verrouilleFacture || false;
     const datesTrouvees = [];
-    fichesDossier.forEach(f => { if (f.rawState?.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 }); if (f.rawState?.multiPeriode && f.rawState?.dateEntree2) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 }); });
+    fichesDossier.forEach(f => { const e1 = f.rawState?.dateEntree1, s1 = f.rawState?.dateSortie1; if (e1 || s1) datesTrouvees.push({ in: e1 || s1, out: s1 || e1 }); const e2 = f.rawState?.dateEntree2, s2 = f.rawState?.dateSortie2; if (f.rawState?.multiPeriode && (e2 || s2)) datesTrouvees.push({ in: e2 || s2, out: s2 || e2 }); });
     let sejourTexte = "—";
     if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map(d => d.in === d.out ? d.in.split("-").reverse().slice(0, 2).join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`).join(" et ");
     const dossierArchiver = {
@@ -555,8 +555,10 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
     const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
     const datesTrouvees = [];
     listeFiches.forEach(f => {
-      if (f.rawState?.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
-      if (f.rawState?.multiPeriode && f.rawState?.dateEntree2) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
+      const e1 = f.rawState?.dateEntree1, s1 = f.rawState?.dateSortie1;
+      if (e1 || s1) datesTrouvees.push({ in: e1 || s1, out: s1 || e1 });
+      const e2 = f.rawState?.dateEntree2, s2 = f.rawState?.dateSortie2;
+      if (f.rawState?.multiPeriode && (e2 || s2)) datesTrouvees.push({ in: e2 || s2, out: s2 || e2 });
     });
     let sejourTexte = "—";
     if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map(d => d.in === d.out ? d.in.split("-").reverse().slice(0,2).join("/") : `du ${d.in.split("-").reverse().slice(0,2).join("/")} au ${d.out.split("-").reverse().slice(0,2).join("/")}`).join(" et ");
@@ -653,8 +655,10 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
     const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
     const datesTrouvees = [];
     listeFiches.forEach(f => {
-      if (f.rawState?.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
-      if (f.rawState?.multiPeriode && f.rawState?.dateEntree2) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
+      const e1 = f.rawState?.dateEntree1, s1 = f.rawState?.dateSortie1;
+      if (e1 || s1) datesTrouvees.push({ in: e1 || s1, out: s1 || e1 });
+      const e2 = f.rawState?.dateEntree2, s2 = f.rawState?.dateSortie2;
+      if (f.rawState?.multiPeriode && (e2 || s2)) datesTrouvees.push({ in: e2 || s2, out: s2 || e2 });
     });
     let sejourTexte = "—";
     if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map(d => d.in === d.out ? d.in.split("-").reverse().slice(0,2).join("/") : `du ${d.in.split("-").reverse().slice(0,2).join("/")} au ${d.out.split("-").reverse().slice(0,2).join("/")}`).join(" et ");

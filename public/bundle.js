@@ -3466,9 +3466,11 @@
       var periodesSejourDossier = (dossier) => {
         const dates = [];
         (dossier.fiches || []).forEach((f) => {
-          var _a, _b, _c;
-          if ((_a = f.rawState) == null ? void 0 : _a.dateEntree1) dates.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
-          if (((_b = f.rawState) == null ? void 0 : _b.multiPeriode) && ((_c = f.rawState) == null ? void 0 : _c.dateEntree2)) dates.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
+          var _a, _b, _c, _d, _e;
+          const e1 = (_a = f.rawState) == null ? void 0 : _a.dateEntree1, s1 = (_b = f.rawState) == null ? void 0 : _b.dateSortie1;
+          if (e1 || s1) dates.push({ in: e1 || s1, out: s1 || e1 });
+          const e2 = (_c = f.rawState) == null ? void 0 : _c.dateEntree2, s2 = (_d = f.rawState) == null ? void 0 : _d.dateSortie2;
+          if (((_e = f.rawState) == null ? void 0 : _e.multiPeriode) && (e2 || s2)) dates.push({ in: e2 || s2, out: s2 || e2 });
         });
         return dates;
       };
@@ -3477,6 +3479,13 @@
         if (periodes.length === 0) return dossier.dateHeure || "";
         return periodes.map(
           (d) => d.in === d.out ? d.in.split("-").reverse().join("/") : `du ${d.in.split("-").reverse().join("/")} au ${d.out.split("-").reverse().join("/")}`
+        ).join(" et ");
+      };
+      var periodeSejourTexteCourt = (dossier) => {
+        const periodes = periodesSejourDossier(dossier);
+        if (periodes.length === 0) return "";
+        return periodes.map(
+          (d) => d.in === d.out ? d.in.split("-").reverse().slice(0, 2).join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`
         ).join(" et ");
       };
       function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, userRole, showToast, onChangerTypeOng, listeOng, listeOngDocs, confirmModal, setConfirmModal, lotInitialFocus, clearLotInitialFocus }) {
@@ -3799,7 +3808,7 @@
               appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.celluleStandard);
               ws.getCell(r, 1).value = formaterNomPropre(doc.nomPatient);
               appliquerStyle(ws.getCell(r, 2), EXCEL_STYLES.celluleStandard);
-              ws.getCell(r, 2).value = doc.periodeSejourString || doc.dateHeure || "\u2014";
+              ws.getCell(r, 2).value = periodeSejourTexteCourt(doc) || doc.dateHeure || "\u2014";
               colonnesExport.forEach((c, i) => {
                 totalsParColonne[c.key] += totalsPatient[c.key] || 0;
                 const cell = ws.getCell(r, 3 + i);
@@ -6671,9 +6680,11 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           const verrouilleFactureExistante = ((_a = verifications.find((v) => v.id === dossierId)) == null ? void 0 : _a.verrouilleFacture) || false;
           const datesTrouvees = [];
           fichesDossier.forEach((f) => {
-            var _a2, _b, _c;
-            if ((_a2 = f.rawState) == null ? void 0 : _a2.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
-            if (((_b = f.rawState) == null ? void 0 : _b.multiPeriode) && ((_c = f.rawState) == null ? void 0 : _c.dateEntree2)) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
+            var _a2, _b, _c, _d, _e;
+            const e1 = (_a2 = f.rawState) == null ? void 0 : _a2.dateEntree1, s1 = (_b = f.rawState) == null ? void 0 : _b.dateSortie1;
+            if (e1 || s1) datesTrouvees.push({ in: e1 || s1, out: s1 || e1 });
+            const e2 = (_c = f.rawState) == null ? void 0 : _c.dateEntree2, s2 = (_d = f.rawState) == null ? void 0 : _d.dateSortie2;
+            if (((_e = f.rawState) == null ? void 0 : _e.multiPeriode) && (e2 || s2)) datesTrouvees.push({ in: e2 || s2, out: s2 || e2 });
           });
           let sejourTexte = "\u2014";
           if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map((d) => d.in === d.out ? d.in.split("-").reverse().slice(0, 2).join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`).join(" et ");
@@ -6791,9 +6802,11 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
           const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
           const datesTrouvees = [];
           listeFiches.forEach((f) => {
-            var _a, _b, _c;
-            if ((_a = f.rawState) == null ? void 0 : _a.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
-            if (((_b = f.rawState) == null ? void 0 : _b.multiPeriode) && ((_c = f.rawState) == null ? void 0 : _c.dateEntree2)) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
+            var _a, _b, _c, _d, _e;
+            const e1 = (_a = f.rawState) == null ? void 0 : _a.dateEntree1, s1 = (_b = f.rawState) == null ? void 0 : _b.dateSortie1;
+            if (e1 || s1) datesTrouvees.push({ in: e1 || s1, out: s1 || e1 });
+            const e2 = (_c = f.rawState) == null ? void 0 : _c.dateEntree2, s2 = (_d = f.rawState) == null ? void 0 : _d.dateSortie2;
+            if (((_e = f.rawState) == null ? void 0 : _e.multiPeriode) && (e2 || s2)) datesTrouvees.push({ in: e2 || s2, out: s2 || e2 });
           });
           let sejourTexte = "\u2014";
           if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map((d) => d.in === d.out ? d.in.split("-").reverse().slice(0, 2).join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`).join(" et ");
@@ -6890,9 +6903,11 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
           const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
           const datesTrouvees = [];
           listeFiches.forEach((f) => {
-            var _a, _b, _c;
-            if ((_a = f.rawState) == null ? void 0 : _a.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
-            if (((_b = f.rawState) == null ? void 0 : _b.multiPeriode) && ((_c = f.rawState) == null ? void 0 : _c.dateEntree2)) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
+            var _a, _b, _c, _d, _e;
+            const e1 = (_a = f.rawState) == null ? void 0 : _a.dateEntree1, s1 = (_b = f.rawState) == null ? void 0 : _b.dateSortie1;
+            if (e1 || s1) datesTrouvees.push({ in: e1 || s1, out: s1 || e1 });
+            const e2 = (_c = f.rawState) == null ? void 0 : _c.dateEntree2, s2 = (_d = f.rawState) == null ? void 0 : _d.dateSortie2;
+            if (((_e = f.rawState) == null ? void 0 : _e.multiPeriode) && (e2 || s2)) datesTrouvees.push({ in: e2 || s2, out: s2 || e2 });
           });
           let sejourTexte = "\u2014";
           if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map((d) => d.in === d.out ? d.in.split("-").reverse().slice(0, 2).join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`).join(" et ");
