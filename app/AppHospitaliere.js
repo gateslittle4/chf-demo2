@@ -526,6 +526,14 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
   };
 
   const finaliserEtArchiverDossierOfficiel = async () => {
+    // Bloque l'archivage (pas l'enregistrement d'une fiche, qui reste libre) tant qu'aucune fiche du
+    // dossier n'a de date d'entrée NI de date de sortie -- au moins l'une des deux doit être présente
+    // sur au moins une fiche avant de clôturer le dossier.
+    const auMoinsUneDateDeSejour = fichesDossier.some(f => f.rawState?.dateEntree1 || f.rawState?.dateSortie1);
+    if (!auMoinsUneDateDeSejour) {
+      showToast("Impossible d'archiver : aucune date d'entrée ni de sortie renseignée sur ce dossier. Ajoute au moins l'une des deux (Hébergement & Séjour) avant de clôturer.", "error");
+      return;
+    }
     const somme = fichesDossier.reduce((s, f) => s + f.totalGlobal, 0);
     const demanderConfirmation = () => setConfirmModal({
       titre: "Archiver ce dossier ?",

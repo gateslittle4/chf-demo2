@@ -6768,6 +6768,14 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           return false;
         };
         const finaliserEtArchiverDossierOfficiel = async () => {
+          const auMoinsUneDateDeSejour = fichesDossier.some((f) => {
+            var _a, _b;
+            return ((_a = f.rawState) == null ? void 0 : _a.dateEntree1) || ((_b = f.rawState) == null ? void 0 : _b.dateSortie1);
+          });
+          if (!auMoinsUneDateDeSejour) {
+            showToast("Impossible d'archiver : aucune date d'entr\xE9e ni de sortie renseign\xE9e sur ce dossier. Ajoute au moins l'une des deux (H\xE9bergement & S\xE9jour) avant de cl\xF4turer.", "error");
+            return;
+          }
           const somme = fichesDossier.reduce((s, f) => s + f.totalGlobal, 0);
           const demanderConfirmation = () => setConfirmModal({
             titre: "Archiver ce dossier ?",
