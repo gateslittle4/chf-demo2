@@ -413,7 +413,9 @@
           numeroLot: "numero_lot",
           moisReport: "mois_report",
           moisLot: "mois_lot",
-          lotVerrouille: "lot_verrouille"
+          lotVerrouille: "lot_verrouille",
+          modifiePar: "modifie_par",
+          modifieParUid: "modifie_par_uid"
         };
         const result = {};
         for (const [k, v] of Object.entries(data)) result[map[k] || k] = v;
@@ -441,7 +443,9 @@
           numero_lot: "numeroLot",
           mois_report: "moisReport",
           mois_lot: "moisLot",
-          lot_verrouille: "lotVerrouille"
+          lot_verrouille: "lotVerrouille",
+          modifie_par: "modifiePar",
+          modifie_par_uid: "modifieParUid"
         };
         const result = {};
         for (const [k, v] of Object.entries(data)) result[map[k] || k] = v;
@@ -4290,7 +4294,7 @@ Pour une nouvelle visite de ${v.nomPatient}, utilise plut\xF4t "Rechercher un pa
 Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             onChargerPourModif(v);
           }, className: "text-amber-700 p-1 bg-amber-50 rounded", title: "Modifier / corriger" }, /* @__PURE__ */ React.createElement(Pencil, { size: 13 })), peutSupprimer && /* @__PURE__ */ React.createElement("button", { onClick: () => onSupprimer(v.id), disabled: v.verrouilleFacture, className: "text-gray-300 hover:text-red-600 p-1 disabled:opacity-20" }, /* @__PURE__ */ React.createElement(Trash2, { size: 13 })), /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerArchive(v), className: "text-gray-600 p-1 bg-gray-50 rounded", title: "Imprimer" }, /* @__PURE__ */ React.createElement(Printer, { size: 13 })), /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerFormulaireCHF(v), className: "text-indigo-700 p-1 bg-indigo-50 rounded", title: "Imprimer le Rapport Dioumitrie" }, /* @__PURE__ */ React.createElement(Printer, { size: 13 })), isSuspendu && peutRouvrir && /* @__PURE__ */ React.createElement("button", { onClick: () => rouvrirDossierSuspendu(v), className: "text-emerald-600 p-1 bg-emerald-50 rounded", title: "Rouvrir" }, /* @__PURE__ */ React.createElement(FolderOpen, { size: 13 }))));
-        })))), dossiersFiltres.length > nombreAffiche && /* @__PURE__ */ React.createElement("div", { className: "flex justify-center pt-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setNombreAffiche((n) => n + 100), className: "bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-1.5 rounded-lg text-xs font-bold" }, "Charger plus (", dossiersFiltres.length - nombreAffiche, " restants)"))), focusedVerif && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border border-blue-200 shadow-md space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 border-b pb-1" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-blue-900 text-xs uppercase" }, "\u{1F50D} ", focusedVerif.nomPatient), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-2 items-center" }, /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerArchive(focusedVerif), className: "bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Imprimer dossier"), /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerFormulaireCHF(focusedVerif), className: "bg-indigo-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Rapport Dioumitrie"), /* @__PURE__ */ React.createElement("button", { onClick: () => setFocusedVerif(null) }, /* @__PURE__ */ React.createElement(X, { size: 14 })))), focusedVerif.numeroLot != null && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 text-xs bg-indigo-50 border border-indigo-200 rounded-lg p-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-indigo-800" }, "\u{1F4E6} Ce dossier fait partie du ", /* @__PURE__ */ React.createElement("strong", null, "Lot ", focusedVerif.numeroLot), " de ", focusedVerif.ongPartenaire, '. Une correction reste possible via "Modifier/corriger" \u2014 pense \xE0 r\xE9imprimer le lot ensuite pour que le partenaire re\xE7oive la version \xE0 jour.')), onChangerTypeOng && peutModifier && (!editTypeArchiveOuvert ? /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 text-xs bg-gray-50 border rounded-lg p-2" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-purple-700" }, focusedVerif.ongPartenaire || "Priv\xE9", " - ", focusedVerif.typePatient === "ONG" ? "Partenaire" : "Priv\xE9"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+        })))), dossiersFiltres.length > nombreAffiche && /* @__PURE__ */ React.createElement("div", { className: "flex justify-center pt-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setNombreAffiche((n) => n + 100), className: "bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-1.5 rounded-lg text-xs font-bold" }, "Charger plus (", dossiersFiltres.length - nombreAffiche, " restants)"))), focusedVerif && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border border-blue-200 shadow-md space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 border-b pb-1" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-blue-900 text-xs uppercase" }, "\u{1F50D} ", focusedVerif.nomPatient), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-2 items-center" }, /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerArchive(focusedVerif), className: "bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Imprimer dossier"), /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerFormulaireCHF(focusedVerif), className: "bg-indigo-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Rapport Dioumitrie"), /* @__PURE__ */ React.createElement("button", { onClick: () => setFocusedVerif(null) }, /* @__PURE__ */ React.createElement(X, { size: 14 })))), focusedVerif.modifiePar && /* @__PURE__ */ React.createElement("p", { className: "text-[10px] text-gray-400 -mt-2" }, "Derni\xE8re modification par ", /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-gray-600" }, focusedVerif.modifiePar)), focusedVerif.numeroLot != null && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 text-xs bg-indigo-50 border border-indigo-200 rounded-lg p-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-indigo-800" }, "\u{1F4E6} Ce dossier fait partie du ", /* @__PURE__ */ React.createElement("strong", null, "Lot ", focusedVerif.numeroLot), " de ", focusedVerif.ongPartenaire, '. Une correction reste possible via "Modifier/corriger" \u2014 pense \xE0 r\xE9imprimer le lot ensuite pour que le partenaire re\xE7oive la version \xE0 jour.')), onChangerTypeOng && peutModifier && (!editTypeArchiveOuvert ? /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 text-xs bg-gray-50 border rounded-lg p-2" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-purple-700" }, focusedVerif.ongPartenaire || "Priv\xE9", " - ", focusedVerif.typePatient === "ONG" ? "Partenaire" : "Priv\xE9"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
           setNouveauTypeArchive(focusedVerif.typePatient || "ONG");
           setNouvelOngArchive(focusedVerif.ongPartenaire || "");
           setEditTypeArchiveOuvert(true);
@@ -6506,6 +6510,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           }
         };
         const enregistrerFicheModifiee = (nouvelleFiche) => {
+          enregistrerAudit("enregistrement_fiche", { dossierId, nomPatient, numeroFiche: nouvelleFiche.numeroFiche, totalGlobal: nouvelleFiche.totalGlobal, type: "modification" });
           const fichesMisesAJour = fichesDossier.map((f) => f.id === nouvelleFiche.id ? nouvelleFiche : f);
           setFichesDossier(fichesMisesAJour);
           synchroniserDossierActif(fichesMisesAJour);
@@ -6537,6 +6542,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           if (idFicheEnCoursDEdition) {
             enregistrerFicheModifiee({ ...fiche, id: idFicheEnCoursDEdition });
           } else {
+            enregistrerAudit("enregistrement_fiche", { dossierId, nomPatient, numeroFiche: fiche.numeroFiche, totalGlobal: fiche.totalGlobal, type: "ajout" });
             const insertionEnCours = !!idFicheApresLaquelleInserer;
             const fichesMisesAJour = positionnerNouvelleFiche(fiche, fichesDossier);
             setFichesDossier(fichesMisesAJour);
@@ -6676,6 +6682,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
         };
         const executerArchivage = async () => executerUneSeuleFois("archiverDossier", async () => {
           var _a;
+          enregistrerAudit("archivage_dossier", { dossierId, nomPatient, ongPartenaire: selectedOng, nombreFiches: fichesDossier.length });
           const somme = fichesDossier.reduce((s, f) => s + f.totalGlobal, 0);
           const verrouilleFactureExistante = ((_a = verifications.find((v) => v.id === dossierId)) == null ? void 0 : _a.verrouilleFacture) || false;
           const datesTrouvees = [];
@@ -6806,6 +6813,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
           demanderConfirmation();
         };
         const executerSuspension = async (fichesAUtiliser, note) => executerUneSeuleFois("suspendreDossier", async () => {
+          enregistrerAudit("suspension_dossier", { dossierId, nomPatient, ongPartenaire: selectedOng, nombreFiches: (fichesAUtiliser || fichesDossier).length, note: note || "" });
           const listeFiches = fichesAUtiliser || fichesDossier;
           const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
           const datesTrouvees = [];
@@ -6907,6 +6915,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
           });
         };
         const executerReport = async (fichesAUtiliser) => executerUneSeuleFois("reporterDossier", async () => {
+          enregistrerAudit("report_dossier", { dossierId, nomPatient, ongPartenaire: selectedOng, nombreFiches: (fichesAUtiliser || fichesDossier).length });
           const listeFiches = fichesAUtiliser || fichesDossier;
           const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
           const datesTrouvees = [];

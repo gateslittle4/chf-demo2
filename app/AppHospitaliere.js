@@ -294,6 +294,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
 
   // --- NOUVEAU : Enregistrer une fiche modifiée (remplace l'ancienne) ---
   const enregistrerFicheModifiee = (nouvelleFiche) => {
+    enregistrerAudit('enregistrement_fiche', { dossierId, nomPatient, numeroFiche: nouvelleFiche.numeroFiche, totalGlobal: nouvelleFiche.totalGlobal, type: 'modification' });
     const fichesMisesAJour = fichesDossier.map(f => f.id === nouvelleFiche.id ? nouvelleFiche : f);
     setFichesDossier(fichesMisesAJour);
     synchroniserDossierActif(fichesMisesAJour);
@@ -338,6 +339,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
       enregistrerFicheModifiee({ ...fiche, id: idFicheEnCoursDEdition });
     } else {
       // Sinon on l'ajoute (en fin de liste, ou insérée + renumérotée si une insertion est en cours)
+      enregistrerAudit('enregistrement_fiche', { dossierId, nomPatient, numeroFiche: fiche.numeroFiche, totalGlobal: fiche.totalGlobal, type: 'ajout' });
       const insertionEnCours = !!idFicheApresLaquelleInserer;
       const fichesMisesAJour = positionnerNouvelleFiche(fiche, fichesDossier);
       setFichesDossier(fichesMisesAJour);
@@ -470,6 +472,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
   };
 
   const executerArchivage = async () => executerUneSeuleFois('archiverDossier', async () => {
+    enregistrerAudit('archivage_dossier', { dossierId, nomPatient, ongPartenaire: selectedOng, nombreFiches: fichesDossier.length });
     const somme = fichesDossier.reduce((s, f) => s + f.totalGlobal, 0);
     // Corriger un dossier déjà verrouillé (facturé/inclus dans un lot envoyé) ne doit pas le déverrouiller
     // silencieusement — sinon son 🔒 disparaît et le bouton Supprimer se réactive dans Archives.
@@ -559,6 +562,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
 
   // --- CORRECTION DE LA SUSPENSION : sauvegarde les fiches ---
   const executerSuspension = async (fichesAUtiliser, note) => executerUneSeuleFois('suspendreDossier', async () => {
+    enregistrerAudit('suspension_dossier', { dossierId, nomPatient, ongPartenaire: selectedOng, nombreFiches: (fichesAUtiliser || fichesDossier).length, note: note || '' });
     const listeFiches = fichesAUtiliser || fichesDossier;
     const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
     const datesTrouvees = [];
@@ -659,6 +663,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
   // déjà saisies (comme la suspension) mais marque le dossier avec le mois cible, pour qu'il soit
   // exclu du rapport Excel du mois en cours et facilement retrouvable pour le mois suivant.
   const executerReport = async (fichesAUtiliser) => executerUneSeuleFois('reporterDossier', async () => {
+    enregistrerAudit('report_dossier', { dossierId, nomPatient, ongPartenaire: selectedOng, nombreFiches: (fichesAUtiliser || fichesDossier).length });
     const listeFiches = fichesAUtiliser || fichesDossier;
     const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
     const datesTrouvees = [];

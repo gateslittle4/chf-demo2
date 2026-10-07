@@ -1289,6 +1289,9 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       {focusedVerif && (
         <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-md space-y-4">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 border-b pb-1"><h3 className="font-bold text-blue-900 text-xs uppercase">🔍 {focusedVerif.nomPatient}</h3><div className="flex flex-wrap gap-2 items-center"><button onClick={() => imprimerArchive(focusedVerif)} className="bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1"><Printer size={12}/> Imprimer dossier</button><button onClick={() => imprimerFormulaireCHF(focusedVerif)} className="bg-indigo-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1"><Printer size={12}/> Rapport Dioumitrie</button><button onClick={() => setFocusedVerif(null)}><X size={14}/></button></div></div>
+          {focusedVerif.modifiePar && (
+            <p className="text-[10px] text-gray-400 -mt-2">Dernière modification par <span className="font-semibold text-gray-600">{focusedVerif.modifiePar}</span></p>
+          )}
           {focusedVerif.numeroLot != null && (
             <div className="flex items-center gap-2 text-xs bg-indigo-50 border border-indigo-200 rounded-lg p-2">
               <span className="text-indigo-800">📦 Ce dossier fait partie du <strong>Lot {focusedVerif.numeroLot}</strong> de {focusedVerif.ongPartenaire}. Une correction reste possible via "Modifier/corriger" — pense à réimprimer le lot ensuite pour que le partenaire reçoive la version à jour.</span>

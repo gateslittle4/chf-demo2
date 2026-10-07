@@ -398,7 +398,8 @@ function toEpisodeApi(data) {
     dateEntreePourTri: 'date_entree_pour_tri', periodeSejourString: 'periode_sejour_string',
     totalSaisiePapierDH: 'total_saisie_papier_dh', contientErreurs: 'contient_erreurs',
     verrouilleFacture: 'verrouille_facture', dateSuspension: 'date_suspension', noteSuspension: 'note_suspension', updatedAt: 'updated_at', serviceChoisi: 'service_choisi',
-    numeroLot: 'numero_lot', moisReport: 'mois_report', moisLot: 'mois_lot', lotVerrouille: 'lot_verrouille'
+    numeroLot: 'numero_lot', moisReport: 'mois_report', moisLot: 'mois_lot', lotVerrouille: 'lot_verrouille',
+    modifiePar: 'modifie_par', modifieParUid: 'modifie_par_uid'
   };
   const result = {};
   for (const [k, v] of Object.entries(data)) result[map[k] || k] = v;
@@ -413,7 +414,8 @@ function fromEpisodeApi(data) {
     date_entree_pour_tri: 'dateEntreePourTri', periode_sejour_string: 'periodeSejourString',
     total_saisie_papier_dh: 'totalSaisiePapierDH', contient_erreurs: 'contientErreurs',
     verrouille_facture: 'verrouilleFacture', date_suspension: 'dateSuspension', note_suspension: 'noteSuspension', updated_at: 'updatedAt', service_choisi: 'serviceChoisi',
-    numero_lot: 'numeroLot', mois_report: 'moisReport', mois_lot: 'moisLot', lot_verrouille: 'lotVerrouille'
+    numero_lot: 'numeroLot', mois_report: 'moisReport', mois_lot: 'moisLot', lot_verrouille: 'lotVerrouille',
+    modifie_par: 'modifiePar', modifie_par_uid: 'modifieParUid'
   };
   const result = {};
   for (const [k, v] of Object.entries(data)) result[map[k] || k] = v;
