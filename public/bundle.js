@@ -414,6 +414,7 @@
           moisReport: "mois_report",
           moisLot: "mois_lot",
           lotVerrouille: "lot_verrouille",
+          dossierComplet: "dossier_complet",
           modifiePar: "modifie_par",
           modifieParUid: "modifie_par_uid"
         };
@@ -444,6 +445,7 @@
           mois_report: "moisReport",
           mois_lot: "moisLot",
           lot_verrouille: "lotVerrouille",
+          dossier_complet: "dossierComplet",
           modifie_par: "modifiePar",
           modifie_par_uid: "modifieParUid"
         };
