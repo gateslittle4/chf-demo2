@@ -413,7 +413,9 @@
           numeroLot: "numero_lot",
           moisReport: "mois_report",
           moisLot: "mois_lot",
-          lotVerrouille: "lot_verrouille"
+          lotVerrouille: "lot_verrouille",
+          modifiePar: "modifie_par",
+          modifieParUid: "modifie_par_uid"
         };
         const result = {};
         for (const [k, v] of Object.entries(data)) result[map[k] || k] = v;
@@ -441,7 +443,9 @@
           numero_lot: "numeroLot",
           mois_report: "moisReport",
           mois_lot: "moisLot",
-          lot_verrouille: "lotVerrouille"
+          lot_verrouille: "lotVerrouille",
+          modifie_par: "modifiePar",
+          modifie_par_uid: "modifieParUid"
         };
         const result = {};
         for (const [k, v] of Object.entries(data)) result[map[k] || k] = v;
@@ -3466,9 +3470,11 @@
       var periodesSejourDossier = (dossier) => {
         const dates = [];
         (dossier.fiches || []).forEach((f) => {
-          var _a, _b, _c;
-          if ((_a = f.rawState) == null ? void 0 : _a.dateEntree1) dates.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
-          if (((_b = f.rawState) == null ? void 0 : _b.multiPeriode) && ((_c = f.rawState) == null ? void 0 : _c.dateEntree2)) dates.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
+          var _a, _b, _c, _d, _e;
+          const e1 = (_a = f.rawState) == null ? void 0 : _a.dateEntree1, s1 = (_b = f.rawState) == null ? void 0 : _b.dateSortie1;
+          if (e1 || s1) dates.push({ in: e1 || s1, out: s1 || e1 });
+          const e2 = (_c = f.rawState) == null ? void 0 : _c.dateEntree2, s2 = (_d = f.rawState) == null ? void 0 : _d.dateSortie2;
+          if (((_e = f.rawState) == null ? void 0 : _e.multiPeriode) && (e2 || s2)) dates.push({ in: e2 || s2, out: s2 || e2 });
         });
         return dates;
       };
@@ -3477,6 +3483,13 @@
         if (periodes.length === 0) return dossier.dateHeure || "";
         return periodes.map(
           (d) => d.in === d.out ? d.in.split("-").reverse().join("/") : `du ${d.in.split("-").reverse().join("/")} au ${d.out.split("-").reverse().join("/")}`
+        ).join(" et ");
+      };
+      var periodeSejourTexteCourt = (dossier) => {
+        const periodes = periodesSejourDossier(dossier);
+        if (periodes.length === 0) return "";
+        return periodes.map(
+          (d) => d.in === d.out ? d.in.split("-").reverse().slice(0, 2).join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`
         ).join(" et ");
       };
       function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourModif, onSupprimer, filtreInitialNom, clearFiltreInitialNom, userRole, showToast, onChangerTypeOng, listeOng, listeOngDocs, confirmModal, setConfirmModal, lotInitialFocus, clearLotInitialFocus }) {
@@ -3811,7 +3824,7 @@
               appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.celluleStandard);
               ws.getCell(r, 1).value = formaterNomPropre(doc.nomPatient);
               appliquerStyle(ws.getCell(r, 2), EXCEL_STYLES.celluleStandard);
-              ws.getCell(r, 2).value = doc.periodeSejourString || doc.dateHeure || "\u2014";
+              ws.getCell(r, 2).value = periodeSejourTexteCourt(doc) || doc.dateHeure || "\u2014";
               colonnesExport.forEach((c, i) => {
                 totalsParColonne[c.key] += totalsPatient[c.key] || 0;
                 const cell = ws.getCell(r, 3 + i);
@@ -4297,7 +4310,7 @@ Pour une nouvelle visite de ${v.nomPatient}, utilise plut\xF4t "Rechercher un pa
 Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             onChargerPourModif(v);
           }, className: "text-amber-700 p-1 bg-amber-50 rounded", title: "Modifier / corriger" }, /* @__PURE__ */ React.createElement(Pencil, { size: 13 })), peutSupprimer && /* @__PURE__ */ React.createElement("button", { onClick: () => onSupprimer(v.id), disabled: v.verrouilleFacture, className: "text-gray-300 hover:text-red-600 p-1 disabled:opacity-20" }, /* @__PURE__ */ React.createElement(Trash2, { size: 13 })), /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerArchive(v), className: "text-gray-600 p-1 bg-gray-50 rounded", title: "Imprimer" }, /* @__PURE__ */ React.createElement(Printer, { size: 13 })), /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerFormulaireCHF(v), className: "text-indigo-700 p-1 bg-indigo-50 rounded", title: "Imprimer le Rapport Dioumitrie" }, /* @__PURE__ */ React.createElement(Printer, { size: 13 })), isSuspendu && peutRouvrir && /* @__PURE__ */ React.createElement("button", { onClick: () => rouvrirDossierSuspendu(v), className: "text-emerald-600 p-1 bg-emerald-50 rounded", title: "Rouvrir" }, /* @__PURE__ */ React.createElement(FolderOpen, { size: 13 }))));
-        })))), dossiersFiltres.length > nombreAffiche && /* @__PURE__ */ React.createElement("div", { className: "flex justify-center pt-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setNombreAffiche((n) => n + 100), className: "bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-1.5 rounded-lg text-xs font-bold" }, "Charger plus (", dossiersFiltres.length - nombreAffiche, " restants)"))), focusedVerif && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border border-blue-200 shadow-md space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 border-b pb-1" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-blue-900 text-xs uppercase" }, "\u{1F50D} ", focusedVerif.nomPatient), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-2 items-center" }, /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerArchive(focusedVerif), className: "bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Imprimer dossier"), /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerFormulaireCHF(focusedVerif), className: "bg-indigo-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Rapport Dioumitrie"), /* @__PURE__ */ React.createElement("button", { onClick: () => setFocusedVerif(null) }, /* @__PURE__ */ React.createElement(X, { size: 14 })))), focusedVerif.numeroLot != null && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 text-xs bg-indigo-50 border border-indigo-200 rounded-lg p-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-indigo-800" }, "\u{1F4E6} Ce dossier fait partie du ", /* @__PURE__ */ React.createElement("strong", null, "Lot ", focusedVerif.numeroLot), " de ", focusedVerif.ongPartenaire, '. Une correction reste possible via "Modifier/corriger" \u2014 pense \xE0 r\xE9imprimer le lot ensuite pour que le partenaire re\xE7oive la version \xE0 jour.')), onChangerTypeOng && peutModifier && (!editTypeArchiveOuvert ? /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 text-xs bg-gray-50 border rounded-lg p-2" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-purple-700" }, focusedVerif.ongPartenaire || "Priv\xE9", " - ", focusedVerif.typePatient === "ONG" ? "Partenaire" : "Priv\xE9"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+        })))), dossiersFiltres.length > nombreAffiche && /* @__PURE__ */ React.createElement("div", { className: "flex justify-center pt-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setNombreAffiche((n) => n + 100), className: "bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-1.5 rounded-lg text-xs font-bold" }, "Charger plus (", dossiersFiltres.length - nombreAffiche, " restants)"))), focusedVerif && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-4 rounded-xl border border-blue-200 shadow-md space-y-4" }, /* @__PURE__ */ React.createElement("div", { className: "flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 border-b pb-1" }, /* @__PURE__ */ React.createElement("h3", { className: "font-bold text-blue-900 text-xs uppercase" }, "\u{1F50D} ", focusedVerif.nomPatient), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-2 items-center" }, /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerArchive(focusedVerif), className: "bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Imprimer dossier"), /* @__PURE__ */ React.createElement("button", { onClick: () => imprimerFormulaireCHF(focusedVerif), className: "bg-indigo-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Printer, { size: 12 }), " Rapport Dioumitrie"), /* @__PURE__ */ React.createElement("button", { onClick: () => setFocusedVerif(null) }, /* @__PURE__ */ React.createElement(X, { size: 14 })))), focusedVerif.modifiePar && /* @__PURE__ */ React.createElement("p", { className: "text-[10px] text-gray-400 -mt-2" }, "Derni\xE8re modification par ", /* @__PURE__ */ React.createElement("span", { className: "font-semibold text-gray-600" }, focusedVerif.modifiePar)), focusedVerif.numeroLot != null && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 text-xs bg-indigo-50 border border-indigo-200 rounded-lg p-2" }, /* @__PURE__ */ React.createElement("span", { className: "text-indigo-800" }, "\u{1F4E6} Ce dossier fait partie du ", /* @__PURE__ */ React.createElement("strong", null, "Lot ", focusedVerif.numeroLot), " de ", focusedVerif.ongPartenaire, '. Une correction reste possible via "Modifier/corriger" \u2014 pense \xE0 r\xE9imprimer le lot ensuite pour que le partenaire re\xE7oive la version \xE0 jour.')), onChangerTypeOng && peutModifier && (!editTypeArchiveOuvert ? /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 text-xs bg-gray-50 border rounded-lg p-2" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-purple-700" }, focusedVerif.ongPartenaire || "Priv\xE9", " - ", focusedVerif.typePatient === "ONG" ? "Partenaire" : "Priv\xE9"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
           setNouveauTypeArchive(focusedVerif.typePatient || "ONG");
           setNouvelOngArchive(focusedVerif.ongPartenaire || "");
           setEditTypeArchiveOuvert(true);
@@ -4683,7 +4696,11 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
         }, []);
         const [selection, setSelection] = useState(null);
         const [quantite, setQuantite] = useState("1");
-        const nombreElementsFiche = lignes.length + (dateEntree1 && dateSortie1 ? 1 : 0) + (multiPeriode && dateEntree2 && dateSortie2 ? 1 : 0) + (hasChirSpec && nomChirSpec ? 1 : 0);
+        const dateEntree1Eff = dateEntree1 || dateSortie1;
+        const dateSortie1Eff = dateSortie1 || dateEntree1;
+        const dateEntree2Eff = dateEntree2 || dateSortie2;
+        const dateSortie2Eff = dateSortie2 || dateEntree2;
+        const nombreElementsFiche = lignes.length + (dateEntree1 || dateSortie1 ? 1 : 0) + (multiPeriode && (dateEntree2 || dateSortie2) ? 1 : 0) + (hasChirSpec && nomChirSpec ? 1 : 0);
         const [montantVerse, setMontantVerse] = useState("");
         const [modePaiement, setModePaiement] = useState("cash");
         const [ongPartenaireFiche, setOngPartenaireFiche] = useState("");
@@ -5045,8 +5062,8 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             numDossier: numDossierPatient || "N/R",
             lignes: lignes || [],
             grandTotal: grandTotal || 0,
-            dateEntree1,
-            dateSortie1,
+            dateEntree1: dateEntree1Eff,
+            dateSortie1: dateSortie1Eff,
             totalE1,
             totalE2,
             j1,
@@ -5054,8 +5071,8 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             typeLit1,
             typeLit2,
             multiPeriode,
-            dateEntree2,
-            dateSortie2,
+            dateEntree2: dateEntree2Eff,
+            dateSortie2: dateSortie2Eff,
             hasChirSpec,
             nomChirSpec,
             totalChirSpec,
@@ -5089,8 +5106,8 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             numDossier: numDossierPatient || "N/R",
             lignes: lignes || [],
             grandTotal: grandTotal || 0,
-            dateEntree1,
-            dateSortie1,
+            dateEntree1: dateEntree1Eff,
+            dateSortie1: dateSortie1Eff,
             totalE1,
             totalE2,
             j1,
@@ -5098,8 +5115,8 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
             typeLit1,
             typeLit2,
             multiPeriode,
-            dateEntree2,
-            dateSortie2,
+            dateEntree2: dateEntree2Eff,
+            dateSortie2: dateSortie2Eff,
             hasChirSpec,
             nomChirSpec,
             totalChirSpec,
@@ -5204,16 +5221,16 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
               statutPaiement: modePaiement === "credit" ? "partiellement_paye" : "paye",
               montantPaye: modePaiement === "cash" ? parseFloat(montantVerse) : modePaiement === "credit" ? 0 : montantRestantApresDepots,
               solde: modePaiement === "credit" ? montantRestantApresDepots : 0,
-              exeat: dateEntree1 && dateSortie1 ? {
-                dateEntree: dateEntree1,
-                dateSortie: dateSortie1,
+              exeat: dateEntree1 || dateSortie1 ? {
+                dateEntree: dateEntree1Eff,
+                dateSortie: dateSortie1Eff,
                 nbJours: j1,
                 typeLit: typeLit1,
                 prixParJour: prixLit(typeLit1, tarifChoisi),
                 totalHebergement: totalE1,
                 multiPeriode,
-                dateEntree2,
-                dateSortie2,
+                dateEntree2: dateEntree2Eff,
+                dateSortie2: dateSortie2Eff,
                 typeLit2,
                 nbJours2: j2,
                 prixParJour2: prixLit(typeLit2, tarifChoisi),
@@ -5221,7 +5238,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
               } : null,
               dateCreation: (/* @__PURE__ */ new Date()).toISOString(),
               creePar: ((_b = auth.currentUser) == null ? void 0 : _b.displayName) || "inconnu",
-              rawState: { lignesCalcul: [...lignes], dateEntree1, dateSortie1, typeLit1, multiPeriode, dateEntree2, dateSortie2, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
+              rawState: { lignesCalcul: [...lignes], dateEntree1: dateEntree1Eff, dateSortie1: dateSortie1Eff, typeLit1, multiPeriode, dateEntree2: dateEntree2Eff, dateSortie2: dateSortie2Eff, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
             };
             onEnregistrerFiche(fiche);
             let montantPaiement = 0;
@@ -5296,7 +5313,7 @@ Mode de paiement : ${libellesMode[modePaiement] || modePaiement}`,
         if (modeSimulation) return /* @__PURE__ */ React.createElement("div", { className: "bg-blue-50 p-4" }, "\u{1F9EE} Mode simulation");
         const enregistrerFicheActive = () => {
           var _a, _b;
-          if (lignes.length === 0 && j1 === 0 && !hasChirSpec && !dateEntree1) {
+          if (lignes.length === 0 && j1 === 0 && !hasChirSpec && !dateEntree1 && !dateSortie1) {
             showToast("Fiche vide", "error");
             return;
           }
@@ -5305,16 +5322,16 @@ Mode de paiement : ${libellesMode[modePaiement] || modePaiement}`,
             numeroFiche: idFicheEnCoursDEdition ? ((_a = fichesDossier.find((f) => f.id === idFicheEnCoursDEdition)) == null ? void 0 : _a.numeroFiche) || numeroFicheCourante : numeroFicheCourante,
             breakdown: { ...totalsParService },
             totalGlobal: grandTotal,
-            exeat: dateEntree1 && dateSortie1 ? {
-              dateEntree: dateEntree1,
-              dateSortie: dateSortie1,
+            exeat: dateEntree1 || dateSortie1 ? {
+              dateEntree: dateEntree1Eff,
+              dateSortie: dateSortie1Eff,
               nbJours: j1,
               typeLit: typeLit1,
               prixParJour: prixLit(typeLit1, tarifChoisi),
               totalHebergement: totalE1,
               multiPeriode,
-              dateEntree2,
-              dateSortie2,
+              dateEntree2: dateEntree2Eff,
+              dateSortie2: dateSortie2Eff,
               typeLit2,
               nbJours2: j2,
               prixParJour2: prixLit(typeLit2, tarifChoisi),
@@ -5323,7 +5340,7 @@ Mode de paiement : ${libellesMode[modePaiement] || modePaiement}`,
             dateCreation: (/* @__PURE__ */ new Date(dateFiche + "T12:00:00")).toISOString(),
             creePar: ((_b = auth.currentUser) == null ? void 0 : _b.displayName) || "inconnu",
             prescritPar: prescritPar.trim() || "",
-            rawState: { lignesCalcul: [...lignes], dateEntree1, dateSortie1, typeLit1, multiPeriode, dateEntree2, dateSortie2, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
+            rawState: { lignesCalcul: [...lignes], dateEntree1: dateEntree1Eff, dateSortie1: dateSortie1Eff, typeLit1, multiPeriode, dateEntree2: dateEntree2Eff, dateSortie2: dateSortie2Eff, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
           };
           onEnregistrerFiche(fiche);
           if (idEntreeChargee) {
@@ -5492,7 +5509,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
         }, className: `flex-1 py-1.5 border rounded-lg ${categorie === "med" ? "bg-[#1E2A24] text-white" : "bg-gray-50"}` }, "\u{1F48A} Pharmacie"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
           setCategorie("acte");
           setSelection(null);
-        }, className: `flex-1 py-1.5 border rounded-lg ${categorie === "acte" ? "bg-[#1E2A24] text-white" : "bg-gray-50"}` }, "\u{1F52C} Examens / Actes")), /* @__PURE__ */ React.createElement("p", { className: "text-[9px] text-gray-400" }, "\u{1F4A1} Clique une lettre puis un r\xE9sultat pour l'ajouter (quantit\xE9 1) \u2014 aucune saisie, ajuste la quantit\xE9 juste en dessous."), /* @__PURE__ */ React.createElement("div", { className: estMobile ? "space-y-2" : "border-t pt-2 space-y-2" }, /* @__PURE__ */ React.createElement("p", { className: "text-[10px] font-bold text-gray-400 uppercase" }, categorie === "med" ? "Choisir une lettre" : "Choisir une cat\xE9gorie"), categorie === "med" ? /* @__PURE__ */ React.createElement("div", { className: "flex gap-1 flex-wrap" }, lettresDisponibles.map((l) => /* @__PURE__ */ React.createElement("button", { key: l, onClick: () => setLettreActive(l), className: `rounded font-bold ${estMobile ? "w-10 h-10 text-sm" : "w-7 h-7 text-xs"} ${(lettreActive || lettresDisponibles[0]) === l ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-600"}` }, l))) : /* @__PURE__ */ React.createElement("div", { className: "flex gap-1 flex-wrap" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setSousCategorieActeActive(null), className: `rounded font-bold ${estMobile ? "px-4 py-2 text-sm" : "px-3 py-1 text-xs"} ${sousCategorieActeActive === null ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-600"}` }, "Toutes"), categoriesActesDisponibles.map((c) => /* @__PURE__ */ React.createElement("button", { key: c.key, onClick: () => setSousCategorieActeActive(c.key), className: `rounded font-bold ${estMobile ? "px-4 py-2 text-sm" : "px-3 py-1 text-xs"} ${sousCategorieActeActive === c.key ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-600"}` }, c.label))), /* @__PURE__ */ React.createElement("div", { className: `grid gap-1.5 overflow-y-auto ${estMobile ? "grid-cols-2 max-h-72" : "grid-cols-5 max-h-[32rem]"}` }, catalogueGrille.map((item) => /* @__PURE__ */ React.createElement("button", { key: item.id, onClick: () => ajouterAvecQuantite(item, 1), disabled: !peutAjouterLignes, className: `border rounded-lg text-left hover:bg-emerald-50 hover:border-emerald-400 active:bg-emerald-100 disabled:opacity-30 disabled:cursor-not-allowed ${estMobile ? "p-3" : "p-2"}` }, /* @__PURE__ */ React.createElement("div", { className: `font-semibold text-gray-800 line-clamp-2 ${estMobile ? "text-sm" : "text-xs"}` }, item.nom))), catalogueGrille.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "col-span-2 text-center text-gray-400 text-xs py-3" }, "Rien dans cette section.")))), !estMobile && /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl border overflow-hidden shadow-sm max-h-[75vh] overflow-y-auto" }, /* @__PURE__ */ React.createElement("table", { className: "w-full text-xs text-left table-fixed" }, /* @__PURE__ */ React.createElement("thead", { className: "sticky top-0" }, /* @__PURE__ */ React.createElement("tr", { className: "bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono" }, /* @__PURE__ */ React.createElement("th", { className: "p-3 w-[46%]" }, "D\xE9signation"), /* @__PURE__ */ React.createElement("th", { className: "p-3 w-[14%] text-center" }, "Qt\xE9"), /* @__PURE__ */ React.createElement("th", { className: "p-3 text-right w-[17%]" }, "Prix"), /* @__PURE__ */ React.createElement("th", { className: "p-3 text-right w-[17%]" }, "Total"), /* @__PURE__ */ React.createElement("th", { className: "w-[6%]" }))), /* @__PURE__ */ React.createElement("tbody", { className: "divide-y divide-gray-100" }, dateEntree1 && dateSortie1 && /* @__PURE__ */ React.createElement("tr", { className: "bg-amber-50/20" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-amber-900" }, "S\xE9jour : ", CONFIG_LITS[typeLit1].nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-bold" }, j1, " jrs"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(prixLit(typeLit1, tarifChoisi))), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalE1)), /* @__PURE__ */ React.createElement("td", null)), multiPeriode && dateEntree2 && dateSortie2 && /* @__PURE__ */ React.createElement("tr", { className: "bg-amber-50/40" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-amber-900" }, "S\xE9jour P2 : ", CONFIG_LITS[typeLit2].nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-bold" }, j2, " jrs"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(prixLit(typeLit2, tarifChoisi))), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalE2)), /* @__PURE__ */ React.createElement("td", null)), hasChirSpec && nomChirSpec && /* @__PURE__ */ React.createElement("tr", { className: "bg-red-50/20" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-red-900" }, "Chirurgie : ", nomChirSpec), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center" }, "1"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(totalChirSpec)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalChirSpec)), /* @__PURE__ */ React.createElement("td", null)), lignes.map((l) => {
+        }, className: `flex-1 py-1.5 border rounded-lg ${categorie === "acte" ? "bg-[#1E2A24] text-white" : "bg-gray-50"}` }, "\u{1F52C} Examens / Actes")), /* @__PURE__ */ React.createElement("p", { className: "text-[9px] text-gray-400" }, "\u{1F4A1} Clique une lettre puis un r\xE9sultat pour l'ajouter (quantit\xE9 1) \u2014 aucune saisie, ajuste la quantit\xE9 juste en dessous."), /* @__PURE__ */ React.createElement("div", { className: estMobile ? "space-y-2" : "border-t pt-2 space-y-2" }, /* @__PURE__ */ React.createElement("p", { className: "text-[10px] font-bold text-gray-400 uppercase" }, categorie === "med" ? "Choisir une lettre" : "Choisir une cat\xE9gorie"), categorie === "med" ? /* @__PURE__ */ React.createElement("div", { className: "flex gap-1 flex-wrap" }, lettresDisponibles.map((l) => /* @__PURE__ */ React.createElement("button", { key: l, onClick: () => setLettreActive(l), className: `rounded font-bold ${estMobile ? "w-10 h-10 text-sm" : "w-7 h-7 text-xs"} ${(lettreActive || lettresDisponibles[0]) === l ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-600"}` }, l))) : /* @__PURE__ */ React.createElement("div", { className: "flex gap-1 flex-wrap" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setSousCategorieActeActive(null), className: `rounded font-bold ${estMobile ? "px-4 py-2 text-sm" : "px-3 py-1 text-xs"} ${sousCategorieActeActive === null ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-600"}` }, "Toutes"), categoriesActesDisponibles.map((c) => /* @__PURE__ */ React.createElement("button", { key: c.key, onClick: () => setSousCategorieActeActive(c.key), className: `rounded font-bold ${estMobile ? "px-4 py-2 text-sm" : "px-3 py-1 text-xs"} ${sousCategorieActeActive === c.key ? "bg-[#1E2A24] text-white" : "bg-gray-100 text-gray-600"}` }, c.label))), /* @__PURE__ */ React.createElement("div", { className: `grid gap-1.5 overflow-y-auto ${estMobile ? "grid-cols-2 max-h-72" : "grid-cols-5 max-h-[32rem]"}` }, catalogueGrille.map((item) => /* @__PURE__ */ React.createElement("button", { key: item.id, onClick: () => ajouterAvecQuantite(item, 1), disabled: !peutAjouterLignes, className: `border rounded-lg text-left hover:bg-emerald-50 hover:border-emerald-400 active:bg-emerald-100 disabled:opacity-30 disabled:cursor-not-allowed ${estMobile ? "p-3" : "p-2"}` }, /* @__PURE__ */ React.createElement("div", { className: `font-semibold text-gray-800 line-clamp-2 ${estMobile ? "text-sm" : "text-xs"}` }, item.nom))), catalogueGrille.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "col-span-2 text-center text-gray-400 text-xs py-3" }, "Rien dans cette section.")))), !estMobile && /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl border overflow-hidden shadow-sm max-h-[75vh] overflow-y-auto" }, /* @__PURE__ */ React.createElement("table", { className: "w-full text-xs text-left table-fixed" }, /* @__PURE__ */ React.createElement("thead", { className: "sticky top-0" }, /* @__PURE__ */ React.createElement("tr", { className: "bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono" }, /* @__PURE__ */ React.createElement("th", { className: "p-3 w-[46%]" }, "D\xE9signation"), /* @__PURE__ */ React.createElement("th", { className: "p-3 w-[14%] text-center" }, "Qt\xE9"), /* @__PURE__ */ React.createElement("th", { className: "p-3 text-right w-[17%]" }, "Prix"), /* @__PURE__ */ React.createElement("th", { className: "p-3 text-right w-[17%]" }, "Total"), /* @__PURE__ */ React.createElement("th", { className: "w-[6%]" }))), /* @__PURE__ */ React.createElement("tbody", { className: "divide-y divide-gray-100" }, (dateEntree1 || dateSortie1) && /* @__PURE__ */ React.createElement("tr", { className: "bg-amber-50/20" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-amber-900" }, "S\xE9jour : ", CONFIG_LITS[typeLit1].nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-bold" }, j1, " jrs"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(prixLit(typeLit1, tarifChoisi))), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalE1)), /* @__PURE__ */ React.createElement("td", null)), multiPeriode && (dateEntree2 || dateSortie2) && /* @__PURE__ */ React.createElement("tr", { className: "bg-amber-50/40" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-amber-900" }, "S\xE9jour P2 : ", CONFIG_LITS[typeLit2].nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-bold" }, j2, " jrs"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(prixLit(typeLit2, tarifChoisi))), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalE2)), /* @__PURE__ */ React.createElement("td", null)), hasChirSpec && nomChirSpec && /* @__PURE__ */ React.createElement("tr", { className: "bg-red-50/20" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-red-900" }, "Chirurgie : ", nomChirSpec), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center" }, "1"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(totalChirSpec)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalChirSpec)), /* @__PURE__ */ React.createElement("td", null)), lignes.map((l) => {
           const decrementer = () => setLignes((p) => p.map((x) => x.id === l.id ? { ...x, qte: Math.max(1, x.qte - 1) } : x));
           const incrementer = () => setLignes((p) => p.map((x) => x.id === l.id ? { ...x, qte: x.qte + 1 } : x));
           return /* @__PURE__ */ React.createElement("tr", { key: l.id, className: "zebra-row" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-gray-800" }, /* @__PURE__ */ React.createElement("span", { className: `text-[8px] font-bold uppercase px-1 rounded mr-1 ${l.type === "med" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}` }, l.type === "med" ? "Pharma" : "Acte"), l.nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-center gap-1" }, /* @__PURE__ */ React.createElement("button", { onMouseDown: () => demarrerRepetition(decrementer), onMouseUp: arreterRepetition, onMouseLeave: arreterRepetition, onTouchStart: (e) => {
@@ -5514,7 +5531,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           if (m === 0) return null;
           const c = ((_a = coutsParService == null ? void 0 : coutsParService.valeurs) == null ? void 0 : _a[srv.key]) || 0;
           return /* @__PURE__ */ React.createElement("div", { key: srv.key }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 py-0.5" }, /* @__PURE__ */ React.createElement("span", null, "\u2022 ", srv.label), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, formatGourdes(m)), /* @__PURE__ */ React.createElement("span", { className: "text-right font-bold" }, formatDH(m), " DH")), c > 0 && /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 pb-0.5 text-[10px] text-orange-600" }, /* @__PURE__ */ React.createElement("span", { className: "pl-3" }, "\u21B3 Co\xFBt"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, formatGourdes(c)), /* @__PURE__ */ React.createElement("span", { className: `text-right font-bold ${m - c >= 0 ? "text-emerald-700" : "text-red-600"}` }, "Marge ", formatGourdes(m - c))));
-        }), (coutsParService == null ? void 0 : coutsParService.incomplet) && Object.values(coutsParService.valeurs).some((v) => v > 0) && /* @__PURE__ */ React.createElement("p", { className: "text-[9px] text-gray-400 italic pt-1" }, "Co\xFBt partiel : certains articles de cette fiche (ou l'h\xE9bergement/chirurgie sp\xE9ciale) n'ont pas encore de co\xFBt renseign\xE9 dans le catalogue.")), /* @__PURE__ */ React.createElement("div", { className: "bg-[#1E2A24] text-white p-4 flex justify-between items-center font-bold text-sm font-mono sticky bottom-0" }, /* @__PURE__ */ React.createElement("span", null, "SOUS-TOTAL FICHE ", idFicheEnCoursDEdition ? "EN MODIFICATION" : `N\xB0${numeroFicheCourante}`, " ", /* @__PURE__ */ React.createElement("span", { className: "text-emerald-400 font-normal text-xs" }, "(", nombreElementsFiche, " \xE9l\xE9ment", nombreElementsFiche > 1 ? "s" : "", ")"), " :"), /* @__PURE__ */ React.createElement("span", null, formatGourdes(grandTotal), " Gdes (", formatDH(grandTotal), " DH)")))), estMobile && dossierActif && /* @__PURE__ */ React.createElement("button", { onClick: () => setDetailOuvert(true), className: "fixed bottom-0 left-0 right-0 z-40 bg-[#1E2A24] text-white px-4 py-3 flex justify-between items-center font-bold text-sm shadow-2xl" }, /* @__PURE__ */ React.createElement("span", null, nombreElementsFiche, " article(s)"), /* @__PURE__ */ React.createElement("span", null, formatDH(grandTotal), " DH \u25B2")), estMobile && detailOuvert && /* @__PURE__ */ React.createElement("div", { className: "fixed inset-0 z-50 bg-black/40 flex items-end", onClick: () => setDetailOuvert(false) }, /* @__PURE__ */ React.createElement("div", { className: "bg-white w-full rounded-t-2xl max-h-[85vh] overflow-y-auto", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "sticky top-0 bg-white p-3 border-b flex justify-between items-center z-10" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-sm text-gray-800" }, "R\xE9capitulatif de la fiche"), /* @__PURE__ */ React.createElement("button", { onClick: () => setDetailOuvert(false), className: "p-2 text-gray-500" }, /* @__PURE__ */ React.createElement(X, { size: 18 }))), /* @__PURE__ */ React.createElement("table", { className: "w-full text-xs text-left table-fixed" }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", { className: "bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono" }, /* @__PURE__ */ React.createElement("th", { className: "p-3 w-[40%]" }, "D\xE9signation"), /* @__PURE__ */ React.createElement("th", { className: "p-3 w-[22%] text-center" }, "Qt\xE9"), /* @__PURE__ */ React.createElement("th", { className: "p-3 text-right w-[19%]" }, "Prix"), /* @__PURE__ */ React.createElement("th", { className: "p-3 text-right w-[19%]" }, "Total"), /* @__PURE__ */ React.createElement("th", { className: "w-8" }))), /* @__PURE__ */ React.createElement("tbody", { className: "divide-y divide-gray-100" }, dateEntree1 && dateSortie1 && /* @__PURE__ */ React.createElement("tr", { className: "bg-amber-50/20" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-amber-900" }, "S\xE9jour : ", CONFIG_LITS[typeLit1].nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-bold" }, j1, " jrs"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(CONFIG_LITS[typeLit1].prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalE1)), /* @__PURE__ */ React.createElement("td", null)), multiPeriode && dateEntree2 && dateSortie2 && /* @__PURE__ */ React.createElement("tr", { className: "bg-amber-50/40" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-amber-900" }, "S\xE9jour P2 : ", CONFIG_LITS[typeLit2].nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-bold" }, j2, " jrs"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(CONFIG_LITS[typeLit2].prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalE2)), /* @__PURE__ */ React.createElement("td", null)), hasChirSpec && nomChirSpec && /* @__PURE__ */ React.createElement("tr", { className: "bg-red-50/20" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-red-900" }, "Chirurgie : ", nomChirSpec), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center" }, "1"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(totalChirSpec)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalChirSpec)), /* @__PURE__ */ React.createElement("td", null)), lignes.map((l) => {
+        }), (coutsParService == null ? void 0 : coutsParService.incomplet) && Object.values(coutsParService.valeurs).some((v) => v > 0) && /* @__PURE__ */ React.createElement("p", { className: "text-[9px] text-gray-400 italic pt-1" }, "Co\xFBt partiel : certains articles de cette fiche (ou l'h\xE9bergement/chirurgie sp\xE9ciale) n'ont pas encore de co\xFBt renseign\xE9 dans le catalogue.")), /* @__PURE__ */ React.createElement("div", { className: "bg-[#1E2A24] text-white p-4 flex justify-between items-center font-bold text-sm font-mono sticky bottom-0" }, /* @__PURE__ */ React.createElement("span", null, "SOUS-TOTAL FICHE ", idFicheEnCoursDEdition ? "EN MODIFICATION" : `N\xB0${numeroFicheCourante}`, " ", /* @__PURE__ */ React.createElement("span", { className: "text-emerald-400 font-normal text-xs" }, "(", nombreElementsFiche, " \xE9l\xE9ment", nombreElementsFiche > 1 ? "s" : "", ")"), " :"), /* @__PURE__ */ React.createElement("span", null, formatGourdes(grandTotal), " Gdes (", formatDH(grandTotal), " DH)")))), estMobile && dossierActif && /* @__PURE__ */ React.createElement("button", { onClick: () => setDetailOuvert(true), className: "fixed bottom-0 left-0 right-0 z-40 bg-[#1E2A24] text-white px-4 py-3 flex justify-between items-center font-bold text-sm shadow-2xl" }, /* @__PURE__ */ React.createElement("span", null, nombreElementsFiche, " article(s)"), /* @__PURE__ */ React.createElement("span", null, formatDH(grandTotal), " DH \u25B2")), estMobile && detailOuvert && /* @__PURE__ */ React.createElement("div", { className: "fixed inset-0 z-50 bg-black/40 flex items-end", onClick: () => setDetailOuvert(false) }, /* @__PURE__ */ React.createElement("div", { className: "bg-white w-full rounded-t-2xl max-h-[85vh] overflow-y-auto", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "sticky top-0 bg-white p-3 border-b flex justify-between items-center z-10" }, /* @__PURE__ */ React.createElement("span", { className: "font-bold text-sm text-gray-800" }, "R\xE9capitulatif de la fiche"), /* @__PURE__ */ React.createElement("button", { onClick: () => setDetailOuvert(false), className: "p-2 text-gray-500" }, /* @__PURE__ */ React.createElement(X, { size: 18 }))), /* @__PURE__ */ React.createElement("table", { className: "w-full text-xs text-left table-fixed" }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", { className: "bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono" }, /* @__PURE__ */ React.createElement("th", { className: "p-3 w-[40%]" }, "D\xE9signation"), /* @__PURE__ */ React.createElement("th", { className: "p-3 w-[22%] text-center" }, "Qt\xE9"), /* @__PURE__ */ React.createElement("th", { className: "p-3 text-right w-[19%]" }, "Prix"), /* @__PURE__ */ React.createElement("th", { className: "p-3 text-right w-[19%]" }, "Total"), /* @__PURE__ */ React.createElement("th", { className: "w-8" }))), /* @__PURE__ */ React.createElement("tbody", { className: "divide-y divide-gray-100" }, (dateEntree1 || dateSortie1) && /* @__PURE__ */ React.createElement("tr", { className: "bg-amber-50/20" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-amber-900" }, "S\xE9jour : ", CONFIG_LITS[typeLit1].nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-bold" }, j1, " jrs"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(CONFIG_LITS[typeLit1].prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalE1)), /* @__PURE__ */ React.createElement("td", null)), multiPeriode && (dateEntree2 || dateSortie2) && /* @__PURE__ */ React.createElement("tr", { className: "bg-amber-50/40" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-amber-900" }, "S\xE9jour P2 : ", CONFIG_LITS[typeLit2].nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center font-bold" }, j2, " jrs"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(CONFIG_LITS[typeLit2].prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalE2)), /* @__PURE__ */ React.createElement("td", null)), hasChirSpec && nomChirSpec && /* @__PURE__ */ React.createElement("tr", { className: "bg-red-50/20" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-red-900" }, "Chirurgie : ", nomChirSpec), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center" }, "1"), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(totalChirSpec)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(totalChirSpec)), /* @__PURE__ */ React.createElement("td", null)), lignes.map((l) => {
           const decrementer = () => setLignes((p) => p.map((x) => x.id === l.id ? { ...x, qte: Math.max(1, x.qte - 1) } : x));
           const incrementer = () => setLignes((p) => p.map((x) => x.id === l.id ? { ...x, qte: x.qte + 1 } : x));
           return /* @__PURE__ */ React.createElement("tr", { key: l.id, className: "zebra-row" }, /* @__PURE__ */ React.createElement("td", { className: "p-3 text-gray-800" }, /* @__PURE__ */ React.createElement("span", { className: `text-[8px] font-bold uppercase px-1 rounded mr-1 ${l.type === "med" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}` }, l.type === "med" ? "Pharma" : "Acte"), l.nom), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-center" }, /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-center gap-1" }, /* @__PURE__ */ React.createElement("button", { onMouseDown: () => demarrerRepetition(decrementer), onMouseUp: arreterRepetition, onMouseLeave: arreterRepetition, onTouchStart: (e) => {
@@ -5530,7 +5547,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
             e.preventDefault();
             arreterRepetition();
           }, onTouchCancel: arreterRepetition, className: "w-8 h-8 bg-gray-100 active:bg-gray-300 rounded-lg font-bold text-gray-700 select-none" }, "+"))), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right text-gray-400" }, formatGourdes(l.prix)), /* @__PURE__ */ React.createElement("td", { className: "p-3 text-right font-bold" }, formatGourdes(l.qte * l.prix)), /* @__PURE__ */ React.createElement("td", { className: "text-center" }, peutSupprimerFiche && /* @__PURE__ */ React.createElement("button", { onClick: () => setLignes((p) => p.filter((x) => x.id !== l.id)), className: "text-gray-300 hover:text-red-600" }, /* @__PURE__ */ React.createElement(X, { size: 12 }))));
-        }), lignes.length === 0 && !dateEntree1 && !hasChirSpec && /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", { colSpan: 5, className: "p-6 text-center text-gray-400" }, "Fiche vide pour l'instant.")))), /* @__PURE__ */ React.createElement("div", { className: "p-4 bg-gray-50 border-t border-b text-[11px] text-gray-600 font-mono space-y-1" }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 font-bold text-[#1E2A24] border-b pb-1 mb-2" }, /* @__PURE__ */ React.createElement("span", null, "R\xC9CAPITULATIF DE LA FICHE"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "Gdes"), /* @__PURE__ */ React.createElement("span", { className: "text-right text-emerald-800" }, "\u{1F4B5} DH")), require_constants().CATEGORIES_LISTE.map((srv) => {
+        }), lignes.length === 0 && !dateEntree1 && !dateSortie1 && !hasChirSpec && /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("td", { colSpan: 5, className: "p-6 text-center text-gray-400" }, "Fiche vide pour l'instant.")))), /* @__PURE__ */ React.createElement("div", { className: "p-4 bg-gray-50 border-t border-b text-[11px] text-gray-600 font-mono space-y-1" }, /* @__PURE__ */ React.createElement("div", { className: "grid grid-cols-3 font-bold text-[#1E2A24] border-b pb-1 mb-2" }, /* @__PURE__ */ React.createElement("span", null, "R\xC9CAPITULATIF DE LA FICHE"), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, "Gdes"), /* @__PURE__ */ React.createElement("span", { className: "text-right text-emerald-800" }, "\u{1F4B5} DH")), require_constants().CATEGORIES_LISTE.map((srv) => {
           const m = totalsParService[srv.key];
           if (m === 0) return null;
           return /* @__PURE__ */ React.createElement("div", { key: srv.key, className: "grid grid-cols-3 py-0.5" }, /* @__PURE__ */ React.createElement("span", null, "\u2022 ", srv.label), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, formatGourdes(m)), /* @__PURE__ */ React.createElement("span", { className: "text-right font-bold" }, formatDH(m), " DH"));
@@ -6509,6 +6526,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           }
         };
         const enregistrerFicheModifiee = (nouvelleFiche) => {
+          enregistrerAudit("enregistrement_fiche", { dossierId, nomPatient, numeroFiche: nouvelleFiche.numeroFiche, totalGlobal: nouvelleFiche.totalGlobal, type: "modification" });
           const fichesMisesAJour = fichesDossier.map((f) => f.id === nouvelleFiche.id ? nouvelleFiche : f);
           setFichesDossier(fichesMisesAJour);
           synchroniserDossierActif(fichesMisesAJour);
@@ -6540,6 +6558,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           if (idFicheEnCoursDEdition) {
             enregistrerFicheModifiee({ ...fiche, id: idFicheEnCoursDEdition });
           } else {
+            enregistrerAudit("enregistrement_fiche", { dossierId, nomPatient, numeroFiche: fiche.numeroFiche, totalGlobal: fiche.totalGlobal, type: "ajout" });
             const insertionEnCours = !!idFicheApresLaquelleInserer;
             const fichesMisesAJour = positionnerNouvelleFiche(fiche, fichesDossier);
             setFichesDossier(fichesMisesAJour);
@@ -6679,13 +6698,16 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
         };
         const executerArchivage = async () => executerUneSeuleFois("archiverDossier", async () => {
           var _a;
+          enregistrerAudit("archivage_dossier", { dossierId, nomPatient, ongPartenaire: selectedOng, nombreFiches: fichesDossier.length });
           const somme = fichesDossier.reduce((s, f) => s + f.totalGlobal, 0);
           const verrouilleFactureExistante = ((_a = verifications.find((v) => v.id === dossierId)) == null ? void 0 : _a.verrouilleFacture) || false;
           const datesTrouvees = [];
           fichesDossier.forEach((f) => {
-            var _a2, _b, _c;
-            if ((_a2 = f.rawState) == null ? void 0 : _a2.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
-            if (((_b = f.rawState) == null ? void 0 : _b.multiPeriode) && ((_c = f.rawState) == null ? void 0 : _c.dateEntree2)) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
+            var _a2, _b, _c, _d, _e;
+            const e1 = (_a2 = f.rawState) == null ? void 0 : _a2.dateEntree1, s1 = (_b = f.rawState) == null ? void 0 : _b.dateSortie1;
+            if (e1 || s1) datesTrouvees.push({ in: e1 || s1, out: s1 || e1 });
+            const e2 = (_c = f.rawState) == null ? void 0 : _c.dateEntree2, s2 = (_d = f.rawState) == null ? void 0 : _d.dateSortie2;
+            if (((_e = f.rawState) == null ? void 0 : _e.multiPeriode) && (e2 || s2)) datesTrouvees.push({ in: e2 || s2, out: s2 || e2 });
           });
           let sejourTexte = "\u2014";
           if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map((d) => d.in === d.out ? d.in.split("-").reverse().slice(0, 2).join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`).join(" et ");
@@ -6769,6 +6791,14 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           return false;
         };
         const finaliserEtArchiverDossierOfficiel = async () => {
+          const auMoinsUneDateDeSejour = fichesDossier.some((f) => {
+            var _a, _b;
+            return ((_a = f.rawState) == null ? void 0 : _a.dateEntree1) || ((_b = f.rawState) == null ? void 0 : _b.dateSortie1);
+          });
+          if (!auMoinsUneDateDeSejour) {
+            showToast("Impossible d'archiver : aucune date d'entr\xE9e ni de sortie renseign\xE9e sur ce dossier. Ajoute au moins l'une des deux (H\xE9bergement & S\xE9jour) avant de cl\xF4turer.", "error");
+            return;
+          }
           const somme = fichesDossier.reduce((s, f) => s + f.totalGlobal, 0);
           const demanderConfirmation = () => setConfirmModal({
             titre: "Archiver ce dossier ?",
@@ -6799,13 +6829,16 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
           demanderConfirmation();
         };
         const executerSuspension = async (fichesAUtiliser, note) => executerUneSeuleFois("suspendreDossier", async () => {
+          enregistrerAudit("suspension_dossier", { dossierId, nomPatient, ongPartenaire: selectedOng, nombreFiches: (fichesAUtiliser || fichesDossier).length, note: note || "" });
           const listeFiches = fichesAUtiliser || fichesDossier;
           const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
           const datesTrouvees = [];
           listeFiches.forEach((f) => {
-            var _a, _b, _c;
-            if ((_a = f.rawState) == null ? void 0 : _a.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
-            if (((_b = f.rawState) == null ? void 0 : _b.multiPeriode) && ((_c = f.rawState) == null ? void 0 : _c.dateEntree2)) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
+            var _a, _b, _c, _d, _e;
+            const e1 = (_a = f.rawState) == null ? void 0 : _a.dateEntree1, s1 = (_b = f.rawState) == null ? void 0 : _b.dateSortie1;
+            if (e1 || s1) datesTrouvees.push({ in: e1 || s1, out: s1 || e1 });
+            const e2 = (_c = f.rawState) == null ? void 0 : _c.dateEntree2, s2 = (_d = f.rawState) == null ? void 0 : _d.dateSortie2;
+            if (((_e = f.rawState) == null ? void 0 : _e.multiPeriode) && (e2 || s2)) datesTrouvees.push({ in: e2 || s2, out: s2 || e2 });
           });
           let sejourTexte = "\u2014";
           if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map((d) => d.in === d.out ? d.in.split("-").reverse().slice(0, 2).join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`).join(" et ");
@@ -6898,13 +6931,16 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
           });
         };
         const executerReport = async (fichesAUtiliser) => executerUneSeuleFois("reporterDossier", async () => {
+          enregistrerAudit("report_dossier", { dossierId, nomPatient, ongPartenaire: selectedOng, nombreFiches: (fichesAUtiliser || fichesDossier).length });
           const listeFiches = fichesAUtiliser || fichesDossier;
           const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
           const datesTrouvees = [];
           listeFiches.forEach((f) => {
-            var _a, _b, _c;
-            if ((_a = f.rawState) == null ? void 0 : _a.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
-            if (((_b = f.rawState) == null ? void 0 : _b.multiPeriode) && ((_c = f.rawState) == null ? void 0 : _c.dateEntree2)) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
+            var _a, _b, _c, _d, _e;
+            const e1 = (_a = f.rawState) == null ? void 0 : _a.dateEntree1, s1 = (_b = f.rawState) == null ? void 0 : _b.dateSortie1;
+            if (e1 || s1) datesTrouvees.push({ in: e1 || s1, out: s1 || e1 });
+            const e2 = (_c = f.rawState) == null ? void 0 : _c.dateEntree2, s2 = (_d = f.rawState) == null ? void 0 : _d.dateSortie2;
+            if (((_e = f.rawState) == null ? void 0 : _e.multiPeriode) && (e2 || s2)) datesTrouvees.push({ in: e2 || s2, out: s2 || e2 });
           });
           let sejourTexte = "\u2014";
           if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map((d) => d.in === d.out ? d.in.split("-").reverse().slice(0, 2).join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`).join(" et ");

@@ -269,11 +269,18 @@ const cumulPourFormulaireCHF = (dossier) => {
 
 // Toutes les périodes d'hébergement du dossier (une par fiche ayant une période 1, + une de plus si
 // la fiche a une 2e période) — pour gérer le cas d'un patient admis/hospitalisé à plusieurs reprises.
+// Si une seule des deux dates (entrée/sortie) est renseignée -- cas fréquent : admission et sortie
+// le même jour -- l'autre est traitée comme identique (séjour d'un jour), exactement comme au moment
+// de la saisie (voir dateEntree1Eff/dateSortie1Eff dans CalculateurPanel.js). Appliqué aussi ici, à
+// la lecture, pour corriger l'affichage des dossiers enregistrés avant ce correctif (23/09-25/09 :
+// stockés avec une seule date, sans l'avoir re-remplie depuis) sans avoir à toucher la base.
 const periodesSejourDossier = (dossier) => {
   const dates = [];
   (dossier.fiches || []).forEach(f => {
-    if (f.rawState?.dateEntree1) dates.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
-    if (f.rawState?.multiPeriode && f.rawState?.dateEntree2) dates.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
+    const e1 = f.rawState?.dateEntree1, s1 = f.rawState?.dateSortie1;
+    if (e1 || s1) dates.push({ in: e1 || s1, out: s1 || e1 });
+    const e2 = f.rawState?.dateEntree2, s2 = f.rawState?.dateSortie2;
+    if (f.rawState?.multiPeriode && (e2 || s2)) dates.push({ in: e2 || s2, out: s2 || e2 });
   });
   return dates;
 };
@@ -289,6 +296,20 @@ const dateAdmissionFormulaireCHF = (dossier) => {
   return periodes.map(d => d.in === d.out
     ? d.in.split('-').reverse().join('/')
     : `du ${d.in.split('-').reverse().join('/')} au ${d.out.split('-').reverse().join('/')}`
+  ).join(' et ');
+};
+
+// Même texte que dateAdmissionFormulaireCHF mais sans l'année (JJ/MM) -- format utilisé dans la
+// colonne "Date" de l'Excel du lot, où l'année est déjà donnée une seule fois en en-tête
+// ("DATE D'ADMISSION : OCTOBRE 2026"). Recalculé à chaque génération du fichier à partir des fiches
+// elles-mêmes (jamais depuis une valeur figée) : un dossier archivé avec l'ancien code, puis
+// réimprimé après ce correctif, affiche la bonne date sans qu'on ait besoin de le retoucher.
+const periodeSejourTexteCourt = (dossier) => {
+  const periodes = periodesSejourDossier(dossier);
+  if (periodes.length === 0) return '';
+  return periodes.map(d => d.in === d.out
+    ? d.in.split('-').reverse().slice(0, 2).join('/')
+    : `du ${d.in.split('-').reverse().slice(0, 2).join('/')} au ${d.out.split('-').reverse().slice(0, 2).join('/')}`
   ).join(' et ');
 };
 
@@ -625,7 +646,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
         });
 
         appliquerStyle(ws.getCell(r, 1), EXCEL_STYLES.celluleStandard); ws.getCell(r, 1).value = formaterNomPropre(doc.nomPatient);
-        appliquerStyle(ws.getCell(r, 2), EXCEL_STYLES.celluleStandard); ws.getCell(r, 2).value = doc.periodeSejourString || doc.dateHeure || "—";
+        appliquerStyle(ws.getCell(r, 2), EXCEL_STYLES.celluleStandard); ws.getCell(r, 2).value = periodeSejourTexteCourt(doc) || doc.dateHeure || "—";
         colonnesExport.forEach((c, i) => {
           totalsParColonne[c.key] += totalsPatient[c.key] || 0;
           const cell = ws.getCell(r, 3 + i);
@@ -1292,6 +1313,9 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       {focusedVerif && (
         <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-md space-y-4">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 border-b pb-1"><h3 className="font-bold text-blue-900 text-xs uppercase">🔍 {focusedVerif.nomPatient}</h3><div className="flex flex-wrap gap-2 items-center"><button onClick={() => imprimerArchive(focusedVerif)} className="bg-gray-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1"><Printer size={12}/> Imprimer dossier</button><button onClick={() => imprimerFormulaireCHF(focusedVerif)} className="bg-indigo-700 text-white px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1"><Printer size={12}/> Rapport Dioumitrie</button><button onClick={() => setFocusedVerif(null)}><X size={14}/></button></div></div>
+          {focusedVerif.modifiePar && (
+            <p className="text-[10px] text-gray-400 -mt-2">Dernière modification par <span className="font-semibold text-gray-600">{focusedVerif.modifiePar}</span></p>
+          )}
           {focusedVerif.numeroLot != null && (
             <div className="flex items-center gap-2 text-xs bg-indigo-50 border border-indigo-200 rounded-lg p-2">
               <span className="text-indigo-800">📦 Ce dossier fait partie du <strong>Lot {focusedVerif.numeroLot}</strong> de {focusedVerif.ongPartenaire}. Une correction reste possible via "Modifier/corriger" — pense à réimprimer le lot ensuite pour que le partenaire reçoive la version à jour.</span>

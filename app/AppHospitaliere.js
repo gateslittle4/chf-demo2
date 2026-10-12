@@ -294,6 +294,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
 
   // --- NOUVEAU : Enregistrer une fiche modifiée (remplace l'ancienne) ---
   const enregistrerFicheModifiee = (nouvelleFiche) => {
+    enregistrerAudit('enregistrement_fiche', { dossierId, nomPatient, numeroFiche: nouvelleFiche.numeroFiche, totalGlobal: nouvelleFiche.totalGlobal, type: 'modification' });
     const fichesMisesAJour = fichesDossier.map(f => f.id === nouvelleFiche.id ? nouvelleFiche : f);
     setFichesDossier(fichesMisesAJour);
     synchroniserDossierActif(fichesMisesAJour);
@@ -338,6 +339,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
       enregistrerFicheModifiee({ ...fiche, id: idFicheEnCoursDEdition });
     } else {
       // Sinon on l'ajoute (en fin de liste, ou insérée + renumérotée si une insertion est en cours)
+      enregistrerAudit('enregistrement_fiche', { dossierId, nomPatient, numeroFiche: fiche.numeroFiche, totalGlobal: fiche.totalGlobal, type: 'ajout' });
       const insertionEnCours = !!idFicheApresLaquelleInserer;
       const fichesMisesAJour = positionnerNouvelleFiche(fiche, fichesDossier);
       setFichesDossier(fichesMisesAJour);
@@ -470,12 +472,13 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
   };
 
   const executerArchivage = async () => executerUneSeuleFois('archiverDossier', async () => {
+    enregistrerAudit('archivage_dossier', { dossierId, nomPatient, ongPartenaire: selectedOng, nombreFiches: fichesDossier.length });
     const somme = fichesDossier.reduce((s, f) => s + f.totalGlobal, 0);
     // Corriger un dossier déjà verrouillé (facturé/inclus dans un lot envoyé) ne doit pas le déverrouiller
     // silencieusement — sinon son 🔒 disparaît et le bouton Supprimer se réactive dans Archives.
     const verrouilleFactureExistante = verifications.find(v => v.id === dossierId)?.verrouilleFacture || false;
     const datesTrouvees = [];
-    fichesDossier.forEach(f => { if (f.rawState?.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 }); if (f.rawState?.multiPeriode && f.rawState?.dateEntree2) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 }); });
+    fichesDossier.forEach(f => { const e1 = f.rawState?.dateEntree1, s1 = f.rawState?.dateSortie1; if (e1 || s1) datesTrouvees.push({ in: e1 || s1, out: s1 || e1 }); const e2 = f.rawState?.dateEntree2, s2 = f.rawState?.dateSortie2; if (f.rawState?.multiPeriode && (e2 || s2)) datesTrouvees.push({ in: e2 || s2, out: s2 || e2 }); });
     let sejourTexte = "—";
     if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map(d => d.in === d.out ? d.in.split("-").reverse().slice(0, 2).join("/") : `du ${d.in.split("-").reverse().slice(0, 2).join("/")} au ${d.out.split("-").reverse().slice(0, 2).join("/")}`).join(" et ");
     const dossierArchiver = {
@@ -526,6 +529,14 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
   };
 
   const finaliserEtArchiverDossierOfficiel = async () => {
+    // Bloque l'archivage (pas l'enregistrement d'une fiche, qui reste libre) tant qu'aucune fiche du
+    // dossier n'a de date d'entrée NI de date de sortie -- au moins l'une des deux doit être présente
+    // sur au moins une fiche avant de clôturer le dossier.
+    const auMoinsUneDateDeSejour = fichesDossier.some(f => f.rawState?.dateEntree1 || f.rawState?.dateSortie1);
+    if (!auMoinsUneDateDeSejour) {
+      showToast("Impossible d'archiver : aucune date d'entrée ni de sortie renseignée sur ce dossier. Ajoute au moins l'une des deux (Hébergement & Séjour) avant de clôturer.", "error");
+      return;
+    }
     const somme = fichesDossier.reduce((s, f) => s + f.totalGlobal, 0);
     const demanderConfirmation = () => setConfirmModal({
       titre: "Archiver ce dossier ?",
@@ -551,12 +562,15 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
 
   // --- CORRECTION DE LA SUSPENSION : sauvegarde les fiches ---
   const executerSuspension = async (fichesAUtiliser, note) => executerUneSeuleFois('suspendreDossier', async () => {
+    enregistrerAudit('suspension_dossier', { dossierId, nomPatient, ongPartenaire: selectedOng, nombreFiches: (fichesAUtiliser || fichesDossier).length, note: note || '' });
     const listeFiches = fichesAUtiliser || fichesDossier;
     const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
     const datesTrouvees = [];
     listeFiches.forEach(f => {
-      if (f.rawState?.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
-      if (f.rawState?.multiPeriode && f.rawState?.dateEntree2) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
+      const e1 = f.rawState?.dateEntree1, s1 = f.rawState?.dateSortie1;
+      if (e1 || s1) datesTrouvees.push({ in: e1 || s1, out: s1 || e1 });
+      const e2 = f.rawState?.dateEntree2, s2 = f.rawState?.dateSortie2;
+      if (f.rawState?.multiPeriode && (e2 || s2)) datesTrouvees.push({ in: e2 || s2, out: s2 || e2 });
     });
     let sejourTexte = "—";
     if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map(d => d.in === d.out ? d.in.split("-").reverse().slice(0,2).join("/") : `du ${d.in.split("-").reverse().slice(0,2).join("/")} au ${d.out.split("-").reverse().slice(0,2).join("/")}`).join(" et ");
@@ -649,12 +663,15 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
   // déjà saisies (comme la suspension) mais marque le dossier avec le mois cible, pour qu'il soit
   // exclu du rapport Excel du mois en cours et facilement retrouvable pour le mois suivant.
   const executerReport = async (fichesAUtiliser) => executerUneSeuleFois('reporterDossier', async () => {
+    enregistrerAudit('report_dossier', { dossierId, nomPatient, ongPartenaire: selectedOng, nombreFiches: (fichesAUtiliser || fichesDossier).length });
     const listeFiches = fichesAUtiliser || fichesDossier;
     const somme = listeFiches.reduce((s, f) => s + f.totalGlobal, 0);
     const datesTrouvees = [];
     listeFiches.forEach(f => {
-      if (f.rawState?.dateEntree1) datesTrouvees.push({ in: f.rawState.dateEntree1, out: f.rawState.dateSortie1 });
-      if (f.rawState?.multiPeriode && f.rawState?.dateEntree2) datesTrouvees.push({ in: f.rawState.dateEntree2, out: f.rawState.dateSortie2 });
+      const e1 = f.rawState?.dateEntree1, s1 = f.rawState?.dateSortie1;
+      if (e1 || s1) datesTrouvees.push({ in: e1 || s1, out: s1 || e1 });
+      const e2 = f.rawState?.dateEntree2, s2 = f.rawState?.dateSortie2;
+      if (f.rawState?.multiPeriode && (e2 || s2)) datesTrouvees.push({ in: e2 || s2, out: s2 || e2 });
     });
     let sejourTexte = "—";
     if (datesTrouvees.length > 0) sejourTexte = datesTrouvees.map(d => d.in === d.out ? d.in.split("-").reverse().slice(0,2).join("/") : `du ${d.in.split("-").reverse().slice(0,2).join("/")} au ${d.out.split("-").reverse().slice(0,2).join("/")}`).join(" et ");
