@@ -353,6 +353,20 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     return items.sort((a, b) => (a.key === 'hospit' ? 1 : 0) - (b.key === 'hospit' ? 1 : 0));
   };
 
+  // Type(s) de lit réellement choisi(s) sur les séjours (exeat) du dossier -- affiché à côté du badge
+  // Hébergement dans la liste d'un lot, pour repérer d'un coup d'œil si un bébé est resté sur un lit
+  // normal plutôt qu'une isolette/incubateur (ou l'inverse). Plusieurs fiches/périodes peuvent avoir
+  // des types différents (ex: isolette puis lit normal une fois stabilisé) -- on les liste tous.
+  const typesLitDossier = (dossier) => {
+    const types = [];
+    (dossier.fiches || []).forEach(f => {
+      if (!f.exeat) return;
+      if (f.exeat.nbJours > 0 && f.exeat.typeLit && !types.includes(f.exeat.typeLit)) types.push(f.exeat.typeLit);
+      if (f.exeat.nbJours2 > 0 && f.exeat.typeLit2 && !types.includes(f.exeat.typeLit2)) types.push(f.exeat.typeLit2);
+    });
+    return types.map(t => CONFIG_LITS[t]?.nom || t).join(' / ');
+  };
+
   const lotsDuPartenaire = useMemo(() => {
     if (!lotOngSelectionne) return [];
     const parNumero = {};
@@ -1182,7 +1196,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                       <span className="text-gray-400">— {formatGourdes(v.totalGlobal||0)} Gdes <span className="text-indigo-400">({formatDH(v.totalGlobal||0)} DH)</span></span>
                       <div className="flex flex-wrap gap-1 mt-1 pl-2 sm:pl-40">
                         {ventilationDossier(v).map(x => (
-                          <span key={x.label} className="bg-indigo-50 text-indigo-700 border border-indigo-100 rounded px-1.5 py-0.5 text-[10px] whitespace-nowrap">{x.label}: {formatDH(x.montant)} DH</span>
+                          <span key={x.label} className="bg-indigo-50 text-indigo-700 border border-indigo-100 rounded px-1.5 py-0.5 text-[10px] whitespace-nowrap">{x.label}: {formatDH(x.montant)} DH{x.key === 'hospit' && typesLitDossier(v) ? ` (${typesLitDossier(v)})` : ''}</span>
                         ))}
                       </div>
                     </div>
