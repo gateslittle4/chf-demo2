@@ -938,11 +938,17 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
   const supprimerFicheDossier = (idF) => {
     if (confirm("Supprimer cette fiche ?")) {
       const fiche = fichesDossier.find(f => f.id === idF);
-      const fichesMisesAJour = fichesDossier.filter(f => f.id !== idF);
+      // Les fiches suivantes remontent d'un numéro (symétrique de l'insertion, qui les décale de +1) :
+      // supprimer la Fiche 1 ne doit pas laisser un dossier qui commence à la Fiche 2. Renumérotation
+      // dans l'ordre actuel des numéros, ce qui referme aussi les trous déjà présents.
+      const fichesMisesAJour = fichesDossier
+        .filter(f => f.id !== idF)
+        .sort((a, b) => a.numeroFiche - b.numeroFiche)
+        .map((f, i) => f.numeroFiche === i + 1 ? f : { ...f, numeroFiche: i + 1 });
       setFichesDossier(fichesMisesAJour);
       synchroniserDossierActif(fichesMisesAJour);
       if (fiche) restituerStock([fiche]);
-      showToast("Fiche supprimée — stock remis à jour", "success");
+      showToast("Fiche supprimée — stock remis à jour, fiches suivantes renumérotées", "success");
     }
   };
 

@@ -7273,11 +7273,11 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
         const supprimerFicheDossier = (idF) => {
           if (confirm("Supprimer cette fiche ?")) {
             const fiche = fichesDossier.find((f) => f.id === idF);
-            const fichesMisesAJour = fichesDossier.filter((f) => f.id !== idF);
+            const fichesMisesAJour = fichesDossier.filter((f) => f.id !== idF).sort((a, b) => a.numeroFiche - b.numeroFiche).map((f, i) => f.numeroFiche === i + 1 ? f : { ...f, numeroFiche: i + 1 });
             setFichesDossier(fichesMisesAJour);
             synchroniserDossierActif(fichesMisesAJour);
             if (fiche) restituerStock([fiche]);
-            showToast("Fiche supprim\xE9e \u2014 stock remis \xE0 jour", "success");
+            showToast("Fiche supprim\xE9e \u2014 stock remis \xE0 jour, fiches suivantes renum\xE9rot\xE9es", "success");
           }
         };
         const marquerProblemeFiche = (idF) => {
