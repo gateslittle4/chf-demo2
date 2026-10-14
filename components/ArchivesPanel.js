@@ -858,7 +858,9 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
   // OU enchaîné avec d'autres fiches/dossiers (impression groupée pour tout un lot).
   const nomTypeLit = (typeLit) => CONFIG_LITS[typeLit]?.nom || typeLit;
 
-  const genererCorpsFiche = (dossier, fiche, { afficherTotalDossier } = {}) => {
+  const genererCorpsFiche = (dossier, fiche, { afficherTotalDossier, afficherSejour } = {}) => {
+    const sejourPatient = (afficherSejour && dossier.periodeSejourString && dossier.periodeSejourString !== '—')
+      ? `<div class="info info-patient"><span>Séjour : ${echapperHTML(dossier.periodeSejourString)}</span></div>` : '';
     const lignesDetaillees = fiche.rawState?.lignesCalcul || [];
     const hasLignes = lignesDetaillees.length > 0;
     const lignesHTML = hasLignes ? lignesDetaillees.map(l => `<tr><td>${echapperHTML(l.nom)}</td><td class="qte">${l.qte}</td><td class="prix">${formatGourdes(l.prix)}</td><td class="sous-total">${formatGourdes(l.qte * l.prix)}</td></tr>`).join('') : '';
@@ -868,17 +870,33 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       if (key === 'hospit' && fiche.exeat) { return `<tr><td>Hébergement — ${echapperHTML(nomTypeLit(fiche.exeat.typeLit))} (${fiche.exeat.nbJours}j)</td><td class="qte">${fiche.exeat.nbJours}</td><td class="prix">${formatGourdes(fiche.exeat.prixParJour)}</td><td class="sous-total">${formatGourdes(val)}</td></tr>`; }
       return `<tr><td>${label}</td><td class="qte">1</td><td class="prix">${formatGourdes(val)}</td><td class="sous-total">${formatGourdes(val)}</td></tr>`;
     }).join('') : '';
-    return `<div class="entete"><img class="logo-entete" src="${LOGO_CHF_BASE64}" alt="Logo CHF"/><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p></div><div class="info"><span>Patient: ${echapperHTML(formaterNomPropre(dossier.nomPatient))}</span><span>${dossier.typePatient === 'ONG' ? `Partenaire : ${echapperHTML(dossier.ongPartenaire || 'N/R')}` : 'Privé'}</span></div><div class="info"><span>Fiche N°${fiche.numeroFiche}</span></div><div class="info info-patient"><span>📁 ${echapperHTML(dossier.numDossier || 'N/R')}</span></div>${fiche.exeat ? `<p style="font-size:10px; margin:4px 0;"><strong>Séjour (${echapperHTML(nomTypeLit(fiche.exeat.typeLit))}):</strong> ${fiche.exeat.dateEntree.split('-').reverse().slice(0,2).join('/')} → ${fiche.exeat.dateSortie.split('-').reverse().slice(0,2).join('/')}</p>` : ''}<table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${hasLignes ? lignesHTML : fallbackHTML}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes<br/>${formatDH(fiche.totalGlobal)} DH</div>${afficherTotalDossier ? `<div class="total-dossier">TOTAL DOSSIER : ${formatGourdes(dossier.totalGlobal || 0)} Gdes<br/>${formatDH(dossier.totalGlobal || 0)} DH</div>` : ''}${fiche.solde && fiche.solde > 0 ? `<p style="font-size:12px; color:red;"><strong>Solde restant :</strong> ${formatGourdes(fiche.solde)} Gdes</p>` : ''}<div class="footer">Merci de votre visite !<br/>CHF Système Hospitalier – ${new Date().getFullYear()}</div>`;
+    return `<div class="entete"><img class="logo-entete" src="${LOGO_CHF_BASE64}" alt="Logo CHF"/><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cité Soleil</p><p>Tél: (509) 3647-0563 / 2226-8900</p></div><div class="info"><span>Patient: ${echapperHTML(formaterNomPropre(dossier.nomPatient))}</span><span>${dossier.typePatient === 'ONG' ? `Partenaire : ${echapperHTML(dossier.ongPartenaire || 'N/R')}` : 'Privé'}</span></div><div class="info"><span>Fiche N°${fiche.numeroFiche}</span></div><div class="info info-patient"><span>📁 ${echapperHTML(dossier.numDossier || 'N/R')}</span></div>${sejourPatient}${fiche.exeat ? `<p style="font-size:13px; margin:3px 0;"><strong>Séjour (${echapperHTML(nomTypeLit(fiche.exeat.typeLit))}):</strong> ${fiche.exeat.dateEntree.split('-').reverse().slice(0,2).join('/')} → ${fiche.exeat.dateSortie.split('-').reverse().slice(0,2).join('/')}</p>` : ''}<table><thead><tr><th>Désignation</th><th class="qte">Qté</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${hasLignes ? lignesHTML : fallbackHTML}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes<br/>${formatDH(fiche.totalGlobal)} DH</div>${afficherTotalDossier ? `<div class="total-dossier">TOTAL DOSSIER : ${formatGourdes(dossier.totalGlobal || 0)} Gdes<br/>${formatDH(dossier.totalGlobal || 0)} DH</div>` : ''}${fiche.solde && fiche.solde > 0 ? `<p style="font-size:15px; color:red;"><strong>Solde restant :</strong> ${formatGourdes(fiche.solde)} Gdes</p>` : ''}<div class="footer">Merci de votre visite !<br/>CHF Système Hospitalier – ${new Date().getFullYear()}</div>`;
   };
 
-  const STYLE_FICHE = `@page{size:100mm 297mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:14px;color:#000;background:white;margin:0;padding:0;width:90mm;margin:0 auto;}.entete{position:relative;text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.logo-entete{position:absolute;top:0;left:0;width:38px;height:38px;object-fit:contain;}.entete h1{font-size:23px;margin:4px 0;}.entete p{margin:2px 0;font-size:13px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:13px;margin-bottom:6px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px;}th,td{padding:4px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:12px;text-transform:uppercase;}.total{font-weight:bold;font-size:19px;text-align:right;border-top:3px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:12px;font-size:11px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.info-patient{font-size:12px;margin-bottom:4px;}.separation-fiche{border-top:2px dashed #000;margin:10px 0;}.total-dossier{font-weight:bold;font-size:19px;text-align:right;border-top:2px double #000;padding-top:6px;margin-top:6px;}`;
+  // Marge de page à 0 : le navigateur n'imprime son en-tête/pied (titre, date, adresse du site, n° de
+  // page) que dans une marge non nulle -- le décalage visuel est reporté en padding sur le body.
+  const STYLE_FICHE = `@page{size:100mm 297mm;margin:0;}body{font-family:'Courier New',monospace;font-size:17px;color:#000;background:white;margin:0 auto;padding:3mm 0;width:90mm;}.entete{position:relative;text-align:center;border-bottom:2px dashed #000;padding-bottom:4px;margin-bottom:5px;}.logo-entete{position:absolute;top:0;left:0;width:44px;height:44px;object-fit:contain;}.entete h1{font-size:27px;margin:2px 0;}.entete p{margin:1px 0;font-size:16px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:16px;margin-bottom:3px;}table{width:100%;border-collapse:collapse;margin:4px 0;font-size:16px;}th,td{padding:3px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:14px;text-transform:uppercase;}.total{font-weight:bold;font-size:23px;text-align:right;border-top:3px solid #000;padding-top:4px;margin-top:4px;}.footer{margin-top:6px;font-size:13px;text-align:center;border-top:1px dashed #ccc;padding-top:4px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.info-patient{font-size:15px;margin-bottom:2px;}.separation-fiche{border-top:2px dashed #000;margin:6px 0;}.total-dossier{font-weight:bold;font-size:23px;text-align:right;border-top:2px double #000;padding-top:4px;margin-top:4px;}`;
+
+  // Cale la hauteur de page sur celle du reçu au lieu des 297mm fixes : sinon l'imprimante fait avancer
+  // du papier blanc après le dernier total. Au-delà de 297mm, on garde la pagination normale.
+  const ajusterHauteurPageRecu = (doc) => {
+    try {
+      const hauteurMm = Math.ceil(doc.body.getBoundingClientRect().height * 25.4 / 96) + 3;
+      if (hauteurMm >= 297) return;
+      const style = doc.createElement('style');
+      style.textContent = `@page{size:100mm ${hauteurMm}mm;margin:0;}`;
+      doc.head.appendChild(style);
+    } catch (e) { console.warn('Ajustement de la hauteur du reçu impossible :', e); }
+  };
 
   const imprimerFiche = (fiche) => {
     const estLaDerniereFiche = fiche.numeroFiche === Math.max(...(focusedVerif.fiches || []).map(f => f.numeroFiche || 0));
-    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N°${fiche.numeroFiche}</title><style>${STYLE_FICHE}</style></head><body>${genererCorpsFiche(focusedVerif, fiche, { afficherTotalDossier: estLaDerniereFiche })}</body></html>`;
+    const numerosTries = (focusedVerif.fiches || []).map(f => f.numeroFiche || 0).sort((a, b) => a - b);
+    const afficherSejour = numerosTries.length === 1 || fiche.numeroFiche === numerosTries[numerosTries.length - 2];
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N°${fiche.numeroFiche}</title><style>${STYLE_FICHE}</style></head><body>${genererCorpsFiche(focusedVerif, fiche, { afficherTotalDossier: estLaDerniereFiche, afficherSejour })}</body></html>`;
     const win = window.open('', '_blank', 'width=500,height=700');
     if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
-    win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 500);
+    win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => { ajusterHauteurPageRecu(win.document); win.print(); }, 500);
   };
 
   // Imprime le reçu de CHAQUE fiche de CHAQUE dossier d'un lot, en un seul clic -- les fiches d'un
@@ -909,7 +927,10 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       }
       const d = patients[index];
       const fiches = [...(d.fiches || [])].sort((a, b) => (a.numeroFiche || 0) - (b.numeroFiche || 0));
-      const corps = fiches.map((f, i) => genererCorpsFiche(d, f, { afficherTotalDossier: i === fiches.length - 1 })).join('<div class="separation-fiche"></div>');
+      // La dernière fiche porte le TOTAL DOSSIER : la date de séjour va sur l'avant-dernière (ou sur
+      // l'unique fiche si le dossier n'en a qu'une, sinon elle n'apparaîtrait nulle part).
+      const indexSejour = fiches.length === 1 ? 0 : fiches.length - 2;
+      const corps = fiches.map((f, i) => genererCorpsFiche(d, f, { afficherTotalDossier: i === fiches.length - 1, afficherSejour: i === indexSejour })).join('<div class="separation-fiche"></div>');
       const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Reçu - ${echapperHTML(formaterNomPropre(d.nomPatient))}</title><style>${STYLE_FICHE}</style></head><body>${corps}</body></html>`;
       let dejaEnchaine = false;
       const passerAuSuivant = () => { if (dejaEnchaine) return; dejaEnchaine = true; imprimerUnPatient(index + 1); };
@@ -922,6 +943,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
         setTimeout(passerAuSuivant, 2500);
         try {
           iframe.contentWindow.addEventListener('afterprint', passerAuSuivant, { once: true });
+          ajusterHauteurPageRecu(iframe.contentDocument);
           iframe.contentWindow.focus();
           iframe.contentWindow.print();
         } catch (e) {
