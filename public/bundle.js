@@ -4097,16 +4097,18 @@
             showToast("Aucune fiche \xE0 imprimer dans ce lot.", "error");
             return;
           }
-          const iframe = document.createElement("iframe");
-          iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
-          document.body.appendChild(iframe);
-          const stylePageParent = document.createElement("style");
-          stylePageParent.textContent = regleDePageRecu(297);
-          document.head.appendChild(stylePageParent);
+          const win = window.open("", "_blank", "width=500,height=700");
+          if (!win) {
+            showToast("Impression bloqu\xE9e par le navigateur. R\xE9essaie en cliquant sur Imprimer \u2014 si \xE7a ne marche toujours pas, demande \xE0 quelqu'un de v\xE9rifier les r\xE9glages.", "error");
+            return;
+          }
           const imprimerUnPatient = (index) => {
+            if (win.closed) {
+              if (index < patients.length) showToast(`Impression interrompue (fen\xEAtre ferm\xE9e) \u2014 ${index} re\xE7u(s) sur ${patients.length} envoy\xE9(s).`, "info");
+              return;
+            }
             if (index >= patients.length) {
-              document.body.removeChild(iframe);
-              stylePageParent.remove();
+              win.close();
               showToast(`\u{1F5A8}\uFE0F ${patients.length} re\xE7u(s) de patient envoy\xE9(s) \xE0 l'impression.`, "success");
               return;
             }
@@ -4121,18 +4123,20 @@
               dejaEnchaine = true;
               imprimerUnPatient(index + 1);
             };
-            iframe.onload = () => {
+            win.document.open();
+            win.document.write(contenu);
+            win.document.close();
+            setTimeout(() => {
               setTimeout(passerAuSuivant, 2500);
               try {
-                iframe.contentWindow.addEventListener("afterprint", passerAuSuivant, { once: true });
-                stylePageParent.textContent = regleDePageRecu(ajusterHauteurPageRecu(iframe.contentDocument));
-                iframe.contentWindow.focus();
-                iframe.contentWindow.print();
+                win.addEventListener("afterprint", passerAuSuivant, { once: true });
+                ajusterHauteurPageRecu(win.document);
+                win.focus();
+                win.print();
               } catch (e) {
                 console.error("Impression du lot : \xE9chec pour", d.nomPatient, e);
               }
-            };
-            iframe.srcdoc = contenu;
+            }, 300);
           };
           imprimerUnPatient(0);
         };

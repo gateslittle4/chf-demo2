@@ -906,7 +906,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
   // Imprime le reçu de CHAQUE fiche de CHAQUE dossier d'un lot, en un seul clic -- les fiches d'un
   // même patient sortent à la suite sur la même bande (séparées par un simple trait pointillé).
   //
-  // Pourquoi un iframe caché réimprimé en boucle plutôt qu'un seul document multi-pages (ancienne
+  // Pourquoi un document réimprimé en boucle plutôt qu'un seul document multi-pages (ancienne
   // version, voir historique git) : un saut de page CSS (page-break-after) ne crée qu'une nouvelle
   // PAGE à l'intérieur d'un même JOB d'impression -- la plupart des pilotes d'imprimantes tickets ne
   // coupent le papier qu'à la fin du JOB, pas à chaque saut de page interne. Résultat rapporté : tout
@@ -914,25 +914,26 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
   // job séparé (un seul patient par appel à print()), l'imprimante termine et coupe réellement après
   // chaque patient avant de recevoir le job suivant -- la coupe automatique en fin de job est quasi
   // universelle sur ce type d'imprimante.
+  //
+  // Pourquoi une fenêtre (window.open) plutôt qu'un iframe caché : imprimé depuis un iframe, Chrome
+  // ajoutait quand même son en-tête/pied (titre, date, adresse du site, n° de page) malgré
+  // @page{margin:0}, constaté sur des impressions réelles. Une seule fenêtre est ouverte au clic (pas
+  // de blocage des popups) et réécrite pour chaque patient.
   const imprimerTousLesRecusDuLot = (dossiers) => {
     if (!dossiers || dossiers.length === 0) { showToast("Aucun dossier dans ce lot.", "error"); return; }
     const patients = dossiers.filter(d => (d.fiches || []).length > 0);
     if (patients.length === 0) { showToast("Aucune fiche à imprimer dans ce lot.", "error"); return; }
 
-    const iframe = document.createElement('iframe');
-    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
-    document.body.appendChild(iframe);
-    // Chrome ne lit pas toujours le @page de l'iframe quand on imprime depuis un iframe (en-tête/pied
-    // du navigateur -- titre, date, adresse du site, n° de page -- qui réapparaissaient malgré
-    // margin:0 dans le reçu) : on pose la même règle dans la page principale le temps de l'impression.
-    const stylePageParent = document.createElement('style');
-    stylePageParent.textContent = regleDePageRecu(297);
-    document.head.appendChild(stylePageParent);
+    const win = window.open('', '_blank', 'width=500,height=700');
+    if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
 
     const imprimerUnPatient = (index) => {
+      if (win.closed) {
+        if (index < patients.length) showToast(`Impression interrompue (fenêtre fermée) — ${index} reçu(s) sur ${patients.length} envoyé(s).`, "info");
+        return;
+      }
       if (index >= patients.length) {
-        document.body.removeChild(iframe);
-        stylePageParent.remove();
+        win.close();
         showToast(`🖨️ ${patients.length} reçu(s) de patient envoyé(s) à l'impression.`, "success");
         return;
       }
@@ -945,23 +946,25 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
       const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Reçu - ${echapperHTML(formaterNomPropre(d.nomPatient))}</title><style>${STYLE_FICHE}</style></head><body>${corps}</body></html>`;
       let dejaEnchaine = false;
       const passerAuSuivant = () => { if (dejaEnchaine) return; dejaEnchaine = true; imprimerUnPatient(index + 1); };
-      iframe.onload = () => {
-        // Filet de sécurité programmé D'ABORD, avant tout appel risqué ci-dessous : si print() (ou
-        // contentWindow lui-même) lève une exception sur une config donnée (imprimante occupée,
-        // dialogue déjà ouvert...), ce filet doit quand même se déclencher -- sinon la boucle
-        // s'arrête net sans erreur visible dès le premier patient qui pose problème (bug constaté :
-        // un throw AVANT ce setTimeout empêchait le filet de s'armer du tout).
+      win.document.open(); win.document.write(contenu); win.document.close();
+      // Petit délai pour la mise en page (logo inclus) avant de mesurer la hauteur et d'imprimer.
+      setTimeout(() => {
+        // Filet de sécurité programmé D'ABORD, avant tout appel risqué ci-dessous : si print() lève
+        // une exception sur une config donnée (imprimante occupée, dialogue déjà ouvert...), ce filet
+        // doit quand même se déclencher -- sinon la boucle s'arrête net sans erreur visible dès le
+        // premier patient qui pose problème (bug constaté : un throw AVANT ce setTimeout empêchait le
+        // filet de s'armer du tout).
         setTimeout(passerAuSuivant, 2500);
         try {
-          iframe.contentWindow.addEventListener('afterprint', passerAuSuivant, { once: true });
-          stylePageParent.textContent = regleDePageRecu(ajusterHauteurPageRecu(iframe.contentDocument));
-          iframe.contentWindow.focus();
-          iframe.contentWindow.print();
+          // Écouteur ajouté APRÈS document.write : document.open() efface ceux de la fenêtre.
+          win.addEventListener('afterprint', passerAuSuivant, { once: true });
+          ajusterHauteurPageRecu(win.document);
+          win.focus();
+          win.print();
         } catch (e) {
           console.error('Impression du lot : échec pour', d.nomPatient, e);
         }
-      };
-      iframe.srcdoc = contenu;
+      }, 300);
     };
     imprimerUnPatient(0);
   };
