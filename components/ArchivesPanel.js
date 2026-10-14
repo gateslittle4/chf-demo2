@@ -879,14 +879,18 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
 
   // Cale la hauteur de page sur celle du reçu au lieu des 297mm fixes : sinon l'imprimante fait avancer
   // du papier blanc après le dernier total. Au-delà de 297mm, on garde la pagination normale.
+  const regleDePageRecu = (hauteurMm) => `@page{size:100mm ${hauteurMm}mm;margin:0;}`;
+
   const ajusterHauteurPageRecu = (doc) => {
+    let hauteurMm = 297;
     try {
-      const hauteurMm = Math.ceil(doc.body.getBoundingClientRect().height * 25.4 / 96) + 3;
-      if (hauteurMm >= 297) return;
+      const mesure = Math.ceil(doc.body.getBoundingClientRect().height * 25.4 / 96) + 3;
+      if (mesure < 297) hauteurMm = mesure;
       const style = doc.createElement('style');
-      style.textContent = `@page{size:100mm ${hauteurMm}mm;margin:0;}`;
+      style.textContent = regleDePageRecu(hauteurMm);
       doc.head.appendChild(style);
     } catch (e) { console.warn('Ajustement de la hauteur du reçu impossible :', e); }
+    return hauteurMm;
   };
 
   const imprimerFiche = (fiche) => {
@@ -918,10 +922,17 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     const iframe = document.createElement('iframe');
     iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
     document.body.appendChild(iframe);
+    // Chrome ne lit pas toujours le @page de l'iframe quand on imprime depuis un iframe (en-tête/pied
+    // du navigateur -- titre, date, adresse du site, n° de page -- qui réapparaissaient malgré
+    // margin:0 dans le reçu) : on pose la même règle dans la page principale le temps de l'impression.
+    const stylePageParent = document.createElement('style');
+    stylePageParent.textContent = regleDePageRecu(297);
+    document.head.appendChild(stylePageParent);
 
     const imprimerUnPatient = (index) => {
       if (index >= patients.length) {
         document.body.removeChild(iframe);
+        stylePageParent.remove();
         showToast(`🖨️ ${patients.length} reçu(s) de patient envoyé(s) à l'impression.`, "success");
         return;
       }
@@ -943,7 +954,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
         setTimeout(passerAuSuivant, 2500);
         try {
           iframe.contentWindow.addEventListener('afterprint', passerAuSuivant, { once: true });
-          ajusterHauteurPageRecu(iframe.contentDocument);
+          stylePageParent.textContent = regleDePageRecu(ajusterHauteurPageRecu(iframe.contentDocument));
           iframe.contentWindow.focus();
           iframe.contentWindow.print();
         } catch (e) {

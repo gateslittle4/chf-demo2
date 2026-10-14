@@ -4055,16 +4055,19 @@
           return `<div class="entete"><img class="logo-entete" src="${LOGO_CHF_BASE64}" alt="Logo CHF"/><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>#13, Fontaine Duvivier, Cit\xE9 Soleil</p><p>T\xE9l: (509) 3647-0563 / 2226-8900</p></div><div class="info"><span>Patient: ${echapperHTML(formaterNomPropre(dossier.nomPatient))}</span><span>${dossier.typePatient === "ONG" ? `Partenaire : ${echapperHTML(dossier.ongPartenaire || "N/R")}` : "Priv\xE9"}</span></div><div class="info"><span>Fiche N\xB0${fiche.numeroFiche}</span></div><div class="info info-patient"><span>\u{1F4C1} ${echapperHTML(dossier.numDossier || "N/R")}</span></div>${sejourPatient}${fiche.exeat ? `<p style="font-size:13px; margin:3px 0;"><strong>S\xE9jour (${echapperHTML(nomTypeLit(fiche.exeat.typeLit))}):</strong> ${fiche.exeat.dateEntree.split("-").reverse().slice(0, 2).join("/")} \u2192 ${fiche.exeat.dateSortie.split("-").reverse().slice(0, 2).join("/")}</p>` : ""}<table><thead><tr><th>D\xE9signation</th><th class="qte">Qt\xE9</th><th class="prix">Prix</th><th class="sous-total">Total</th></tr></thead><tbody>${hasLignes ? lignesHTML : fallbackHTML}</tbody></table><div class="total">TOTAL FICHE : ${formatGourdes(fiche.totalGlobal)} Gdes<br/>${formatDH(fiche.totalGlobal)} DH</div>${afficherTotalDossier ? `<div class="total-dossier">TOTAL DOSSIER : ${formatGourdes(dossier.totalGlobal || 0)} Gdes<br/>${formatDH(dossier.totalGlobal || 0)} DH</div>` : ""}${fiche.solde && fiche.solde > 0 ? `<p style="font-size:15px; color:red;"><strong>Solde restant :</strong> ${formatGourdes(fiche.solde)} Gdes</p>` : ""}<div class="footer">Merci de votre visite !<br/>CHF Syst\xE8me Hospitalier \u2013 ${(/* @__PURE__ */ new Date()).getFullYear()}</div>`;
         };
         const STYLE_FICHE = `@page{size:100mm 297mm;margin:0;}body{font-family:'Courier New',monospace;font-size:17px;color:#000;background:white;margin:0 auto;padding:3mm 0;width:90mm;}.entete{position:relative;text-align:center;border-bottom:2px dashed #000;padding-bottom:4px;margin-bottom:5px;}.logo-entete{position:absolute;top:0;left:0;width:44px;height:44px;object-fit:contain;}.entete h1{font-size:27px;margin:2px 0;}.entete p{margin:1px 0;font-size:16px;}.info{display:flex;justify-content:space-between;font-weight:bold;font-size:16px;margin-bottom:3px;}table{width:100%;border-collapse:collapse;margin:4px 0;font-size:16px;}th,td{padding:3px 6px;text-align:left;border-bottom:1px dotted #ccc;}th{border-bottom:2px solid #000;font-size:14px;text-transform:uppercase;}.total{font-weight:bold;font-size:23px;text-align:right;border-top:3px solid #000;padding-top:4px;margin-top:4px;}.footer{margin-top:6px;font-size:13px;text-align:center;border-top:1px dashed #ccc;padding-top:4px;color:#555;}.qte{text-align:center;}.prix,.sous-total{text-align:right;}.info-patient{font-size:15px;margin-bottom:2px;}.separation-fiche{border-top:2px dashed #000;margin:6px 0;}.total-dossier{font-weight:bold;font-size:23px;text-align:right;border-top:2px double #000;padding-top:4px;margin-top:4px;}`;
+        const regleDePageRecu = (hauteurMm) => `@page{size:100mm ${hauteurMm}mm;margin:0;}`;
         const ajusterHauteurPageRecu = (doc) => {
+          let hauteurMm = 297;
           try {
-            const hauteurMm = Math.ceil(doc.body.getBoundingClientRect().height * 25.4 / 96) + 3;
-            if (hauteurMm >= 297) return;
+            const mesure = Math.ceil(doc.body.getBoundingClientRect().height * 25.4 / 96) + 3;
+            if (mesure < 297) hauteurMm = mesure;
             const style = doc.createElement("style");
-            style.textContent = `@page{size:100mm ${hauteurMm}mm;margin:0;}`;
+            style.textContent = regleDePageRecu(hauteurMm);
             doc.head.appendChild(style);
           } catch (e) {
             console.warn("Ajustement de la hauteur du re\xE7u impossible :", e);
           }
+          return hauteurMm;
         };
         const imprimerFiche = (fiche) => {
           const estLaDerniereFiche = fiche.numeroFiche === Math.max(...(focusedVerif.fiches || []).map((f) => f.numeroFiche || 0));
@@ -4097,9 +4100,13 @@
           const iframe = document.createElement("iframe");
           iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
           document.body.appendChild(iframe);
+          const stylePageParent = document.createElement("style");
+          stylePageParent.textContent = regleDePageRecu(297);
+          document.head.appendChild(stylePageParent);
           const imprimerUnPatient = (index) => {
             if (index >= patients.length) {
               document.body.removeChild(iframe);
+              stylePageParent.remove();
               showToast(`\u{1F5A8}\uFE0F ${patients.length} re\xE7u(s) de patient envoy\xE9(s) \xE0 l'impression.`, "success");
               return;
             }
@@ -4118,7 +4125,7 @@
               setTimeout(passerAuSuivant, 2500);
               try {
                 iframe.contentWindow.addEventListener("afterprint", passerAuSuivant, { once: true });
-                ajusterHauteurPageRecu(iframe.contentDocument);
+                stylePageParent.textContent = regleDePageRecu(ajusterHauteurPageRecu(iframe.contentDocument));
                 iframe.contentWindow.focus();
                 iframe.contentWindow.print();
               } catch (e) {
