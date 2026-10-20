@@ -2,8 +2,14 @@
 const React = window.React;
 const { useState, useEffect } = React;
 const { auth, db, enregistrerAudit } = require('../api/firebase');
+const { API_BASE } = require('../api/supabase');
 
 function GestionUtilisateursPanel({ showToast }) {
+  const [cibleMdp, setCibleMdp] = useState(null); // utilisateur dont on change le mot de passe
+  const [mdp, setMdp] = useState("");
+  const [mdpConfirmation, setMdpConfirmation] = useState("");
+  const [mdpVisible, setMdpVisible] = useState(false);
+  const [mdpEnCours, setMdpEnCours] = useState(false);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -49,6 +55,33 @@ function GestionUtilisateursPanel({ showToast }) {
     } catch (error) { showToast("Erreur : " + error.message, "error"); }
   };
 
+  const ouvrirChangementMdp = (u) => { setCibleMdp(u); setMdp(""); setMdpConfirmation(""); setMdpVisible(false); };
+  const fermerChangementMdp = () => { if (mdpEnCours) return; setCibleMdp(null); setMdp(""); setMdpConfirmation(""); };
+  // Appel direct (pas chf.request) : cette requête ne doit JAMAIS être mise en file d'attente hors
+  // ligne, sinon le mot de passe serait recopié en clair dans la mémoire locale du navigateur.
+  const changerMotDePasse = async () => {
+    if (mdp.length < 8) { showToast("Mot de passe minimum 8 caractères.", "error"); return; }
+    if (mdp !== mdpConfirmation) { showToast("Les deux mots de passe ne sont pas identiques.", "error"); return; }
+    setMdpEnCours(true);
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      const reponse = await fetch(`${API_BASE}/users/${encodeURIComponent(cibleMdp.id)}/password`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+        body: JSON.stringify({ password: mdp })
+      });
+      if (!reponse.ok) {
+        let message = `Erreur serveur (${reponse.status})`;
+        try { const err = await reponse.json(); if (err && err.error) message = err.error; } catch (_) {}
+        throw new Error(message);
+      }
+      showToast(`🔑 Mot de passe de ${cibleMdp.displayName || cibleMdp.email} modifié`, "success");
+      setCibleMdp(null); setMdp(""); setMdpConfirmation("");
+    } catch (error) {
+      showToast(error instanceof TypeError ? "Pas de connexion au serveur — réessaie quand le réseau est revenu." : "Erreur : " + error.message, "error");
+    } finally { setMdpEnCours(false); }
+  };
+
   const filtered = users.filter(u => (u.displayName||'').toLowerCase().includes(search.toLowerCase()) || (u.email||'').toLowerCase().includes(search.toLowerCase()));
   const roles = [{ value: 'administrateur', label: '🔑 Administrateur' }, { value: 'direction', label: '📊 Direction' }, { value: 'comptable', label: '💰 Comptable' }, { value: 'auditeur', label: '📋 Auditeur' }, { value: 'lecteur', label: '👁️ Lecteur' }];
   if (loading) return <div className="p-8 text-center">Chargement...</div>;
@@ -86,7 +119,10 @@ function GestionUtilisateursPanel({ showToast }) {
                     </td>
                     <td className="p-2 text-center">{isActive ? <span className="text-emerald-600 font-bold">✅ Actif</span> : <span className="text-red-500">⛔ Désactivé</span>}</td>
                     <td className="p-2 text-center">
-                      {u.id !== auth.currentUser?.uid ? <button onClick={()=>toggleActive(u.id,isActive)} className={`text-[10px] font-bold ${isActive?'text-red-500 hover:text-red-700':'text-emerald-500 hover:text-emerald-700'}`}>{isActive ? 'Désactiver' : 'Réactiver'}</button> : <span className="text-gray-400">(Vous)</span>}
+                      <div className="flex items-center justify-center gap-3">
+                        <button onClick={()=>ouvrirChangementMdp(u)} className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 whitespace-nowrap" title="Changer le mot de passe de ce compte">🔑 Mot de passe</button>
+                        {u.id !== auth.currentUser?.uid ? <button onClick={()=>toggleActive(u.id,isActive)} className={`text-[10px] font-bold ${isActive?'text-red-500 hover:text-red-700':'text-emerald-500 hover:text-emerald-700'}`}>{isActive ? 'Désactiver' : 'Réactiver'}</button> : <span className="text-gray-400">(Vous)</span>}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -103,6 +139,22 @@ function GestionUtilisateursPanel({ showToast }) {
         <div className="text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Direction</span><p className="text-xl font-black text-purple-600">{users.filter(u=>u.role==='direction').length}</p></div>
         <div className="text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Désactivés</span><p className="text-xl font-black text-gray-400">{users.filter(u=>u.active===false).length}</p></div>
       </div>
+      {cibleMdp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={fermerChangementMdp}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-5 space-y-3" onClick={e => e.stopPropagation()}>
+            <h3 className="font-black text-gray-800 text-sm">🔑 Changer le mot de passe</h3>
+            <p className="text-gray-500">Compte : <span className="font-bold text-gray-800">{cibleMdp.displayName || '—'}</span><br/><span className="text-[11px]">{cibleMdp.email}</span></p>
+            <input type={mdpVisible ? 'text' : 'password'} value={mdp} onChange={e=>setMdp(e.target.value)} placeholder="Nouveau mot de passe (8+)" autoFocus autoComplete="new-password" className="w-full border rounded-lg p-2 text-xs outline-none font-mono" />
+            <input type={mdpVisible ? 'text' : 'password'} value={mdpConfirmation} onChange={e=>setMdpConfirmation(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') changerMotDePasse(); }} placeholder="Confirmer le mot de passe" autoComplete="new-password" className="w-full border rounded-lg p-2 text-xs outline-none font-mono" />
+            <label className="flex items-center gap-2 text-gray-600"><input type="checkbox" checked={mdpVisible} onChange={e=>setMdpVisible(e.target.checked)} /> Afficher le mot de passe</label>
+            {cibleMdp.id !== auth.currentUser?.uid && <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg p-2">Cette personne sera déconnectée de ses autres appareils et devra se reconnecter avec le nouveau mot de passe.</p>}
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={fermerChangementMdp} disabled={mdpEnCours} className="px-3 py-2 rounded-lg border text-xs font-bold text-gray-600 disabled:opacity-50">Annuler</button>
+              <button onClick={changerMotDePasse} disabled={mdpEnCours} className="px-4 py-2 rounded-lg bg-indigo-700 text-white text-xs font-bold disabled:opacity-50">{mdpEnCours ? 'Enregistrement…' : 'Enregistrer'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
