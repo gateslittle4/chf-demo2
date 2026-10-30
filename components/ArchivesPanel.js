@@ -181,9 +181,30 @@ const construireIndexMeres = (poolRecherche) => {
   return { resoudre };
 };
 
+// Jumeaux probables : une mère qui a au moins 2 dossiers bébé rattachés (mêmes règles de rapprochement
+// que ci-dessus, donc "Bb1 X" / "Bb2 X" / "Bb X" proches du nom de la mère comptent tous). Sert à
+// signaler "accouchement gémellaire possible" à côté du nom de la mère dans la liste d'un lot --
+// jamais dans l'export Excel. Calculé une fois par pool de dossiers (le tri d'un lot est refait pour
+// chaque lot, avec le même pool "toutes les archives").
+const bebesParMereCache = new WeakMap();
+const bebesRattachesParMere = (poolRecherche, indexMeres) => {
+  if (bebesParMereCache.has(poolRecherche)) return bebesParMereCache.get(poolRecherche);
+  const parMere = {};
+  poolRecherche.forEach(v => {
+    if (!estUnBebe(v.nomPatient)) return;
+    const mere = indexMeres.resoudre(cleFamilleDossier(v.nomPatient));
+    if (mere) (parMere[mere.id] = parMere[mere.id] || []).push(v);
+  });
+  bebesParMereCache.set(poolRecherche, parMere);
+  return parMere;
+};
+const aAccouchementGemellaire = (dossier) => (dossier.fiches || []).some(f =>
+  (f.rawState?.lignesCalcul || []).some(l => l.type === 'acte' && (l.itemId === 'a3' || /g[ée]mellaire/i.test(l.nom || ''))));
+
 const trierAvecRegroupementMereBebe = (dossiersDuLot, tousLesDossiers) => {
   const poolRecherche = tousLesDossiers || dossiersDuLot;
   const indexMeres = construireIndexMeres(poolRecherche);
+  const bebesParMere = bebesRattachesParMere(poolRecherche, indexMeres);
   // Résout une fois pour toutes la mère de chaque dossier du lot (mémoïsé par id) -- réutilisé pour
   // le tri chronologique ET pour les indicateurs plus bas, afin de toujours pointer vers la même mère.
   const mereResolueParId = {};
@@ -217,7 +238,11 @@ const trierAvecRegroupementMereBebe = (dossiersDuLot, tousLesDossiers) => {
       sansExeat: !(v.fiches || []).some(f => f.exeat) && !((cumul.hospit || 0) > 0),
       sansAdmission: !estBebeAvecMere && !((cumul.service || 0) > 0),
       medicamentsSortieManquants: medicamentsSortieManquants(v),
-      oxytocineSansAccouchement: dossierAOxytocine(v) && !((cumul.accouchement || 0) > 0) && !((cumul.cesarienne || 0) > 0)
+      oxytocineSansAccouchement: dossierAOxytocine(v) && !((cumul.accouchement || 0) > 0) && !((cumul.cesarienne || 0) > 0),
+      nomsBebesRattaches: bebe ? [] : (bebesParMere[v.id] || []).map(b => b.nomPatient),
+      jumeauxProbables: !bebe && (bebesParMere[v.id] || []).length >= 2,
+      accouchementGemellaireFacture: !bebe && aAccouchementGemellaire(v),
+      cesarienneFacturee: (cumul.cesarienne || 0) > 0
     };
   });
 };
@@ -1241,6 +1266,11 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                       <button onClick={() => toggleDossierComplet(v)} title={v.dossierComplet ? "Dossier marqué complet — cliquer pour annuler" : "Marquer ce dossier comme complet"} className={`inline-flex items-center justify-center w-4 h-4 rounded-full border align-middle mr-1 ${v.dossierComplet ? 'bg-emerald-500 border-emerald-600 text-white' : 'bg-white border-gray-300 text-gray-300 hover:border-emerald-400 hover:text-emerald-400'}`}>
                         <Check size={10}/>
                       </button>
+                      {v.jumeauxProbables && (v.accouchementGemellaireFacture
+                        ? <span title={`Bébés rattachés : ${v.nomsBebesRattaches.join(', ')}`} className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">👶👶 Accouchement gémellaire ✓</span>
+                        : v.cesarienneFacturee
+                          ? <span title={`Bébés rattachés : ${v.nomsBebesRattaches.join(', ')} — le catalogue n'a pas de tarif césarienne gémellaire, la césarienne reste facturée seule`} className="bg-gray-100 text-gray-600 border border-gray-200 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">👶👶 Jumeaux — césarienne</span>
+                          : <span title={`Cette mère a ${v.nomsBebesRattaches.length} dossiers bébé (${v.nomsBebesRattaches.join(', ')}) : vérifie si l'accouchement doit être facturé en gémellaire plutôt qu'en physiologique`} className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">👶👶 Accouchement gémellaire possible</span>)}
                       {v.estBebeAvecMere && <span title={`Rattaché au dossier de ${v.nomMereTrouvee} — pas besoin d'ouvrir de fiche Admission/Consultation pour ce bébé, il est déjà couvert par celle de sa mère`} className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">👩 Mère : {v.nomMereTrouvee}</span>}
                       {v.estBebeSansMere && <span title="Aucun dossier de mère retrouvé dans tout l'historique — vérifie s'il faut ouvrir une fiche d'urgence pour ce bébé" className="bg-red-100 text-red-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">🚨 Sans mère</span>}
                       {v.sansExeat && <span title="Aucun séjour (exeat) sur ce dossier — vérifie s'il a été oublié" className="bg-red-100 text-red-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">🚨 Sans exeat</span>}
