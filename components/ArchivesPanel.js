@@ -229,9 +229,15 @@ const trierAvecRegroupementMereBebe = (dossiersDuLot, tousLesDossiers) => {
   dossiersDuLot.forEach(v => {
     mereResolueParId[v.id] = estUnBebe(v.nomPatient) ? indexMeres.resoudre(cleFamilleDossier(v.nomPatient), v) : null;
   });
+  const idsDuLot = new Set(dossiersDuLot.map(v => v.id));
+  const aUneDate = (v) => !!v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31';
+  // Un bébé hérite de la date de sa mère seulement si elle est dans CE lot (il se range alors juste
+  // après elle) ou s'il n'a lui-même aucune date. Sinon sa mère est ailleurs (autre lot/partenaire) :
+  // le ranger à la date de sa mère le placerait à un endroit incohérent avec la date qui s'affiche
+  // sur sa ligne (ex. Bb1 Almeus Rosemene, 23/08 chez MSF-H, rangé au 09/08 avec la date de sa mère MSF-F).
   const dateEffective = (v) => {
     const mere = mereResolueParId[v.id];
-    return mere ? mere.dateEntreePourTri : v.dateEntreePourTri;
+    return mere && (idsDuLot.has(mere.id) || !aUneDate(v)) ? mere.dateEntreePourTri : v.dateEntreePourTri;
   };
   return [...dossiersDuLot].sort((a, b) => {
     const diff = new Date(dateEffective(a)) - new Date(dateEffective(b));
@@ -239,7 +245,15 @@ const trierAvecRegroupementMereBebe = (dossiersDuLot, tousLesDossiers) => {
     const cleA = (mereResolueParId[a.id] ? cleFamilleDossier(mereResolueParId[a.id].nomPatient) : cleFamilleDossier(a.nomPatient));
     const cleB = (mereResolueParId[b.id] ? cleFamilleDossier(mereResolueParId[b.id].nomPatient) : cleFamilleDossier(b.nomPatient));
     if (cleA !== cleB) return cleA.localeCompare(cleB);
-    return (estUnBebe(a.nomPatient) ? 1 : 0) - (estUnBebe(b.nomPatient) ? 1 : 0);
+    const bebeA = estUnBebe(a.nomPatient), bebeB = estUnBebe(b.nomPatient);
+    if (bebeA !== bebeB) return bebeA ? 1 : -1;
+    // Deux bébés de la même mère (jumeaux) : le plus ancien séjour d'abord, puis Bb1 avant Bb2.
+    if (bebeA && bebeB) {
+      const ecart = new Date(aUneDate(a) ? a.dateEntreePourTri : '9999-12-31') - new Date(aUneDate(b) ? b.dateEntreePourTri : '9999-12-31');
+      if (ecart !== 0) return ecart;
+      return a.nomPatient.localeCompare(b.nomPatient, 'fr', { numeric: true });
+    }
+    return 0;
   }).map(v => {
     const bebe = estUnBebe(v.nomPatient);
     const mere = mereResolueParId[v.id];

@@ -3497,9 +3497,11 @@
         dossiersDuLot.forEach((v) => {
           mereResolueParId[v.id] = estUnBebe(v.nomPatient) ? indexMeres.resoudre(cleFamilleDossier(v.nomPatient), v) : null;
         });
+        const idsDuLot = new Set(dossiersDuLot.map((v) => v.id));
+        const aUneDate = (v) => !!v.dateEntreePourTri && v.dateEntreePourTri !== "9999-12-31";
         const dateEffective = (v) => {
           const mere = mereResolueParId[v.id];
-          return mere ? mere.dateEntreePourTri : v.dateEntreePourTri;
+          return mere && (idsDuLot.has(mere.id) || !aUneDate(v)) ? mere.dateEntreePourTri : v.dateEntreePourTri;
         };
         return [...dossiersDuLot].sort((a, b) => {
           const diff = new Date(dateEffective(a)) - new Date(dateEffective(b));
@@ -3507,7 +3509,14 @@
           const cleA = mereResolueParId[a.id] ? cleFamilleDossier(mereResolueParId[a.id].nomPatient) : cleFamilleDossier(a.nomPatient);
           const cleB = mereResolueParId[b.id] ? cleFamilleDossier(mereResolueParId[b.id].nomPatient) : cleFamilleDossier(b.nomPatient);
           if (cleA !== cleB) return cleA.localeCompare(cleB);
-          return (estUnBebe(a.nomPatient) ? 1 : 0) - (estUnBebe(b.nomPatient) ? 1 : 0);
+          const bebeA = estUnBebe(a.nomPatient), bebeB = estUnBebe(b.nomPatient);
+          if (bebeA !== bebeB) return bebeA ? 1 : -1;
+          if (bebeA && bebeB) {
+            const ecart = new Date(aUneDate(a) ? a.dateEntreePourTri : "9999-12-31") - new Date(aUneDate(b) ? b.dateEntreePourTri : "9999-12-31");
+            if (ecart !== 0) return ecart;
+            return a.nomPatient.localeCompare(b.nomPatient, "fr", { numeric: true });
+          }
+          return 0;
         }).map((v) => {
           const bebe = estUnBebe(v.nomPatient);
           const mere = mereResolueParId[v.id];
