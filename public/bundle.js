@@ -3439,19 +3439,37 @@
         poolRecherche.forEach((v) => {
           if (estUnBebe(v.nomPatient)) return;
           const cle = cleFamilleDossier(v.nomPatient);
-          parCle[cle] = v;
+          (parCle[cle] = parCle[cle] || []).push(v);
           const cleTriee = cleMotsTries(cle);
           (parCleTriee[cleTriee] = parCleTriee[cleTriee] || []).push(v);
         });
         const toutesLesCles = Object.keys(parCle);
-        const resoudre = (cleBebe) => {
-          if (parCle[cleBebe]) return parCle[cleBebe];
-          const candidatsOrdre = parCleTriee[cleMotsTries(cleBebe)];
-          if (candidatsOrdre && candidatsOrdre.length === 1) return candidatsOrdre[0];
+        const jours = (d) => {
+          const t = d && d !== "9999-12-31" ? Date.parse(d) : NaN;
+          return Number.isFinite(t) ? t / 864e5 : null;
+        };
+        const ecartJours = (m, bebe) => {
+          const x = jours(m.dateEntreePourTri), y = jours(bebe && bebe.dateEntreePourTri);
+          return x == null || y == null ? Infinity : Math.abs(x - y);
+        };
+        const choisir = (liste, bebe) => {
+          if (liste.length <= 1) return liste[0] || null;
+          const memePartenaire = liste.filter((m) => bebe && m.ongPartenaire === bebe.ongPartenaire);
+          return (memePartenaire.length ? memePartenaire : liste).reduce((meilleur, m) => ecartJours(m, bebe) < ecartJours(meilleur, bebe) ? m : meilleur);
+        };
+        const resoudreFlou = (cleBebe, bebe) => {
+          const candidatsOrdre = (parCleTriee[cleMotsTries(cleBebe)] || []).filter((m) => cleFamilleDossier(m.nomPatient) !== cleBebe);
+          if (candidatsOrdre.length === 1) return candidatsOrdre[0];
           const seuil = seuilFauteFrappe(cleBebe);
-          const candidatsProches = toutesLesCles.filter((c) => distanceLevenshtein(c, cleBebe) <= seuil);
-          if (candidatsProches.length === 1) return parCle[candidatsProches[0]];
+          const candidatsProches = toutesLesCles.filter((c) => c !== cleBebe && distanceLevenshtein(c, cleBebe) <= seuil).flatMap((c) => parCle[c]);
+          if (candidatsProches.length === 1) return candidatsProches[0];
           return null;
+        };
+        const resoudre = (cleBebe, bebe) => {
+          const exact = choisir(parCle[cleBebe] || [], bebe);
+          const flou = resoudreFlou(cleBebe, bebe);
+          if (exact && flou && bebe && flou.ongPartenaire === bebe.ongPartenaire && exact.ongPartenaire !== bebe.ongPartenaire && ecartJours(flou, bebe) < ecartJours(exact, bebe)) return flou;
+          return exact || flou;
         };
         return { resoudre };
       };
@@ -3461,7 +3479,7 @@
         const parMere = {};
         poolRecherche.forEach((v) => {
           if (!estUnBebe(v.nomPatient)) return;
-          const mere = indexMeres.resoudre(cleFamilleDossier(v.nomPatient));
+          const mere = indexMeres.resoudre(cleFamilleDossier(v.nomPatient), v);
           if (mere) (parMere[mere.id] = parMere[mere.id] || []).push(v);
         });
         bebesParMereCache.set(poolRecherche, parMere);
@@ -3477,7 +3495,7 @@
         const bebesParMere = bebesRattachesParMere(poolRecherche, indexMeres);
         const mereResolueParId = {};
         dossiersDuLot.forEach((v) => {
-          mereResolueParId[v.id] = estUnBebe(v.nomPatient) ? indexMeres.resoudre(cleFamilleDossier(v.nomPatient)) : null;
+          mereResolueParId[v.id] = estUnBebe(v.nomPatient) ? indexMeres.resoudre(cleFamilleDossier(v.nomPatient), v) : null;
         });
         const dateEffective = (v) => {
           const mere = mereResolueParId[v.id];
