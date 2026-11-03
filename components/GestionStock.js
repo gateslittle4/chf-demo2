@@ -3,7 +3,7 @@ const React = window.React;
 const { useState } = React;
 const { chf } = require('../api/supabase');
 const { LOG_MEDS_KEY } = require('../api/firebase');
-const { formatGourdes } = require('../utils/helpers');
+const { formatPrix } = require('../utils/helpers');
 const { LISTE_ONG } = require('../utils/constants');
 const { Check, X, Pencil } = require('../utils/icons');
 
@@ -71,7 +71,7 @@ function GestionStockPanel({ items, setItems, showToast }) {
                 return (
                   <tr key={item.id} className={enAlerte ? 'bg-red-50/40' : 'hover:bg-gray-50/50'}>
                     <td className="p-2 font-medium">{item.nom}</td>
-                    <td className="p-2 text-center font-mono">{formatGourdes(item.prix)} Gdes</td>
+                    <td className="p-2 text-center font-mono">{formatPrix(item.prix)}</td>
                     <td className="p-2 text-center font-bold">
                       {editingId === item.id ? <input type="number" value={editQuantite} onChange={e=>setEditQuantite(e.target.value)} className="w-16 border rounded p-1 text-center font-mono" />
                       : <span className={enAlerte ? 'text-red-600' : ''}>{item.quantite || 0} {enAlerte && '⚠️'}</span>}
@@ -123,7 +123,7 @@ function GestionStockPanel({ items, setItems, showToast }) {
       <div className="bg-white p-4 rounded-xl border shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Total</span><p className="text-xl font-black">{items.length}</p></div>
         <div className="text-center"><span className="text-[10px] uppercase font-bold text-gray-400">En alerte</span><p className="text-xl font-black text-red-600">{items.filter(i => (i.quantite||0) <= (i.seuilAlerte||5)).length}</p></div>
-        <div className="text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Valeur stock</span><p className="text-xl font-black text-emerald-700">{formatGourdes(items.reduce((s,i)=>s + i.prix*(i.quantite||0),0))} Gdes</p></div>
+        <div className="text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Valeur stock</span><p className="text-xl font-black text-emerald-700">{formatPrix(items.reduce((s,i)=>s + i.prix*(i.quantite||0),0))}</p></div>
       </div>
     </div>
   );

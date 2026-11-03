@@ -2,7 +2,7 @@
 // Purement présentationnel : les calculs (jours, totaux) restent dans CalculateurPanel.js.
 const React = window.React;
 const { CONFIG_LITS, prixLit } = require('../utils/constants');
-const { formatGourdes } = require('../utils/helpers');
+const { formatPrix } = require('../utils/helpers');
 
 function HebergementForm({
   dateEntree1, setDateEntree1, dateSortie1, setDateSortie1, typeLit1, setTypeLit1,
@@ -15,7 +15,7 @@ function HebergementForm({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div><label className="text-[10px] font-bold text-gray-500 uppercase">Date d'entrée</label><input type="date" value={dateEntree1} onChange={e=>setDateEntree1(e.target.value)} className="border rounded-lg p-1.5 text-xs w-full" /></div>
         <div><label className="text-[10px] font-bold text-gray-500 uppercase">Date de sortie</label><input type="date" value={dateSortie1} onChange={e=>setDateSortie1(e.target.value)} className="border rounded-lg p-1.5 text-xs w-full" /></div>
-        <div><label className="text-[10px] font-bold text-gray-500 uppercase">Type de lit</label><select value={typeLit1} onChange={e=>setTypeLit1(e.target.value)} className="border rounded-lg p-1.5 bg-white text-xs w-full">{Object.entries(CONFIG_LITS).map(([cle, lit]) => <option key={cle} value={cle}>{lit.nom} ({formatGourdes(prixLit(cle, tarifChoisi))}/j)</option>)}</select></div>
+        <div><label className="text-[10px] font-bold text-gray-500 uppercase">Type de lit</label><select value={typeLit1} onChange={e=>setTypeLit1(e.target.value)} className="border rounded-lg p-1.5 bg-white text-xs w-full">{Object.entries(CONFIG_LITS).map(([cle, lit]) => <option key={cle} value={cle}>{lit.nom} ({formatPrix(prixLit(cle, tarifChoisi))}/j)</option>)}</select></div>
       </div>
       <div className="flex gap-4 pt-1 border-t border-dashed mt-2">
         <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 cursor-pointer"><input type="checkbox" checked={multiPeriode} onChange={e=>setMultiPeriode(e.target.checked)} className="rounded" /> Acter une seconde période</label>

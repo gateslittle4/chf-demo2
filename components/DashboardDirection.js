@@ -2,7 +2,7 @@
 const React = window.React;
 const { useState, useEffect } = React;
 const { CATEGORIES_LISTE } = require('../utils/constants');
-const { formatGourdes } = require('../utils/helpers');
+const { formatPrix } = require('../utils/helpers');
 
 function DashboardDirectionPanel({ verifications, paiements, medicaments }) {
   const [stats, setStats] = useState({ caMois: 0, caJourCash: 0, caJourOng: 0, occupation: 0, topActes: [], topDetail: [], sonographiesAujourdhui: [], recouvrement: 0, patientsJour: 0 });
@@ -69,9 +69,9 @@ function DashboardDirectionPanel({ verifications, paiements, medicaments }) {
     <div className="space-y-4">
       <h2 className="font-black text-gray-800 text-base">📊 Tableau de bord - Direction</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">CA du mois</span><p className="text-2xl font-black text-emerald-700">{formatGourdes(stats.caMois)} Gdes</p></div>
-        <div className="bg-white p-4 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Cash aujourd'hui</span><p className="text-2xl font-black text-blue-600">{formatGourdes(stats.caJourCash)} Gdes</p></div>
-        <div className="bg-white p-4 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Partenaire aujourd'hui</span><p className="text-2xl font-black text-purple-600">{formatGourdes(stats.caJourOng)} Gdes</p></div>
+        <div className="bg-white p-4 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">CA du mois</span><p className="text-2xl font-black text-emerald-700">{formatPrix(stats.caMois)}</p></div>
+        <div className="bg-white p-4 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Cash aujourd'hui</span><p className="text-2xl font-black text-blue-600">{formatPrix(stats.caJourCash)}</p></div>
+        <div className="bg-white p-4 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Partenaire aujourd'hui</span><p className="text-2xl font-black text-purple-600">{formatPrix(stats.caJourOng)}</p></div>
         <div className="bg-white p-4 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Consultations aujourd'hui</span><p className="text-2xl font-black text-purple-600">{stats.patientsJour}</p></div>
         <div className="bg-white p-4 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Taux d'occupation</span><p className="text-2xl font-black text-amber-600">{Math.round(stats.occupation)}%</p></div>
         <div className="bg-white p-4 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Taux de recouvrement</span><p className="text-2xl font-black text-emerald-600">{Math.round(stats.recouvrement)}%</p></div>

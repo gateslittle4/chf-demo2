@@ -13,7 +13,7 @@
 //   ont changé depuis.
 const React = window.React;
 const { useState, useEffect, useMemo, useRef } = React;
-const { formatGourdes, formatDH } = require('../utils/helpers');
+const { formatPrix } = require('../utils/helpers');
 
 const COULEURS_SERVICE = {
   'Urgences': '#dc2626',
@@ -265,9 +265,9 @@ function AnalyticsPanel({ verifications }) {
       config = { type: 'line', data: { labels: donneesActivites.labels, datasets: donneesActivites.series.map(s => ({ label: s.label, data: s.data, borderColor: s.couleur, backgroundColor: s.couleur, tension: 0.3, fill: false })) }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } } };
     } else if (sousOnglet === 'revenus') {
       config = { type: 'bar', data: { labels: donneesRevenus.map(r => r.service), datasets: [
-        { type: 'bar', label: 'Revenu (Gdes)', data: donneesRevenus.map(r => r.revenu), backgroundColor: donneesRevenus.map(r => COULEURS_SERVICE[r.service]||'#999'), yAxisID: 'y' },
+        { type: 'bar', label: 'Revenu ($)', data: donneesRevenus.map(r => r.revenu / 5), backgroundColor: donneesRevenus.map(r => COULEURS_SERVICE[r.service]||'#999'), yAxisID: 'y' },
         { type: 'line', label: 'Patients uniques', data: donneesRevenus.map(r => r.patients), borderColor: '#f59e0b', backgroundColor: '#f59e0b', yAxisID: 'y1', tension: 0.3 }
-      ] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { position: 'left', title: { display: true, text: 'Gdes' } }, y1: { position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Patients' } } }, plugins: { legend: { position: 'bottom' } } } };
+      ] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { position: 'left', title: { display: true, text: '$' } }, y1: { position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Patients' } } }, plugins: { legend: { position: 'bottom' } } } };
     } else if (sousOnglet === 'occupation') {
       config = { type: 'line', data: { labels: donneesOccupation.labels, datasets: donneesOccupation.series.map(s => ({ label: s.label, data: s.data, borderColor: s.couleur, backgroundColor: s.couleur, tension: 0.2, fill: false, pointRadius: 0 })) }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: { ticks: { maxTicksLimit: 10 } } } } };
     } else if (sousOnglet === 'repartition') {
@@ -314,7 +314,7 @@ function AnalyticsPanel({ verifications }) {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-white p-3 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Total dossiers</span><p className="text-lg font-black">{kpiActivites.total}</p></div>
             <div className="bg-white p-3 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Patients actifs</span><p className="text-lg font-black text-blue-600">{kpiActivites.actifs}</p></div>
-            <div className="bg-white p-3 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Revenu total</span><p className="text-lg font-black text-emerald-700">{formatGourdes(kpiActivites.revenu)} Gdes</p></div>
+            <div className="bg-white p-3 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Revenu total</span><p className="text-lg font-black text-emerald-700">{formatPrix(kpiActivites.revenu)}</p></div>
             <div className="bg-white p-3 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Patients uniques</span><p className="text-lg font-black text-purple-600">{kpiActivites.uniques}</p></div>
           </div>
           <div className="bg-white p-4 rounded-xl border shadow-sm" style={{ height: 340 }}><canvas ref={chartRef}></canvas></div>
@@ -325,10 +325,10 @@ function AnalyticsPanel({ verifications }) {
       {sousOnglet === 'revenus' && (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-white p-3 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Total revenu</span><p className="text-lg font-black text-emerald-700">{formatGourdes(totalRevenuGeneral)} Gdes</p></div>
+            <div className="bg-white p-3 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Total revenu</span><p className="text-lg font-black text-emerald-700">{formatPrix(totalRevenuGeneral)}</p></div>
             {['Urgences','Maternité','Néonatologie'].map(s => {
               const r = donneesRevenus.find(x => x.service === s);
-              return <div key={s} className="bg-white p-3 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">{s}</span><p className="text-lg font-black" style={{color: COULEURS_SERVICE[s]}}>{formatGourdes(r?.revenu||0)} Gdes</p></div>;
+              return <div key={s} className="bg-white p-3 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">{s}</span><p className="text-lg font-black" style={{color: COULEURS_SERVICE[s]}}>{formatPrix(r?.revenu||0)}</p></div>;
             })}
           </div>
           <div className="bg-white p-4 rounded-xl border shadow-sm" style={{ height: 340 }}><canvas ref={chartRef}></canvas></div>
@@ -337,7 +337,7 @@ function AnalyticsPanel({ verifications }) {
               <thead><tr className="bg-gray-100 text-[10px] text-gray-500 uppercase border-b"><th className="p-2">Service</th><th className="p-2 text-right">Revenu</th><th className="p-2 text-right">% du total</th><th className="p-2 text-right">Patients uniques</th></tr></thead>
               <tbody className="divide-y">
                 {donneesRevenus.map(r => (
-                  <tr key={r.service}><td className="p-2 font-bold" style={{color: COULEURS_SERVICE[r.service]}}>{r.service}</td><td className="p-2 text-right font-mono">{formatGourdes(r.revenu)} Gdes</td><td className="p-2 text-right">{r.pourcentage.toFixed(1)}%</td><td className="p-2 text-right">{r.patients}</td></tr>
+                  <tr key={r.service}><td className="p-2 font-bold" style={{color: COULEURS_SERVICE[r.service]}}>{r.service}</td><td className="p-2 text-right font-mono">{formatPrix(r.revenu)}</td><td className="p-2 text-right">{r.pourcentage.toFixed(1)}%</td><td className="p-2 text-right">{r.patients}</td></tr>
                 ))}
               </tbody>
             </table>

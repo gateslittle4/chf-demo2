@@ -2,7 +2,7 @@
 const React = window.React;
 const { useState, useEffect } = React;
 const { auth, db } = require('../api/firebase');
-const { formatGourdes } = require('../utils/helpers');
+const { formatPrix } = require('../utils/helpers');
 
 function DemandesPanel({ userRole, showToast }) {
   const [demandes, setDemandes] = useState([]);
@@ -30,7 +30,7 @@ function DemandesPanel({ userRole, showToast }) {
           <div key={d.id} className="bg-gray-50 p-3 rounded-lg border flex justify-between items-center mb-2">
             <div>
               <p className="font-bold">{d.patientNom}</p>
-              <p className="text-gray-600">{d.pourcentageDemande}% ({formatGourdes(d.montantExonere)} Gdes) par {d.demandeur}</p>
+              <p className="text-gray-600">{d.pourcentageDemande}% ({formatPrix(d.montantExonere)}) par {d.demandeur}</p>
             </div>
             <div className="flex gap-2">
               {peutAutoriser ? (

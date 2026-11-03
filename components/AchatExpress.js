@@ -6,7 +6,7 @@ const { useState, useMemo, useRef, useEffect } = React;
 const { chf, toEpisodeApi, toPaiementApi, generateLocalId } = require('../api/supabase');
 const { auth, LOG_MEDS_KEY } = require('../api/firebase');
 const { CATEGORIES_LISTE } = require('../utils/constants');
-const { formatGourdes, formatDH, echapperHTML, formaterNomPropre } = require('../utils/helpers');
+const { echapperHTML, formaterNomPropre, formatPrix, formatPrixEtGdes } = require('../utils/helpers');
 const { Search, X, Plus } = require('../utils/icons');
 
 function AchatExpress({ medicaments, actes, setMedicaments, userRole, showToast, onFermer, onDossierCree }) {
@@ -62,7 +62,7 @@ function AchatExpress({ medicaments, actes, setMedicaments, userRole, showToast,
   const retirerDuPanier = (idx) => setPanier(prev => prev.filter((_, i) => i !== idx));
 
   const imprimerTicketExpress = (nom, lignes, totalVente, verseVal, renduVal) => {
-    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket CHF - Achat Express</title><style>@page{size:80mm 200mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:13px;color:#000;width:70mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:20px;margin:4px 0;}.entete p{margin:2px 0;font-size:12px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:12px;}th,td{padding:4px;text-align:left;border-bottom:1px dotted #ccc;}.total{font-weight:bold;font-size:17px;text-align:right;border-top:2px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:10px;font-size:10px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>Achat Express — Comptoir</p><p>${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</p></div><p>Client: ${echapperHTML(nom || 'Comptoir')}</p><table><thead><tr><th>Article</th><th>Qté</th><th>Total</th></tr></thead><tbody>${lignes.map(l => `<tr><td>${echapperHTML(l.nom)}</td><td>${l.qte}</td><td>${formatGourdes(l.qte*l.prix)}</td></tr>`).join('')}</tbody></table><div class="total">TOTAL : ${formatGourdes(totalVente)} Gdes (${formatDH(totalVente)} DH)</div><p>Versé: ${formatGourdes(verseVal)} Gdes<br/>Monnaie: ${formatGourdes(renduVal)} Gdes</p><div class="footer">Merci de votre visite !</div></body></html>`;
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ticket CHF - Achat Express</title><style>@page{size:80mm 200mm;margin:3mm 5mm;}body{font-family:'Courier New',monospace;font-size:13px;color:#000;width:70mm;margin:0 auto;}.entete{text-align:center;border-bottom:2px dashed #000;padding-bottom:6px;margin-bottom:8px;}.entete h1{font-size:20px;margin:4px 0;}.entete p{margin:2px 0;font-size:12px;}table{width:100%;border-collapse:collapse;margin:6px 0;font-size:12px;}th,td{padding:4px;text-align:left;border-bottom:1px dotted #ccc;}.total{font-weight:bold;font-size:17px;text-align:right;border-top:2px solid #000;padding-top:6px;margin-top:6px;}.footer{margin-top:10px;font-size:10px;text-align:center;border-top:1px dashed #ccc;padding-top:6px;}</style></head><body><div class="entete"><h1>CHF</h1><p>Centre Hospitalier de Fontaine</p><p>Achat Express — Comptoir</p><p>${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</p></div><p>Client: ${echapperHTML(nom || 'Comptoir')}</p><table><thead><tr><th>Article</th><th>Qté</th><th>Total</th></tr></thead><tbody>${lignes.map(l => `<tr><td>${echapperHTML(l.nom)}</td><td>${l.qte}</td><td>${formatPrix(l.qte*l.prix)}</td></tr>`).join('')}</tbody></table><div class="total">TOTAL : ${formatPrix(totalVente)}</div><p>Versé: ${formatPrix(verseVal)}<br/>Monnaie: ${formatPrix(renduVal)}</p><div class="footer">Merci de votre visite !</div></body></html>`;
     const win = window.open('', '_blank', 'width=400,height=600');
     if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
     win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 400);
@@ -70,8 +70,8 @@ function AchatExpress({ medicaments, actes, setMedicaments, userRole, showToast,
 
   const validerAchat = async () => {
     if (panier.length === 0) { showToast("Le panier est vide.", "error"); return; }
-    if (!totalPanier || totalPanier <= 0) { showToast("Impossible d'encaisser : le total est à 0 Gdes.", "error"); return; }
-    if (verse < totalPanier) { showToast(`Montant insuffisant. Reste : ${formatGourdes(totalPanier - verse)} Gdes`, "error"); return; }
+    if (!totalPanier || totalPanier <= 0) { showToast("Impossible d'encaisser : le total est à $0.", "error"); return; }
+    if (verse < totalPanier) { showToast(`Montant insuffisant. Reste : ${formatPrixEtGdes(totalPanier - verse)}`, "error"); return; }
 
     setEnCours(true);
     const nomFinal = formaterNomPropre(nomClient) || "Client Comptoir";
@@ -140,7 +140,7 @@ function AchatExpress({ medicaments, actes, setMedicaments, userRole, showToast,
       }
 
       if (horsLigne) showToast("📴 Vente enregistrée hors ligne — sera synchronisée au retour d'internet", "info");
-      else showToast(`✅ Vente enregistrée : ${formatGourdes(totalPanier)} Gdes`, "success");
+      else showToast(`✅ Vente enregistrée : ${formatPrix(totalPanier)}`, "success");
 
       onDossierCree({ ...episodeData, id: episodeId });
       if (confirm("🖨️ Imprimer le ticket ?")) imprimerTicketExpress(nomFinal, panier, totalPanier, verse, monnaie);
@@ -183,7 +183,7 @@ function AchatExpress({ medicaments, actes, setMedicaments, userRole, showToast,
             <ul className="absolute z-10 left-0 right-0 bg-white border rounded-lg shadow-2xl mt-1 text-xs max-h-40 overflow-y-auto divide-y">
               {suggestions.map(i => (
                 <li key={i.id}><button type="button" onClick={()=>{ setSelection(i); setRecherche(i.nom); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 flex justify-between">
-                  <span>{i.nom}</span><span className="text-gray-500 font-mono">{formatGourdes(i.prix)} Gdes</span>
+                  <span>{i.nom}</span><span className="text-gray-500 font-mono">{formatPrix(i.prix)}</span>
                 </button></li>
               ))}
             </ul>
@@ -192,7 +192,7 @@ function AchatExpress({ medicaments, actes, setMedicaments, userRole, showToast,
 
         {selection && (
           <div className="bg-gray-50 border rounded-lg p-3 space-y-2 text-xs">
-            <div className="flex justify-between font-bold"><span>{selection.nom}</span><span>{formatGourdes(selection.prix)} Gdes / unité</span></div>
+            <div className="flex justify-between font-bold"><span>{selection.nom}</span><span>{formatPrix(selection.prix)} / unité</span></div>
             <div className="flex items-center gap-2">
               <label className="font-bold text-gray-500">Quantité :</label>
               <input type="number" min="1" value={quantite} onChange={e=>setQuantite(e.target.value)} className="w-20 border rounded p-1.5 text-center font-mono" />
@@ -208,12 +208,12 @@ function AchatExpress({ medicaments, actes, setMedicaments, userRole, showToast,
               <div key={idx} className="flex justify-between items-center px-3 py-1.5 text-xs">
                 <span>{l.nom} <span className="text-gray-400">×{l.qte}</span></span>
                 <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold">{formatGourdes(l.qte * l.prix)} Gdes</span>
+                  <span className="font-mono font-bold">{formatPrix(l.qte * l.prix)}</span>
                   <button onClick={()=>retirerDuPanier(idx)} className="text-gray-300 hover:text-red-600"><X size={12}/></button>
                 </div>
               </div>
             ))}
-            <div className="flex justify-between px-3 py-2 font-black text-sm bg-gray-50"><span>TOTAL</span><span>{formatGourdes(totalPanier)} Gdes ({formatDH(totalPanier)} DH)</span></div>
+            <div className="flex justify-between px-3 py-2 font-black text-sm bg-gray-50"><span>TOTAL</span><span>{formatPrixEtGdes(totalPanier)}</span></div>
           </div>
         )}
 
@@ -224,17 +224,17 @@ function AchatExpress({ medicaments, actes, setMedicaments, userRole, showToast,
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-[10px] font-bold text-gray-500 uppercase">Montant versé</label>
+            <label className="text-[10px] font-bold text-gray-500 uppercase">Montant versé (Gdes)</label>
             <input type="number" min="0" value={montantVerse} onChange={e=>setMontantVerse(e.target.value)} placeholder="0" className="w-full border rounded-lg p-2 text-sm font-mono" />
           </div>
           <div>
             <label className="text-[10px] font-bold text-gray-500 uppercase">Monnaie</label>
-            <div className="bg-gray-100 p-2 rounded-lg text-right font-mono font-bold text-emerald-700">{formatGourdes(monnaie)} Gdes</div>
+            <div className="bg-gray-100 p-2 rounded-lg text-right font-mono font-bold text-emerald-700">{formatPrixEtGdes(monnaie)}</div>
           </div>
         </div>
 
         <button onClick={validerAchat} disabled={panier.length === 0 || enCours} className="w-full bg-emerald-700 hover:bg-emerald-800 text-white py-2.5 rounded-lg text-sm font-bold shadow-md disabled:opacity-50">
-          {enCours ? "Traitement..." : `💳 Encaisser le panier (${formatGourdes(totalPanier)} Gdes)`}
+          {enCours ? "Traitement..." : `💳 Encaisser le panier (${formatPrixEtGdes(totalPanier)})`}
         </button>
       </div>
     </div>

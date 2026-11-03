@@ -2,7 +2,7 @@
 const React = window.React;
 const { useState, useMemo } = React;
 // utils/constants n'est plus requis directement ici — la liste des partenaires vient en prop (listeOng).
-const { formatGourdes, echapperHTML } = require('../utils/helpers');
+const { echapperHTML, formatPrix } = require('../utils/helpers');
 const { Printer } = require('../utils/icons');
 
 function DashboardCaissePanel({ verifications, paiements, userDisplayName, listeOng, showToast }) {
@@ -38,7 +38,7 @@ function DashboardCaissePanel({ verifications, paiements, userDisplayName, liste
   const LABELS_MODE = { cash: 'CASH', credit: 'CRÉDIT', ong: 'PARTENAIRE', exoneration: 'EXONÉRATION', depot: 'DÉPÔT' };
 
   const imprimerRapport = () => {
-    const contenu = `<html><head><meta charset="UTF-8"><title>Rapport Partenaire</title><style>body{font-family:sans-serif;padding:20px;} table{width:100%;border-collapse:collapse;} th,td{border:1px solid #ccc;padding:6px;text-align:center;} th{background:#eee;} .footer{margin-top:16px;font-size:11px;color:#555;text-align:right;} </style></head><body><h2>Rapport Partenaire - ${new Date().toLocaleDateString('fr-FR')}</h2><table><thead><tr><th>Partenaire</th>${rapportONG.modes.map(m => `<th>${echapperHTML(LABELS_MODE[m] || m.toUpperCase())}</th>`).join('')}<th>Total</th></tr></thead><tbody>${rapportONG.ongs.map(ong => { const row = rapportONG.matrix[ong]; const totalRow = rapportONG.modes.reduce((s,m) => s + (row[m]||0), 0); return `<tr><td><strong>${echapperHTML(ong)}</strong></td>${rapportONG.modes.map(m => `<td>${formatGourdes(row[m]||0)}</td>`).join('')}<td><strong>${formatGourdes(totalRow)}</strong></td></tr>`; }).join('')}<tr style="border-top:2px solid #000;"><td><strong>TOTAL</strong></td>${rapportONG.modes.map(m => { const totalCol = rapportONG.ongs.reduce((s,ong) => s + (rapportONG.matrix[ong][m]||0), 0); return `<td><strong>${formatGourdes(totalCol)}</strong></td>`; }).join('')}<td><strong>${formatGourdes(totalFiltre)}</strong></td></tr></tbody></table><p class="footer">Imprimé par : ${echapperHTML(userDisplayName || 'inconnu')} — ${new Date().toLocaleString('fr-FR')}</p></body></html>`;
+    const contenu = `<html><head><meta charset="UTF-8"><title>Rapport Partenaire</title><style>body{font-family:sans-serif;padding:20px;} table{width:100%;border-collapse:collapse;} th,td{border:1px solid #ccc;padding:6px;text-align:center;} th{background:#eee;} .footer{margin-top:16px;font-size:11px;color:#555;text-align:right;} </style></head><body><h2>Rapport Partenaire - ${new Date().toLocaleDateString('fr-FR')}</h2><table><thead><tr><th>Partenaire</th>${rapportONG.modes.map(m => `<th>${echapperHTML(LABELS_MODE[m] || m.toUpperCase())}</th>`).join('')}<th>Total</th></tr></thead><tbody>${rapportONG.ongs.map(ong => { const row = rapportONG.matrix[ong]; const totalRow = rapportONG.modes.reduce((s,m) => s + (row[m]||0), 0); return `<tr><td><strong>${echapperHTML(ong)}</strong></td>${rapportONG.modes.map(m => `<td>${formatPrix(row[m]||0)}</td>`).join('')}<td><strong>${formatPrix(totalRow)}</strong></td></tr>`; }).join('')}<tr style="border-top:2px solid #000;"><td><strong>TOTAL</strong></td>${rapportONG.modes.map(m => { const totalCol = rapportONG.ongs.reduce((s,ong) => s + (rapportONG.matrix[ong][m]||0), 0); return `<td><strong>${formatPrix(totalCol)}</strong></td>`; }).join('')}<td><strong>${formatPrix(totalFiltre)}</strong></td></tr></tbody></table><p class="footer">Imprimé par : ${echapperHTML(userDisplayName || 'inconnu')} — ${new Date().toLocaleString('fr-FR')}</p></body></html>`;
     const win = window.open('', '_blank', 'width=800,height=600');
     if (!win) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
     win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 500);
@@ -46,7 +46,7 @@ function DashboardCaissePanel({ verifications, paiements, userDisplayName, liste
 
   const imprimerTransactions = () => {
     if (paiementsFiltres.length === 0) { alert("Aucune transaction à imprimer."); return; }
-    const contenu = `<html><head><meta charset="UTF-8"><title>Transactions - CHF</title><style>body{font-family:sans-serif;padding:20px;} h1{font-size:18px;text-align:center;} table{width:100%;border-collapse:collapse;margin-top:14px;} th,td{border:1px solid #ccc;padding:6px;text-align:left;font-size:12px;} th{background:#eee;} .total{font-weight:bold;font-size:15px;text-align:right;margin-top:10px;} .footer{margin-top:16px;font-size:11px;color:#555;text-align:right;}</style></head><body><h1>CHF — Transactions filtrées (${new Date().toLocaleDateString('fr-FR')})</h1><table><thead><tr><th>Patient</th><th>Montant</th><th>Mode</th><th>Partenaire</th><th>Date</th><th>Encaissé par</th></tr></thead><tbody>${paiementsFiltres.map(p => `<tr><td>${echapperHTML(p.patientNom||'')}</td><td>${formatGourdes(p.montant)} Gdes</td><td>${echapperHTML(LABELS_MODE[p.mode] || p.mode||'')}</td><td>${echapperHTML(p.ongPartenaire||'—')}</td><td>${new Date(p.date).toLocaleDateString('fr-FR')}</td><td>${echapperHTML(p.encaissePar||'—')}</td></tr>`).join('')}</tbody></table><p class="total">Total : ${formatGourdes(totalFiltre)} Gdes (${paiementsFiltres.length} transactions)</p><p class="footer">Imprimé par : ${echapperHTML(userDisplayName || 'inconnu')} — ${new Date().toLocaleString('fr-FR')}</p></body></html>`;
+    const contenu = `<html><head><meta charset="UTF-8"><title>Transactions - CHF</title><style>body{font-family:sans-serif;padding:20px;} h1{font-size:18px;text-align:center;} table{width:100%;border-collapse:collapse;margin-top:14px;} th,td{border:1px solid #ccc;padding:6px;text-align:left;font-size:12px;} th{background:#eee;} .total{font-weight:bold;font-size:15px;text-align:right;margin-top:10px;} .footer{margin-top:16px;font-size:11px;color:#555;text-align:right;}</style></head><body><h1>CHF — Transactions filtrées (${new Date().toLocaleDateString('fr-FR')})</h1><table><thead><tr><th>Patient</th><th>Montant</th><th>Mode</th><th>Partenaire</th><th>Date</th><th>Encaissé par</th></tr></thead><tbody>${paiementsFiltres.map(p => `<tr><td>${echapperHTML(p.patientNom||'')}</td><td>${formatPrix(p.montant)}</td><td>${echapperHTML(LABELS_MODE[p.mode] || p.mode||'')}</td><td>${echapperHTML(p.ongPartenaire||'—')}</td><td>${new Date(p.date).toLocaleDateString('fr-FR')}</td><td>${echapperHTML(p.encaissePar||'—')}</td></tr>`).join('')}</tbody></table><p class="total">Total : ${formatPrix(totalFiltre)} (${paiementsFiltres.length} transactions)</p><p class="footer">Imprimé par : ${echapperHTML(userDisplayName || 'inconnu')} — ${new Date().toLocaleString('fr-FR')}</p></body></html>`;
     const win2 = window.open('', '_blank', 'width=800,height=600');
     if (!win2) { showToast("Impression bloquée par le navigateur. Réessaie en cliquant sur Imprimer — si ça ne marche toujours pas, demande à quelqu'un de vérifier les réglages.", "error"); return; }
     win2.document.write(contenu); win2.document.close(); win2.focus(); setTimeout(() => win2.print(), 500);
@@ -77,7 +77,7 @@ function DashboardCaissePanel({ verifications, paiements, userDisplayName, liste
       {sousOnglet === "general" && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white p-4 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Total filtré</span><p className="text-2xl font-black text-emerald-700">{formatGourdes(totalFiltre)} Gdes</p></div>
+            <div className="bg-white p-4 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Total filtré</span><p className="text-2xl font-black text-emerald-700">{formatPrix(totalFiltre)}</p></div>
             <div className="bg-white p-4 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Transactions</span><p className="text-2xl font-black text-blue-600">{paiementsFiltres.length}</p></div>
             <div className="bg-white p-4 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Dépôts</span><p className="text-2xl font-black text-purple-600">{paiementsFiltres.filter(p=>p.mode==='depot').length}</p></div>
           </div>
@@ -88,7 +88,7 @@ function DashboardCaissePanel({ verifications, paiements, userDisplayName, liste
                 <thead className="sticky top-0 bg-gray-100"><tr><th>Patient</th><th>Montant</th><th>Mode</th><th>Partenaire</th><th>Date</th></tr></thead>
                 <tbody>
                   {paiementsFiltres.slice(0, 50).map((p, i) => (
-                    <tr key={i} className="border-b"><td className="p-1">{p.patientNom}</td><td className="p-1">{formatGourdes(p.montant)}</td><td className="p-1">{LABELS_MODE[p.mode] || p.mode}</td><td className="p-1">{p.ongPartenaire || '—'}</td><td className="p-1">{new Date(p.date).toLocaleDateString('fr-FR')}</td></tr>
+                    <tr key={i} className="border-b"><td className="p-1">{p.patientNom}</td><td className="p-1">{formatPrix(p.montant)}</td><td className="p-1">{LABELS_MODE[p.mode] || p.mode}</td><td className="p-1">{p.ongPartenaire || '—'}</td><td className="p-1">{new Date(p.date).toLocaleDateString('fr-FR')}</td></tr>
                   ))}
                 </tbody>
               </table>
@@ -107,9 +107,9 @@ function DashboardCaissePanel({ verifications, paiements, userDisplayName, liste
                 {rapportONG.ongs.map(ong => {
                   const row = rapportONG.matrix[ong];
                   const totalRow = rapportONG.modes.reduce((s,m) => s + (row[m]||0), 0);
-                  return <tr key={ong}><td className="p-2 border font-bold">{ong}</td>{rapportONG.modes.map(m => <td key={m} className="p-2 border text-right">{formatGourdes(row[m]||0)}</td>)}<td className="p-2 border text-right font-bold">{formatGourdes(totalRow)}</td></tr>;
+                  return <tr key={ong}><td className="p-2 border font-bold">{ong}</td>{rapportONG.modes.map(m => <td key={m} className="p-2 border text-right">{formatPrix(row[m]||0)}</td>)}<td className="p-2 border text-right font-bold">{formatPrix(totalRow)}</td></tr>;
                 })}
-                <tr className="bg-gray-50 border-t-2 border-black"><td className="p-2 border font-bold">TOTAL</td>{rapportONG.modes.map(m => { const totalCol = rapportONG.ongs.reduce((s,ong) => s + (rapportONG.matrix[ong][m]||0), 0); return <td key={m} className="p-2 border text-right font-bold">{formatGourdes(totalCol)}</td>; })}<td className="p-2 border text-right font-bold">{formatGourdes(totalFiltre)}</td></tr>
+                <tr className="bg-gray-50 border-t-2 border-black"><td className="p-2 border font-bold">TOTAL</td>{rapportONG.modes.map(m => { const totalCol = rapportONG.ongs.reduce((s,ong) => s + (rapportONG.matrix[ong][m]||0), 0); return <td key={m} className="p-2 border text-right font-bold">{formatPrix(totalCol)}</td>; })}<td className="p-2 border text-right font-bold">{formatPrix(totalFiltre)}</td></tr>
               </tbody>
             </table>
           </div>

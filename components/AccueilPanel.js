@@ -2,7 +2,7 @@
 const React = window.React;
 const { useState, useEffect, useMemo } = React;
 const { chf } = require('../api/supabase');
-const { formatGourdes } = require('../utils/helpers');
+const { formatPrix } = require('../utils/helpers');
 
 function AccueilPanel({ verifications, paiements, medicaments, userRole, userDisplayName, onNaviguer, onOuvrirAchatExpress, showToast }) {
   const [enAttente, setEnAttente] = useState(0);
@@ -70,7 +70,7 @@ function AccueilPanel({ verifications, paiements, medicaments, userRole, userDis
       <div>
         <h3 className="text-xs font-black text-gray-500 uppercase mb-2">Résumé du jour</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-white p-3 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">CA aujourd'hui</span><p className="text-lg font-black text-emerald-700">{formatGourdes(resume.caJour)} Gdes</p></div>
+          <div className="bg-white p-3 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">CA aujourd'hui</span><p className="text-lg font-black text-emerald-700">{formatPrix(resume.caJour)}</p></div>
           <div className="bg-white p-3 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Consultations</span><p className="text-lg font-black text-purple-600">{resume.consultationsJour}</p></div>
           <div className="bg-white p-3 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Dossiers actifs</span><p className="text-lg font-black text-blue-600">{resume.dossiersActifs}</p></div>
           <div className="bg-white p-3 rounded-xl border shadow-sm text-center"><span className="text-[10px] uppercase font-bold text-gray-400">Suspendus</span><p className="text-lg font-black text-amber-600">{resume.dossiersSuspendus}</p></div>

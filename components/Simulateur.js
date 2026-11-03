@@ -2,7 +2,7 @@
 const React = window.React;
 const { useState, useMemo, useRef } = React;
 const { CONFIG_LITS, prixLit, CATEGORIES_LISTE } = require('../utils/constants');
-const { formatGourdes, formatDH } = require('../utils/helpers');
+const { formatPrix } = require('../utils/helpers');
 const { X } = require('../utils/icons');
 
 function Simulateur({ medicaments, actes, showToast }) {
@@ -96,7 +96,7 @@ function Simulateur({ medicaments, actes, showToast }) {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div><label className="text-[10px] font-bold text-gray-500 uppercase">Date entrée</label><input type="date" value={dateEntree1} onChange={e=>setDateEntree1(e.target.value)} className="border rounded-lg p-1.5 text-xs w-full" /></div>
             <div><label className="text-[10px] font-bold text-gray-500 uppercase">Date sortie</label><input type="date" value={dateSortie1} onChange={e=>setDateSortie1(e.target.value)} className="border rounded-lg p-1.5 text-xs w-full" /></div>
-            <div><label className="text-[10px] font-bold text-gray-500 uppercase">Type de lit</label><select value={typeLit1} onChange={e=>setTypeLit1(e.target.value)} className="border rounded-lg p-1.5 bg-white text-xs w-full">{Object.entries(CONFIG_LITS).map(([cle, lit]) => <option key={cle} value={cle}>{lit.nom} ({formatGourdes(prixLit(cle, tarifChoisi))})</option>)}</select></div>
+            <div><label className="text-[10px] font-bold text-gray-500 uppercase">Type de lit</label><select value={typeLit1} onChange={e=>setTypeLit1(e.target.value)} className="border rounded-lg p-1.5 bg-white text-xs w-full">{Object.entries(CONFIG_LITS).map(([cle, lit]) => <option key={cle} value={cle}>{lit.nom} ({formatPrix(prixLit(cle, tarifChoisi))})</option>)}</select></div>
           </div>
           <div className="flex gap-4 pt-1 border-t border-dashed mt-2">
             <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 cursor-pointer"><input type="checkbox" checked={multiPeriode} onChange={e=>setMultiPeriode(e.target.checked)} className="rounded" /> Seconde période</label>
@@ -152,9 +152,9 @@ function Simulateur({ medicaments, actes, showToast }) {
             <table className="w-full text-xs text-left">
               <thead><tr className="bg-gray-100 text-[10px] text-gray-500 uppercase border-b font-mono"><th className="p-3">Désignation</th><th className="p-3 w-20 text-center">Qté</th><th className="p-3 text-right w-24">Prix</th><th className="p-3 text-right w-24">Total</th><th className="w-8"></th></tr></thead>
               <tbody className="divide-y divide-gray-100">
-                {j1 > 0 && <tr className="bg-amber-50/20"><td className="p-3 text-amber-900">Séjour : {CONFIG_LITS[typeLit1].nom}</td><td className="p-3 text-center font-bold">{j1} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(prixLit(typeLit1, tarifChoisi))}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE1)}</td><td></td></tr>}
-                {multiPeriode && j2 > 0 && <tr className="bg-amber-50/40"><td className="p-3 text-amber-900">Séjour P2 : {CONFIG_LITS[typeLit2].nom}</td><td className="p-3 text-center font-bold">{j2} jrs</td><td className="p-3 text-right text-gray-400">{formatGourdes(prixLit(typeLit2, tarifChoisi))}</td><td className="p-3 text-right font-bold">{formatGourdes(totalE2)}</td><td></td></tr>}
-                {hasChirSpec && nomChirSpec && <tr className="bg-red-50/20"><td className="p-3 text-red-900">Chirurgie : {nomChirSpec}</td><td className="p-3 text-center">1</td><td className="p-3 text-right text-gray-400">{formatGourdes(totalChirSpec)}</td><td className="p-3 text-right font-bold">{formatGourdes(totalChirSpec)}</td><td></td></tr>}
+                {j1 > 0 && <tr className="bg-amber-50/20"><td className="p-3 text-amber-900">Séjour : {CONFIG_LITS[typeLit1].nom}</td><td className="p-3 text-center font-bold">{j1} jrs</td><td className="p-3 text-right text-gray-400">{formatPrix(prixLit(typeLit1, tarifChoisi))}</td><td className="p-3 text-right font-bold">{formatPrix(totalE1)}</td><td></td></tr>}
+                {multiPeriode && j2 > 0 && <tr className="bg-amber-50/40"><td className="p-3 text-amber-900">Séjour P2 : {CONFIG_LITS[typeLit2].nom}</td><td className="p-3 text-center font-bold">{j2} jrs</td><td className="p-3 text-right text-gray-400">{formatPrix(prixLit(typeLit2, tarifChoisi))}</td><td className="p-3 text-right font-bold">{formatPrix(totalE2)}</td><td></td></tr>}
+                {hasChirSpec && nomChirSpec && <tr className="bg-red-50/20"><td className="p-3 text-red-900">Chirurgie : {nomChirSpec}</td><td className="p-3 text-center">1</td><td className="p-3 text-right text-gray-400">{formatPrix(totalChirSpec)}</td><td className="p-3 text-right font-bold">{formatPrix(totalChirSpec)}</td><td></td></tr>}
                 {lignes.map(l => { const decrementer = () => setLignes(p=>p.map(x=>x.id===l.id?{...x,qte:Math.max(1,x.qte-1)}:x)); const incrementer = () => setLignes(p=>p.map(x=>x.id===l.id?{...x,qte:x.qte+1}:x)); return (
                   <tr key={l.id} className="zebra-row">
                     <td className="p-3 text-gray-800"><span className={`text-[8px] font-bold uppercase px-1 rounded mr-1 ${l.type==='med'?'bg-emerald-50 text-emerald-700':'bg-blue-50 text-blue-700'}`}>{l.type==='med'?'Pharma':'Acte'}</span>{l.nom}</td>
@@ -165,18 +165,18 @@ function Simulateur({ medicaments, actes, showToast }) {
                         <button onMouseDown={()=>demarrerRepetition(incrementer)} onMouseUp={arreterRepetition} onMouseLeave={arreterRepetition} onTouchStart={(e)=>{e.preventDefault(); demarrerRepetition(incrementer);}} onTouchEnd={(e)=>{e.preventDefault(); arreterRepetition();}} onTouchCancel={arreterRepetition} className="w-8 h-8 bg-gray-100 active:bg-gray-300 rounded-lg font-bold text-gray-700 select-none">+</button>
                       </div>
                     </td>
-                    <td className="p-3 text-right text-gray-400">{formatGourdes(l.prix)}</td>
-                    <td className="p-3 text-right font-bold">{formatGourdes(l.qte * l.prix)}</td>
+                    <td className="p-3 text-right text-gray-400">{formatPrix(l.prix)}</td>
+                    <td className="p-3 text-right font-bold">{formatPrix(l.qte * l.prix)}</td>
                     <td className="text-center"><button onClick={()=>setLignes(p=>p.filter(x=>x.id!==l.id))} className="text-gray-300 hover:text-red-600"><X size={12}/></button></td>
                   </tr>
                 ); })}
               </tbody>
             </table>
             <div className="p-4 bg-gray-50 border-t border-b text-[11px] text-gray-600 font-mono space-y-1 shadow-inner">
-              <div className="grid grid-cols-3 font-bold text-[#1E2A24] border-b pb-1 mb-2"><span>RÉCAPITULATIF</span><span className="text-right">Gdes</span><span className="text-right text-emerald-800">💵 DH</span></div>
-              {CATEGORIES_LISTE.map(srv => { const m = totalsParService[srv.key]; if (m===0) return null; return <div key={srv.key} className="grid grid-cols-3 py-0.5"><span>• {srv.label}</span><span className="text-right">{formatGourdes(m)}</span><span className="text-right font-bold">{formatDH(m)} DH</span></div>; })}
+              <div className="grid grid-cols-2 font-bold text-[#1E2A24] border-b pb-1 mb-2"><span>RÉCAPITULATIF</span><span className="text-right">Montant</span></div>
+              {CATEGORIES_LISTE.map(srv => { const m = totalsParService[srv.key]; if (m===0) return null; return <div key={srv.key} className="grid grid-cols-2 py-0.5"><span>• {srv.label}</span><span className="text-right">{formatPrix(m)}</span></div>; })}
             </div>
-            <div className="bg-[#1E2A24] text-white p-4 flex justify-between items-center font-bold text-sm font-mono"><span>TOTAL SIMULÉ :</span><span>{formatGourdes(grandTotal)} Gdes ({formatDH(grandTotal)} DH)</span></div>
+            <div className="bg-[#1E2A24] text-white p-4 flex justify-between items-center font-bold text-sm font-mono"><span>TOTAL SIMULÉ :</span><span>{formatPrix(grandTotal)}</span></div>
             <div className="p-3 flex justify-end"><button onClick={vider} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-xs font-bold">🧹 Vider</button></div>
           </div>
         </div>

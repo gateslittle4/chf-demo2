@@ -7,7 +7,7 @@ const { chf, toEpisodeApi, fromEpisodeApi, generateLocalId, fromPaiementApi } = 
 const { firebase, auth, db, LOG_TARGETS_KEY, LOG_DOSSIER_BROUILLON_KEY, enregistrerAudit } = require('../api/firebase');
 const { CONFIG_LITS, prixLit, CATEGORIES_LISTE, LISTE_ONG } = require('../utils/constants');
 const { MEDICAMENTS_PAR_DEFAUT, ACTES_PAR_DEFAUT } = require('../utils/defaultCatalog');
-const { formatGourdes, formatDH, formaterNomPropre } = require('../utils/helpers');
+const { formaterNomPropre, formatPrix } = require('../utils/helpers');
 const { chiffrerTexte, dechiffrerTexte } = require('../utils/crypto');
 const { ArrowUp, ArrowDown } = require('../utils/icons');
 
@@ -442,7 +442,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
       message: idFicheEnCoursDEdition
         ? `Tu modifies la Fiche N°${ficheOriginale?.numeroFiche || ''} et ces changements ne sont pas encore enregistrés.`
         : "Tu as une fiche en cours de saisie qui n'a pas encore été ajoutée au dossier.",
-      detail: `${formatGourdes(grandTotalGlobalFiche)} Gdes`,
+      detail: `${formatPrix(grandTotalGlobalFiche)}`,
       confirmLabel: idFicheEnCoursDEdition ? "Oui, enregistrer la modification" : "Oui, l'ajouter",
       cancelLabel: "Non, continuer sans",
       onConfirm: () => {
@@ -541,7 +541,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
     const demanderConfirmation = () => setConfirmModal({
       titre: "Archiver ce dossier ?",
       message: `Patient : ${nomPatient}\n${fichesDossier.length} fiche(s) — le dossier sera clôturé et archivé.`,
-      detail: `${formatGourdes(somme)} Gdes  (${formatDH(somme)} DH)`,
+      detail: `${formatPrix(somme)}`,
       confirmLabel: "🟢 Archiver",
       onConfirm: () => { setConfirmModal(null); executerArchivage(); },
       onCancel: () => setConfirmModal(null)
@@ -1094,8 +1094,8 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
       {dossierActif && !modePreValidation && (
         <div className="fixed top-20 right-4 z-40 bg-[#1E2A24] text-white px-4 py-2 rounded-xl shadow-2xl border border-emerald-500/30 flex flex-col items-end">
           <span className="text-[9px] uppercase tracking-wider text-[#9FB8A8] font-bold">Dossier {nomPatient}</span>
-          <span className="text-sm font-mono font-black">{formatGourdes(totalDossierGourdes + grandTotalGlobalFiche)} Gdes</span>
-          <span className="text-[10px] font-mono text-emerald-400">{formatDH(totalDossierGourdes + grandTotalGlobalFiche)} DH</span>
+          <span className="text-sm font-mono font-black">{formatPrix(totalDossierGourdes + grandTotalGlobalFiche)}</span>
+          <span className="text-[10px] font-mono text-emerald-400">{formatPrix(totalDossierGourdes + grandTotalGlobalFiche)}</span>
         </div>
       )}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2">
@@ -1157,9 +1157,9 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
           <div className="bg-white p-6 rounded-xl border border-emerald-400 shadow-xl space-y-4">
             <div className="text-center border-b pb-2"><span className="text-emerald-800 font-bold uppercase text-[11px]">Contrôle final</span><h3 className="text-lg font-black">📋 Totaux analytiques</h3><p className="text-xs text-gray-500">{nomPatient} | {selectedOng}</p></div>
             <div className="bg-gray-50 p-4 rounded-xl border shadow-inner space-y-2">
-              <div className="grid grid-cols-3 font-bold font-mono text-xs border-b pb-2 mb-2"><span>CATÉGORIE</span><span className="text-right">Gdes</span><span className="text-right text-emerald-800">DH</span></div>
-              {CATEGORIES_LISTE.map(cat => { const m = cumulCategoriesDossierActif[cat.key]; if (m === 0) return null; return <div key={cat.key} className="grid grid-cols-3 font-mono text-[12px] py-1 border-b border-dashed"><span>{cat.label}</span><span className="text-right font-bold">{formatGourdes(m)}</span><span className="text-right font-bold text-emerald-800">{formatDH(m)}</span></div>; })}
-              <div className="grid grid-cols-3 font-mono font-black text-sm pt-3 mt-2 border-t-2"><span>TOTAL</span><span className="text-right">{formatGourdes(totalDossierGourdes)}</span><span className="text-right text-emerald-800">{formatDH(totalDossierGourdes)}</span></div>
+              <div className="grid grid-cols-2 font-bold font-mono text-xs border-b pb-2 mb-2"><span>CATÉGORIE</span><span className="text-right">Montant</span></div>
+              {CATEGORIES_LISTE.map(cat => { const m = cumulCategoriesDossierActif[cat.key]; if (m === 0) return null; return <div key={cat.key} className="grid grid-cols-2 font-mono text-[12px] py-1 border-b border-dashed"><span>{cat.label}</span><span className="text-right font-bold">{formatPrix(m)}</span></div>; })}
+              <div className="grid grid-cols-2 font-mono font-black text-sm pt-3 mt-2 border-t-2"><span>TOTAL</span><span className="text-right">{formatPrix(totalDossierGourdes)}</span></div>
             </div>
             <div className="grid grid-cols-2 gap-3"><button onClick={() => setModePreValidation(false)} className="bg-gray-100 hover:bg-gray-200 rounded-xl py-3 text-xs font-bold">Retour</button><button onClick={finaliserEtArchiverDossierOfficiel} className="bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl py-3 text-xs font-black">🟢 Archiver</button></div>
           </div>

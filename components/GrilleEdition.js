@@ -5,7 +5,7 @@ const { chf } = require('../api/supabase');
 const { db } = require('../api/firebase');
 const { LOG_MEDS_KEY, LOG_ACTES_KEY } = require('../api/firebase');
 const { CATEGORIES_LISTE } = require('../utils/constants');
-const { formatGourdes } = require('../utils/helpers');
+const { formatPrix } = require('../utils/helpers');
 const { Check, X, Pencil, Trash2 } = require('../utils/icons');
 
 function GrilleEditionPanel({ titre, items, setItems, collectionName, showToast }) {
@@ -158,7 +158,7 @@ function GrilleEditionPanel({ titre, items, setItems, collectionName, showToast 
         <h3 className="font-bold text-gray-800">➕ Ajouter un {titre}</h3>
         <div className="flex flex-wrap gap-2">
           <input type="text" value={nouveauNom} onChange={e=>setNouveauNom(e.target.value)} placeholder="Nom..." className="border rounded-lg p-1.5 flex-1 min-w-[120px] outline-none" />
-          <input type="number" step="0.01" value={nouveauPrix} onChange={e=>setNouveauPrix(e.target.value)} placeholder="Prix (Gourdes)" className="border rounded-lg p-1.5 w-24 font-mono outline-none" />
+          <input type="number" step="0.01" value={nouveauPrix} onChange={e=>setNouveauPrix(e.target.value)} placeholder="Prix en Gdes (÷5 = $)" className="border rounded-lg p-1.5 w-24 font-mono outline-none" />
           <input type="number" step="0.01" value={nouveauCout} onChange={e=>setNouveauCout(e.target.value)} placeholder="Coût (achat+m.o.)" className="border border-orange-300 rounded-lg p-1.5 w-28 font-mono outline-none" />
           {collectionName === 'medicaments' && (
             <><input type="number" step="1" value={quantiteStock} onChange={e=>setQuantiteStock(e.target.value)} placeholder="Stock" className="border rounded-lg p-1.5 w-16 font-mono outline-none" />
@@ -224,13 +224,13 @@ function GrilleEditionPanel({ titre, items, setItems, collectionName, showToast 
                         {categoriesActes.find(c => c.key === i.sub)?.label || '⚠️ Non classé (→ Chirurgie)'}
                       </span>
                     )}
-                    <span className="font-mono bg-gray-100 px-2 py-0.5 rounded font-bold">{formatGourdes(i.prix)} Gdes</span>
+                    <span className="font-mono bg-gray-100 px-2 py-0.5 rounded font-bold">{formatPrix(i.prix)}</span>
                     {i.cout != null ? (
                       <span className="font-mono bg-orange-50 text-orange-700 px-2 py-0.5 rounded font-bold" title="Coût (achat + main d'œuvre)">
-                        Coût: {formatGourdes(i.cout)} <span className={i.prix - i.cout >= 0 ? 'text-emerald-700' : 'text-red-600'}>(marge {formatGourdes(i.prix - i.cout)})</span>
+                        Coût: {formatPrix(i.cout)} <span className={i.prix - i.cout >= 0 ? 'text-emerald-700' : 'text-red-600'}>(marge {formatPrix(i.prix - i.cout)})</span>
                       </span>
                     ) : <span className="font-mono bg-gray-50 text-gray-400 px-2 py-0.5 rounded" title="Coût non renseigné">Coût: —</span>}
-                    {i.nouveauPrix != null && i.nouveauPrix !== "" && <span className="font-mono bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold" title="Nouveau prix à venir">→ {formatGourdes(i.nouveauPrix)} Gdes</span>}
+                    {i.nouveauPrix != null && i.nouveauPrix !== "" && <span className="font-mono bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-bold" title="Nouveau prix à venir">→ {formatPrix(i.nouveauPrix)}</span>}
                     <button onClick={()=>{ setIdEdit(i.id); setNomEdit(i.nom); setPrixEdit(String(i.prix)); setCoutEdit(i.cout != null ? String(i.cout) : ""); setNouveauPrixEdit(i.nouveauPrix != null ? String(i.nouveauPrix) : ""); setSousCategorieEdit(i.sub || 'chirurgie'); }} className="text-gray-400 hover:text-gray-700 p-1"><Pencil size={12}/></button>
                     <button onClick={()=>supprimerElement(i.id)} className="text-gray-300 hover:text-red-600 p-1"><Trash2 size={12}/></button>
                   </div>

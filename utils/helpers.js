@@ -9,6 +9,22 @@ function formatDH(val) {
   return formatGourdes(val / 5);
 }
 
+// Affichage de TOUS les montants à l'écran et sur les impressions : en dollars haïtiens ($ HTG,
+// 1 $ = 5 Gdes) pour éviter de convertir de tête. Les données restent stockées en gourdes ; seul
+// l'export Excel (fichiers envoyés aux partenaires) garde les gourdes. Pas de décimales quand le
+// montant est rond ("$300", "$1 250"), deux décimales sinon ("$87,50").
+function formatPrix(val) {
+  const dollars = (Number.isFinite(val) ? val : 0) / 5;
+  const entier = Math.abs(dollars - Math.round(dollars)) < 1e-9;
+  return "$" + dollars.toLocaleString("fr-FR", { minimumFractionDigits: entier ? 0 : 2, maximumFractionDigits: entier ? 0 : 2 });
+}
+
+// Pour tout montant que la caisse doit compter ou rendre en billets (monnaie, reste à payer,
+// total à encaisser) : les gourdes restent affichées à côté, car l'argent remis est en gourdes.
+function formatPrixEtGdes(val) {
+  return `${formatPrix(val)} (${formatGourdes(val).replace(/,00$/, "")} Gdes)`;
+}
+
 function formaterNomPropre(chaine) {
   // \b\w ne matche que les caractères ASCII (pas les lettres accentuées) : "éliane" restait "éliane"
   // au lieu de "Éliane". \p{L} (avec le flag u) reconnaît toute lettre Unicode ; on capitalise la
@@ -73,6 +89,8 @@ async function dbDeleteItem(id) {
 module.exports = {
   formatGourdes,
   formatDH,
+  formatPrix,
+  formatPrixEtGdes,
   formaterNomPropre,
   echapperHTML,
   getIndexedDB,
