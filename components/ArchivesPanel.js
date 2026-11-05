@@ -201,7 +201,7 @@ const construireIndexMeres = (poolRecherche) => {
 
 // Doublons probables : la même personne enregistrée en deux dossiers séparés (ex. un dossier labo et
 // un dossier sono, tapés avec un nom à une lettre près). On regarde, pour chaque dossier SANS LOT, les
-// autres dossiers du même partenaire (sans lot ou déjà dans un lot) dont le nom est proche :
+// autres dossiers SANS LOT du même partenaire dont le nom est proche :
 //  - mêmes mots dans n'importe quel ordre, à 1 lettre près (noms de 6+ lettres) ou 2 lettres près (10+) ;
 //  - ou, le même jour d'entrée, au moins 2 mots du nom en commun (ex. "Rene Marie Carmel" / "Rene Marie Canose").
 // Les bébés ne sont comparés qu'entre noms identiques : Bb1/Bb2 sont des jumeaux, pas des doublons.
@@ -245,6 +245,9 @@ const trouverDoublonsProbables = (dossiersSansLot, tousLesDossiersDuPartenaire) 
   dossiersSansLot.forEach(a => {
     tousLesDossiersDuPartenaire.forEach(b => {
       if (a.id === b.id) return;
+      // Deux dossiers de lots différents ne sont jamais des doublons (même patient revenu un autre mois) :
+      // on ne compare que des dossiers au même état de lot (ici : tous les deux sans lot).
+      if ((a.numeroLot ?? null) !== (b.numeroLot ?? null)) return;
       const id = [a.id, b.id].sort().join('|');
       if (dejaVues.has(id)) return;
       if (proches(a, b)) { dejaVues.add(id); paires.push({ a, b }); }
@@ -928,11 +931,43 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     genererFichierExcelPourLot(ongCible, idsLot, numeroLot);
   };
 
-  // Retire un dossier de son lot : redevient libre, sera repris au prochain "Générer le prochain
-  // lot" pour ce partenaire — jamais automatiquement dans un autre lot déjà existant.
+  // Une paire de dossiers au nom proche, avec les boutons de fusion -- utilisée à la fois dans l'encadré
+  // orange de la zone "dossiers en attente" (fusion directe, sans ouvrir aucun dossier) et dans la fenêtre
+  // qui s'ouvre quand on clique sur "Générer le prochain lot".
+  const rendrePaireDoublon = (paire) => {
+    const { a, b } = paire;
+    const fusionPossible = [a, b].every(v => v.numeroLot == null && !v.verrouilleFacture && (v.status || 'archived') === 'archived');
+    const carte = (v) => (
+      <div className="flex-1 min-w-0 bg-white border rounded-lg p-2 text-[11px]">
+        <p className="font-black text-gray-800 truncate">{v.nomPatient}</p>
+        <p className="text-gray-600">{ventilationDossier(v).map(x => x.label).join(' + ') || 'vide'} — {(v.fiches || []).length} fiche{(v.fiches || []).length > 1 ? 's' : ''}</p>
+        <p className="font-mono text-gray-700">{formatPrix(v.totalGlobal || 0)} · {v.numeroLot != null ? `Lot ${v.numeroLot}` : 'sans lot'}{v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? ` · ${v.dateEntreePourTri.split('-').reverse().slice(0, 2).join('/')}` : ''}</p>
+      </div>
+    );
+    const ignorer = <button onClick={() => setDoublonsIgnores(l => [...l, cleDoublon(paire)])} className="border text-[10px] font-bold px-2 py-1 rounded bg-white">Deux personnes différentes</button>;
+    return (
+      <div key={cleDoublon(paire)} className="border rounded-lg p-2 space-y-1.5 bg-amber-50/40">
+        <div className="flex gap-2">{carte(a)}{carte(b)}</div>
+        {fusionPossible ? (
+          <div className="flex flex-wrap gap-1.5">
+            <button disabled={fusionEnCours || !peutModifier} onClick={() => fusionnerDossiers(a, b)} className="bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded disabled:opacity-40">🔗 Fusionner dans « {a.nomPatient} »</button>
+            <button disabled={fusionEnCours || !peutModifier} onClick={() => fusionnerDossiers(b, a)} className="bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded disabled:opacity-40">🔗 Fusionner dans « {b.nomPatient} »</button>
+            {ignorer}
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-[10px] text-amber-800">L'un est suspendu ou verrouillé : fusion impossible ici, vérifie à la main.</p>
+            {ignorer}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // Fusionne `retirer` dans `garder` : le dossier gardé conserve son nom et son identifiant, reçoit les fiches de
   // l'autre (ajoutées à la suite, renumérotées 1..n) et son total est recalculé ; l'autre dossier est supprimé
-  // (le serveur en garde une copie complète dans episodes_supprimes). Seulement entre dossiers sans lot.
+  // (le serveur en garde une copie complète dans episodes_supprimes). Seulement entre dossiers sans lot,
+  // sans ouvrir aucun des deux dossiers.
   const fusionnerDossiers = async (garder, retirer) => {
     if (fusionEnCours) return;
     if (garder.numeroLot != null || retirer.numeroLot != null || garder.verrouilleFacture || retirer.verrouilleFacture) { showToast("Fusion impossible : un des dossiers est déjà dans un lot.", "error"); return; }
@@ -953,6 +988,8 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     setFusionEnCours(false);
   };
 
+  // Retire un dossier de son lot : redevient libre, sera repris au prochain "Générer le prochain
+  // lot" pour ce partenaire — jamais automatiquement dans un autre lot déjà existant.
   const retirerDossierDuLot = (dossier) => {
     setConfirmModal({
       titre: `Retirer ${dossier.nomPatient} du Lot ${dossier.numeroLot} ?`,
@@ -1311,34 +1348,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                     </div>
                     <div className="overflow-y-auto p-2 space-y-2">
                       {doublonsProbables.length === 0 && <p className="text-center text-emerald-700 font-bold text-xs py-4">✅ Plus aucun nom proche à vérifier.</p>}
-                      {doublonsProbables.map(paire => {
-                        const { a, b } = paire;
-                        const fusionPossible = [a, b].every(v => v.numeroLot == null && !v.verrouilleFacture && (v.status || 'archived') === 'archived');
-                        const carte = (v) => (
-                          <div className="flex-1 min-w-0 bg-gray-50 border rounded-lg p-2 text-[11px]">
-                            <p className="font-black text-gray-800 truncate">{v.nomPatient}</p>
-                            <p className="text-gray-600">{ventilationDossier(v).map(x => x.label).join(' + ') || 'vide'} — {(v.fiches || []).length} fiche{(v.fiches || []).length > 1 ? 's' : ''}</p>
-                            <p className="font-mono text-gray-700">{formatPrix(v.totalGlobal || 0)} · {v.numeroLot != null ? `Lot ${v.numeroLot}` : 'sans lot'}{v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? ` · ${v.dateEntreePourTri.split('-').reverse().slice(0, 2).join('/')}` : ''}</p>
-                          </div>
-                        );
-                        return (
-                          <div key={cleDoublon(paire)} className="border rounded-lg p-2 space-y-1.5">
-                            <div className="flex gap-2">{carte(a)}{carte(b)}</div>
-                            {fusionPossible ? (
-                              <div className="flex flex-wrap gap-1.5">
-                                <button disabled={fusionEnCours || !peutModifier} onClick={() => fusionnerDossiers(a, b)} className="bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded disabled:opacity-40">🔗 Fusionner dans « {a.nomPatient} »</button>
-                                <button disabled={fusionEnCours || !peutModifier} onClick={() => fusionnerDossiers(b, a)} className="bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded disabled:opacity-40">🔗 Fusionner dans « {b.nomPatient} »</button>
-                                <button onClick={() => setDoublonsIgnores(l => [...l, cleDoublon(paire)])} className="border text-[10px] font-bold px-2 py-1 rounded">Deux personnes différentes</button>
-                              </div>
-                            ) : (
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-[10px] text-amber-800">L'un est déjà dans un lot (ou suspendu) : fusion impossible ici, vérifie à la main.</p>
-                                <button onClick={() => setDoublonsIgnores(l => [...l, cleDoublon(paire)])} className="border text-[10px] font-bold px-2 py-1 rounded">Deux personnes différentes</button>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                      {doublonsProbables.map(rendrePaireDoublon)}
                     </div>
                     <div className="p-3 border-t flex justify-end gap-2">
                       <button onClick={() => setModalDoublonsOuvert(false)} className="border text-xs font-bold px-3 py-1.5 rounded-lg">Annuler</button>
@@ -1348,12 +1358,9 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                 </div>
               )}
               {doublonsProbables.length > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 text-[11px] space-y-1">
-                  <p className="font-bold text-amber-900">⚠️ {doublonsProbables.length} nom{doublonsProbables.length > 1 ? 's' : ''} proche{doublonsProbables.length > 1 ? 's' : ''} à vérifier — peut-être la même personne enregistrée en deux dossiers (ex. labo d'un côté, sono de l'autre)</p>
-                  {doublonsProbables.map(({ a, b }) => {
-                    const decrire = (v) => `${v.nomPatient} — ${ventilationDossier(v).map(x => x.label).join(' + ') || 'vide'} (${formatPrix(v.totalGlobal || 0)}, ${v.numeroLot != null ? `Lot ${v.numeroLot}` : 'sans lot'}${v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? `, ${v.dateEntreePourTri.split('-').reverse().slice(0, 2).join('/')}` : ''})`;
-                    return <p key={a.id + b.id} className="font-mono text-amber-800">• {decrire(a)} <span className="font-bold">↔</span> {decrire(b)}</p>;
-                  })}
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 text-[11px] space-y-1.5">
+                  <p className="font-bold text-amber-900">⚠️ {doublonsProbables.length} nom{doublonsProbables.length > 1 ? 's' : ''} proche{doublonsProbables.length > 1 ? 's' : ''} parmi les dossiers sans lot — peut-être la même personne enregistrée en deux dossiers (ex. labo d'un côté, sono de l'autre). Fusionne ici, sans ouvrir les dossiers :</p>
+                  {doublonsProbables.map(rendrePaireDoublon)}
                 </div>
               )}
               <div className="flex flex-wrap gap-4 items-center bg-gray-50 p-3 rounded-lg border border-dashed">
