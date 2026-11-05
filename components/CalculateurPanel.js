@@ -30,7 +30,7 @@ const phraseSejour = (dateEntree, dateSortie) => {
 // les dépôts, les impressions, etc. Toutes les conversions vers l'API sont faites.
 function CalculateurPanel({
   medicaments, actes, setActes, lignes, setLignes, dossierActif, nomPatient, selectedOng, onNouveauDossier, onAnnulerDossier, onCloturerDossier,
-  fichesDossier, onSupprimerFicheDossier, onMarquerProblemeFiche,
+  fichesDossier, onSupprimerFicheDossier, onMarquerProblemeFiche, onReordonnerFiches,
   idFicheEnCoursDEdition,  // ID de la fiche en cours d'édition (passé par le parent)
   onEditerFiche,           // NOUVELLE PROP : fonction pour charger une fiche en édition
   idFicheApresLaquelleInserer, onInsererApres, onAnnulerInsertion, // insertion d'une fiche oubliée entre deux fiches existantes
@@ -52,6 +52,8 @@ function CalculateurPanel({
   onChangerTypeOng, onChangerNomPatient,
   listeOng
 }) {
+  // Menu "Réordonner les fiches" : liste des ids dans l'ordre en cours de réglage (null = menu fermé)
+  const [ordreFiches, setOrdreFiches] = useState(null);
   const [inputNom, setInputNom] = useState("");
   const [inputOng, setInputOng] = useState(() => localStorage.getItem('chf-dernier-ong') || "");
   const [inputNumDossier, setInputNumDossier] = useState("");
@@ -727,6 +729,14 @@ function CalculateurPanel({
                 Fiches validées {idFicheEnCoursDEdition ? '(modification en cours)' : ''}
               </span>
               <button onClick={imprimerToutesLesFichesDuDossier} className="ml-2 bg-[#1E2A24] text-white text-[9px] font-bold px-2 py-1 rounded-lg">🖨️ Imprimer les {fichesDossier.length} fiche{fichesDossier.length > 1 ? 's' : ''} d'affilée</button>
+              {onReordonnerFiches && fichesDossier.length > 1 && (
+                <button
+                  onClick={() => setOrdreFiches([...fichesDossier].sort((a, b) => a.numeroFiche - b.numeroFiche).map(f => f.id))}
+                  disabled={!!idFicheEnCoursDEdition || !!idFicheApresLaquelleInserer}
+                  title={idFicheEnCoursDEdition || idFicheApresLaquelleInserer ? "Termine d'abord la modification / l'insertion en cours" : "Remettre les fiches dans le bon ordre"}
+                  className="ml-2 bg-indigo-600 text-white text-[9px] font-bold px-2 py-1 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
+                >↕️ Réordonner les fiches</button>
+              )}
               {idFicheApresLaquelleInserer && (
                 <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 text-indigo-800 rounded-lg px-2 py-1.5 text-[10px] font-bold">
                   <span>↕️ La prochaine fiche enregistrée s'insérera au N°{numeroFicheCourante} (fiches suivantes renumérotées)</span>
@@ -792,6 +802,45 @@ function CalculateurPanel({
               </div>
             </div>
           )}
+
+          {ordreFiches && (() => {
+            const parId = new Map(fichesDossier.map(f => [f.id, f]));
+            const resume = (f) => {
+              const noms = (f.rawState?.lignesCalcul || []).map(l => l.nom);
+              if (noms.length) return noms.slice(0, 3).join(', ') + (noms.length > 3 ? '…' : '');
+              return f.exeat ? 'Hébergement' : '—';
+            };
+            const deplacer = (i, delta) => setOrdreFiches(o => { const j = i + delta; if (j < 0 || j >= o.length) return o; const n = [...o]; [n[i], n[j]] = [n[j], n[i]]; return n; });
+            return (
+              <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-3" onClick={() => setOrdreFiches(null)}>
+                <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                  <div className="p-3 border-b">
+                    <p className="font-black text-sm text-gray-800">↕️ Réordonner les fiches</p>
+                    <p className="text-[10px] text-gray-500">Déplace une fiche avec ▲ ▼ : les fiches seront renumérotées 1, 2, 3… dans cet ordre. Aucun montant ne change.</p>
+                  </div>
+                  <div className="overflow-y-auto p-2 space-y-1">
+                    {ordreFiches.map((id, i) => {
+                      const f = parId.get(id); if (!f) return null;
+                      const change = f.numeroFiche !== i + 1;
+                      return (
+                        <div key={id} className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 text-[11px] font-mono ${change ? 'bg-indigo-50 border-indigo-200' : 'bg-gray-50 border-gray-200'}`}>
+                          <span className="font-black w-16 shrink-0">N°{i + 1}{change && <span className="text-indigo-500 font-bold text-[9px]"> (était {f.numeroFiche})</span>}</span>
+                          <span className="flex-1 min-w-0 truncate text-gray-600" title={resume(f)}>{resume(f)}</span>
+                          <span className="font-bold text-gray-800 whitespace-nowrap">{formatPrix(f.totalGlobal)}</span>
+                          <button onClick={() => deplacer(i, -1)} disabled={i === 0} className="w-7 h-7 rounded border bg-white disabled:opacity-20 font-bold">▲</button>
+                          <button onClick={() => deplacer(i, 1)} disabled={i === ordreFiches.length - 1} className="w-7 h-7 rounded border bg-white disabled:opacity-20 font-bold">▼</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="p-3 border-t flex justify-end gap-2">
+                    <button onClick={() => setOrdreFiches(null)} className="border text-xs font-bold px-3 py-1.5 rounded-lg">Annuler</button>
+                    <button onClick={() => { onReordonnerFiches(ordreFiches); setOrdreFiches(null); }} className="bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">Enregistrer l'ordre</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           <HebergementForm
             dateEntree1={dateEntree1} setDateEntree1={setDateEntree1} dateSortie1={dateSortie1} setDateSortie1={setDateSortie1}

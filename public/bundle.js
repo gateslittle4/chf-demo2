@@ -4751,6 +4751,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
         fichesDossier,
         onSupprimerFicheDossier,
         onMarquerProblemeFiche,
+        onReordonnerFiches,
         idFicheEnCoursDEdition,
         // ID de la fiche en cours d'édition (passé par le parent)
         onEditerFiche,
@@ -4822,6 +4823,7 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
         onChangerNomPatient,
         listeOng
       }) {
+        const [ordreFiches, setOrdreFiches] = useState(null);
         const [inputNom, setInputNom] = useState("");
         const [inputOng, setInputOng] = useState(() => localStorage.getItem("chf-dernier-ong") || "");
         const [inputNumDossier, setInputNumDossier] = useState("");
@@ -5578,7 +5580,16 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
         }, className: "text-[9px] font-bold text-blue-600 underline" }, "\u270F\uFE0F Changer")) : /* @__PURE__ */ React.createElement("div", { className: "flex gap-1.5 items-center mt-1 flex-wrap" }, /* @__PURE__ */ React.createElement("select", { value: nouveauTypeEdit, onChange: (e) => setNouveauTypeEdit(e.target.value), className: "border rounded p-1 text-xs bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "ONG" }, "\u{1F3E5} Partenaire"), /* @__PURE__ */ React.createElement("option", { value: "PRIVE" }, "\u{1F4B3} Priv\xE9")), nouveauTypeEdit === "ONG" && /* @__PURE__ */ React.createElement("select", { value: nouvelOngEdit, onChange: (e) => setNouvelOngEdit(e.target.value), className: "border rounded p-1 text-xs bg-white" }, /* @__PURE__ */ React.createElement("option", { value: "" }, "-- Partenaire --"), listeOng.map((o) => /* @__PURE__ */ React.createElement("option", { key: o, value: o }, o))), /* @__PURE__ */ React.createElement("button", { onClick: () => {
           if (onChangerTypeOng) onChangerTypeOng(nouveauTypeEdit, nouveauTypeEdit === "ONG" ? nouvelOngEdit : "");
           setEditTypeOuvert(false);
-        }, className: "bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(Check, { size: 10 })), /* @__PURE__ */ React.createElement("button", { onClick: () => setEditTypeOuvert(false), className: "border text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(X, { size: 10 }))))), fichesDossier.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm space-y-1.5" }, /* @__PURE__ */ React.createElement("span", { className: "text-[9px] uppercase font-black text-gray-400" }, "Fiches valid\xE9es ", idFicheEnCoursDEdition ? "(modification en cours)" : ""), /* @__PURE__ */ React.createElement("button", { onClick: imprimerToutesLesFichesDuDossier, className: "ml-2 bg-[#1E2A24] text-white text-[9px] font-bold px-2 py-1 rounded-lg" }, "\u{1F5A8}\uFE0F Imprimer les ", fichesDossier.length, " fiche", fichesDossier.length > 1 ? "s" : "", " d'affil\xE9e"), idFicheApresLaquelleInserer && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 bg-indigo-50 border border-indigo-200 text-indigo-800 rounded-lg px-2 py-1.5 text-[10px] font-bold" }, /* @__PURE__ */ React.createElement("span", null, "\u2195\uFE0F La prochaine fiche enregistr\xE9e s'ins\xE9rera au N\xB0", numeroFicheCourante, " (fiches suivantes renum\xE9rot\xE9es)"), onAnnulerInsertion && /* @__PURE__ */ React.createElement("button", { onClick: onAnnulerInsertion, className: "underline hover:text-indigo-950" }, "Annuler")), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-1.5" }, onInsererAuDebut && /* @__PURE__ */ React.createElement(
+        }, className: "bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(Check, { size: 10 })), /* @__PURE__ */ React.createElement("button", { onClick: () => setEditTypeOuvert(false), className: "border text-[10px] font-bold px-2 py-1 rounded" }, /* @__PURE__ */ React.createElement(X, { size: 10 }))))), fichesDossier.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "bg-white p-3 rounded-xl border shadow-sm space-y-1.5" }, /* @__PURE__ */ React.createElement("span", { className: "text-[9px] uppercase font-black text-gray-400" }, "Fiches valid\xE9es ", idFicheEnCoursDEdition ? "(modification en cours)" : ""), /* @__PURE__ */ React.createElement("button", { onClick: imprimerToutesLesFichesDuDossier, className: "ml-2 bg-[#1E2A24] text-white text-[9px] font-bold px-2 py-1 rounded-lg" }, "\u{1F5A8}\uFE0F Imprimer les ", fichesDossier.length, " fiche", fichesDossier.length > 1 ? "s" : "", " d'affil\xE9e"), onReordonnerFiches && fichesDossier.length > 1 && /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: () => setOrdreFiches([...fichesDossier].sort((a, b) => a.numeroFiche - b.numeroFiche).map((f) => f.id)),
+            disabled: !!idFicheEnCoursDEdition || !!idFicheApresLaquelleInserer,
+            title: idFicheEnCoursDEdition || idFicheApresLaquelleInserer ? "Termine d'abord la modification / l'insertion en cours" : "Remettre les fiches dans le bon ordre",
+            className: "ml-2 bg-indigo-600 text-white text-[9px] font-bold px-2 py-1 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
+          },
+          "\u2195\uFE0F R\xE9ordonner les fiches"
+        ), idFicheApresLaquelleInserer && /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-2 bg-indigo-50 border border-indigo-200 text-indigo-800 rounded-lg px-2 py-1.5 text-[10px] font-bold" }, /* @__PURE__ */ React.createElement("span", null, "\u2195\uFE0F La prochaine fiche enregistr\xE9e s'ins\xE9rera au N\xB0", numeroFicheCourante, " (fiches suivantes renum\xE9rot\xE9es)"), onAnnulerInsertion && /* @__PURE__ */ React.createElement("button", { onClick: onAnnulerInsertion, className: "underline hover:text-indigo-950" }, "Annuler")), /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-1.5" }, onInsererAuDebut && /* @__PURE__ */ React.createElement(
           "button",
           {
             onClick: onInsererAuDebut,
@@ -5618,7 +5629,31 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           ), peutSupprimerFiche && /* @__PURE__ */ React.createElement("button", { onClick: () => {
             if (confirm("Supprimer cette fiche ?")) onSupprimerFicheDossier(f.id);
           }, className: "px-2 py-1 bg-gray-200/50 hover:bg-red-600 hover:text-white border-l transition-colors" }, /* @__PURE__ */ React.createElement(X, { size: 12 })));
-        }))), /* @__PURE__ */ React.createElement(
+        }))), ordreFiches && (() => {
+          const parId = new Map(fichesDossier.map((f) => [f.id, f]));
+          const resume = (f) => {
+            var _a;
+            const noms = (((_a = f.rawState) == null ? void 0 : _a.lignesCalcul) || []).map((l) => l.nom);
+            if (noms.length) return noms.slice(0, 3).join(", ") + (noms.length > 3 ? "\u2026" : "");
+            return f.exeat ? "H\xE9bergement" : "\u2014";
+          };
+          const deplacer = (i, delta) => setOrdreFiches((o) => {
+            const j = i + delta;
+            if (j < 0 || j >= o.length) return o;
+            const n = [...o];
+            [n[i], n[j]] = [n[j], n[i]];
+            return n;
+          });
+          return /* @__PURE__ */ React.createElement("div", { className: "fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-3", onClick: () => setOrdreFiches(null) }, /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col", onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { className: "p-3 border-b" }, /* @__PURE__ */ React.createElement("p", { className: "font-black text-sm text-gray-800" }, "\u2195\uFE0F R\xE9ordonner les fiches"), /* @__PURE__ */ React.createElement("p", { className: "text-[10px] text-gray-500" }, "D\xE9place une fiche avec \u25B2 \u25BC : les fiches seront renum\xE9rot\xE9es 1, 2, 3\u2026 dans cet ordre. Aucun montant ne change.")), /* @__PURE__ */ React.createElement("div", { className: "overflow-y-auto p-2 space-y-1" }, ordreFiches.map((id, i) => {
+            const f = parId.get(id);
+            if (!f) return null;
+            const change = f.numeroFiche !== i + 1;
+            return /* @__PURE__ */ React.createElement("div", { key: id, className: `flex items-center gap-2 rounded-lg border px-2 py-1.5 text-[11px] font-mono ${change ? "bg-indigo-50 border-indigo-200" : "bg-gray-50 border-gray-200"}` }, /* @__PURE__ */ React.createElement("span", { className: "font-black w-16 shrink-0" }, "N\xB0", i + 1, change && /* @__PURE__ */ React.createElement("span", { className: "text-indigo-500 font-bold text-[9px]" }, " (\xE9tait ", f.numeroFiche, ")")), /* @__PURE__ */ React.createElement("span", { className: "flex-1 min-w-0 truncate text-gray-600", title: resume(f) }, resume(f)), /* @__PURE__ */ React.createElement("span", { className: "font-bold text-gray-800 whitespace-nowrap" }, formatPrix(f.totalGlobal)), /* @__PURE__ */ React.createElement("button", { onClick: () => deplacer(i, -1), disabled: i === 0, className: "w-7 h-7 rounded border bg-white disabled:opacity-20 font-bold" }, "\u25B2"), /* @__PURE__ */ React.createElement("button", { onClick: () => deplacer(i, 1), disabled: i === ordreFiches.length - 1, className: "w-7 h-7 rounded border bg-white disabled:opacity-20 font-bold" }, "\u25BC"));
+          })), /* @__PURE__ */ React.createElement("div", { className: "p-3 border-t flex justify-end gap-2" }, /* @__PURE__ */ React.createElement("button", { onClick: () => setOrdreFiches(null), className: "border text-xs font-bold px-3 py-1.5 rounded-lg" }, "Annuler"), /* @__PURE__ */ React.createElement("button", { onClick: () => {
+            onReordonnerFiches(ordreFiches);
+            setOrdreFiches(null);
+          }, className: "bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg" }, "Enregistrer l'ordre"))));
+        })(), /* @__PURE__ */ React.createElement(
           HebergementForm,
           {
             dateEntree1,
@@ -7427,6 +7462,26 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             showToast("Fiche supprim\xE9e \u2014 stock remis \xE0 jour, fiches suivantes renum\xE9rot\xE9es", "success");
           }
         };
+        const reordonnerFiches = (idsDansLOrdre) => {
+          const parId = new Map(fichesDossier.map((f) => [f.id, f]));
+          if (idsDansLOrdre.length !== fichesDossier.length || idsDansLOrdre.some((id) => !parId.has(id))) {
+            showToast("R\xE9ordonnancement impossible : la liste des fiches a chang\xE9, rouvre le menu.", "error");
+            return;
+          }
+          const fichesMisesAJour = idsDansLOrdre.map((id, i) => {
+            const f = parId.get(id);
+            return f.numeroFiche === i + 1 ? f : { ...f, numeroFiche: i + 1 };
+          });
+          const ordreAvant = [...fichesDossier].sort((a, b) => a.numeroFiche - b.numeroFiche).map((f) => f.id);
+          if (ordreAvant.every((id, i) => id === idsDansLOrdre[i])) {
+            showToast("L'ordre n'a pas chang\xE9.", "info");
+            return;
+          }
+          setFichesDossier(fichesMisesAJour);
+          synchroniserDossierActif(fichesMisesAJour);
+          enregistrerAudit("fiches_reordonnees", { dossierId, nomPatient, nombreFiches: fichesMisesAJour.length, ancienOrdre: ordreAvant.map((id) => parId.get(id).numeroFiche), nouvelOrdre: fichesMisesAJour.map((f) => f.numeroFiche) });
+          showToast("Ordre des fiches enregistr\xE9 \u2014 fiches renum\xE9rot\xE9es", "success");
+        };
         const marquerProblemeFiche = (idF) => {
           const fiche = fichesDossier.find((f) => f.id === idF);
           if (!fiche) return;
@@ -7614,6 +7669,7 @@ ${fichesDossier.length} fiche(s) \u2014 le dossier sera cl\xF4tur\xE9 et archiv\
             fichesDossier,
             onSupprimerFicheDossier: supprimerFicheDossier,
             onMarquerProblemeFiche: marquerProblemeFiche,
+            onReordonnerFiches: reordonnerFiches,
             idFicheEnCoursDEdition,
             onEditerFiche: editerFiche,
             idFicheApresLaquelleInserer,

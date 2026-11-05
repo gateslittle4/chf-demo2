@@ -952,6 +952,24 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
     }
   };
 
+  // Remet les fiches dans un autre ordre (menu "Réordonner les fiches" du calculateur) : l'ordre reçu
+  // devient l'ordre du dossier et les fiches sont renumérotées 1..n -- comme pour une suppression ou une
+  // insertion, aucun montant ne change, seul le numéro (donc la place dans l'Excel et les reçus) bouge.
+  const reordonnerFiches = (idsDansLOrdre) => {
+    const parId = new Map(fichesDossier.map(f => [f.id, f]));
+    if (idsDansLOrdre.length !== fichesDossier.length || idsDansLOrdre.some(id => !parId.has(id))) {
+      showToast("Réordonnancement impossible : la liste des fiches a changé, rouvre le menu.", "error");
+      return;
+    }
+    const fichesMisesAJour = idsDansLOrdre.map((id, i) => { const f = parId.get(id); return f.numeroFiche === i + 1 ? f : { ...f, numeroFiche: i + 1 }; });
+    const ordreAvant = [...fichesDossier].sort((a, b) => a.numeroFiche - b.numeroFiche).map(f => f.id);
+    if (ordreAvant.every((id, i) => id === idsDansLOrdre[i])) { showToast("L'ordre n'a pas changé.", "info"); return; }
+    setFichesDossier(fichesMisesAJour);
+    synchroniserDossierActif(fichesMisesAJour);
+    enregistrerAudit('fiches_reordonnees', { dossierId, nomPatient, nombreFiches: fichesMisesAJour.length, ancienOrdre: ordreAvant.map(id => parId.get(id).numeroFiche), nouvelOrdre: fichesMisesAJour.map(f => f.numeroFiche) });
+    showToast("Ordre des fiches enregistré — fiches renumérotées", "success");
+  };
+
   const marquerProblemeFiche = (idF) => {
     const fiche = fichesDossier.find(f => f.id === idF);
     if (!fiche) return;
@@ -1170,7 +1188,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
               medicaments={medicaments} actes={actes} setActes={setActes} lignes={lignesCalcul} setLignes={setLignesCalcul}
               dossierActif={dossierActif} nomPatient={nomPatient} selectedOng={selectedOng}
               onNouveauDossier={initialiserNouveauDossier} onAnnulerDossier={annulerDossier} onCloturerDossier={declencherPreValidationDossier}
-              fichesDossier={fichesDossier} onSupprimerFicheDossier={supprimerFicheDossier} onMarquerProblemeFiche={marquerProblemeFiche} 
+              fichesDossier={fichesDossier} onSupprimerFicheDossier={supprimerFicheDossier} onMarquerProblemeFiche={marquerProblemeFiche} onReordonnerFiches={reordonnerFiches}
               idFicheEnCoursDEdition={idFicheEnCoursDEdition}  // <-- passé pour affichage
               onEditerFiche={editerFiche}                       // <-- nouvelle prop
               idFicheApresLaquelleInserer={idFicheApresLaquelleInserer}
