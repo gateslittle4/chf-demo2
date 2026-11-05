@@ -199,6 +199,56 @@ const construireIndexMeres = (poolRecherche) => {
   return { resoudre };
 };
 
+// Doublons probables : la même personne enregistrée en deux dossiers séparés (ex. un dossier labo et
+// un dossier sono, tapés avec un nom à une lettre près). On regarde, pour chaque dossier SANS LOT, les
+// autres dossiers du même partenaire (sans lot ou déjà dans un lot) dont le nom est proche :
+//  - mêmes mots dans n'importe quel ordre, à 1 lettre près (noms de 6+ lettres) ou 2 lettres près (10+) ;
+//  - ou, le même jour d'entrée, au moins 2 mots du nom en commun (ex. "Rene Marie Carmel" / "Rene Marie Canose").
+// Les bébés ne sont comparés qu'entre noms identiques : Bb1/Bb2 sont des jumeaux, pas des doublons.
+const trouverDoublonsProbables = (dossiersSansLot, tousLesDossiersDuPartenaire) => {
+  const cle = (v) => cleMotsTries(normaliserTexte(v.nomPatient));
+  const dateValide = (v) => v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? v.dateEntreePourTri : null;
+  // Distance entre deux noms, mot par mot (chaque mot de l'un est rapproché du mot le plus proche de
+  // l'autre, donc l'ordre des mots ne compte pas) -- un tri alphabétique des mots ferait passer
+  // "Misere Odeline" / "Misere Adeline" pour très différents ("adeline" avant "misere", "odeline" après).
+  const distanceMots = (a, b) => {
+    const ma = normaliserTexte(a.nomPatient).split(' ').filter(Boolean), mb = normaliserTexte(b.nomPatient).split(' ').filter(Boolean);
+    if (ma.length !== mb.length) return distanceLevenshtein(cle(a), cle(b));
+    const libres = [...mb];
+    return ma.reduce((somme, m) => {
+      let meilleur = 0, d = Infinity;
+      libres.forEach((x, i) => { const dd = distanceLevenshtein(m, x); if (dd < d) { d = dd; meilleur = i; } });
+      libres.splice(meilleur, 1);
+      return somme + d;
+    }, 0);
+  };
+  const proches = (a, b) => {
+    const bebeA = estUnBebe(a.nomPatient), bebeB = estUnBebe(b.nomPatient);
+    if (bebeA !== bebeB) return false;
+    const ka = cle(a), kb = cle(b);
+    if (bebeA) return normaliserTexte(a.nomPatient) === normaliserTexte(b.nomPatient);
+    const dist = distanceMots(a, b), court = Math.min(ka.length, kb.length);
+    if (dist <= 1 && court >= 6) return true;
+    if (dist <= 2 && court >= 10) return true;
+    const da = dateValide(a), db = dateValide(b);
+    if (da && da === db && dist <= 5) {
+      const motsB = new Set(ka.split(' ').length ? kb.split(' ') : []);
+      return ka.split(' ').filter(m => m.length >= 3 && motsB.has(m)).length >= 2;
+    }
+    return false;
+  };
+  const paires = [], dejaVues = new Set();
+  dossiersSansLot.forEach(a => {
+    tousLesDossiersDuPartenaire.forEach(b => {
+      if (a.id === b.id) return;
+      const id = [a.id, b.id].sort().join('|');
+      if (dejaVues.has(id)) return;
+      if (proches(a, b)) { dejaVues.add(id); paires.push({ a, b }); }
+    });
+  });
+  return paires;
+};
+
 // Jumeaux probables : une mère qui a au moins 2 dossiers bébé rattachés (mêmes règles de rapprochement
 // que ci-dessus, donc "Bb1 X" / "Bb2 X" / "Bb X" proches du nom de la mère comptent tous). Sert à
 // signaler "accouchement gémellaire possible" à côté du nom de la mère dans la liste d'un lot --
@@ -467,6 +517,12 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     if (!lotOngSelectionne) return [];
     return verifications.filter(v => v.ongPartenaire === lotOngSelectionne && (v.status || 'archived') === 'archived' && v.numeroLot == null && !v.verrouilleFacture);
   }, [verifications, lotOngSelectionne]);
+
+  const doublonsProbables = useMemo(() => {
+    if (!lotOngSelectionne) return [];
+    return trouverDoublonsProbables(dossiersEnAttenteDeLot, verifications.filter(v => v.ongPartenaire === lotOngSelectionne && (v.status || 'archived') !== 'brouillon'));
+  }, [dossiersEnAttenteDeLot, verifications, lotOngSelectionne]);
+  const idsDoublonsProbables = useMemo(() => new Set(doublonsProbables.flatMap(p => [p.a.id, p.b.id])), [doublonsProbables]);
 
   // Le mois du lot suit automatiquement le mois où sont datés le plus de dossiers en attente --
   // pas besoin de le choisir à la main, mais reste modifiable si besoin de corriger.
@@ -1203,6 +1259,15 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                   <button onClick={() => rattacherOrphelinsAUnLot(lotOngSelectionne)} className="bg-amber-600 text-white font-bold px-2 py-1.5 rounded text-[10px] whitespace-nowrap">Rattacher au prochain lot</button>
                 </div>
               )}
+              {doublonsProbables.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 text-[11px] space-y-1">
+                  <p className="font-bold text-amber-900">⚠️ {doublonsProbables.length} nom{doublonsProbables.length > 1 ? 's' : ''} proche{doublonsProbables.length > 1 ? 's' : ''} à vérifier — peut-être la même personne enregistrée en deux dossiers (ex. labo d'un côté, sono de l'autre)</p>
+                  {doublonsProbables.map(({ a, b }) => {
+                    const decrire = (v) => `${v.nomPatient} — ${ventilationDossier(v).map(x => x.label).join(' + ') || 'vide'} (${formatPrix(v.totalGlobal || 0)}, ${v.numeroLot != null ? `Lot ${v.numeroLot}` : 'sans lot'}${v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? `, ${v.dateEntreePourTri.split('-').reverse().slice(0, 2).join('/')}` : ''})`;
+                    return <p key={a.id + b.id} className="font-mono text-amber-800">• {decrire(a)} <span className="font-bold">↔</span> {decrire(b)}</p>;
+                  })}
+                </div>
+              )}
               <div className="flex flex-wrap gap-4 items-center bg-gray-50 p-3 rounded-lg border border-dashed">
                 <span className="font-bold text-gray-700">🆕 {dossiersEnAttenteDeLot.length} dossier(s) en attente — {formatPrix(dossiersEnAttenteDeLot.reduce((s,v)=>s+(v.totalGlobal||0),0))}</span>
                 {RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] ? (
@@ -1281,7 +1346,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                   <p className="text-[10px] text-red-700 bg-red-50 border border-red-200 rounded-lg p-2">🔒 Ce lot est verrouillé (déjà approuvé) — déverrouille-le d'abord pour pouvoir y ajouter un dossier.</p>
                 ) : (
                   <div className="flex items-center gap-2 bg-gray-50 border border-dashed rounded-lg p-2">
-                    <select value={dossierAAjouterAuLot} onChange={e => setDossierAAjouterAuLot(e.target.value)} className="border rounded p-1.5 text-xs bg-white flex-1 outline-none"><option value="">-- Ajouter un dossier libre à ce lot --</option>{dossiersEnAttenteDeLot.map(v => <option key={v.id} value={v.id}>{v.nomPatient} — {formatPrix(v.totalGlobal||0)}</option>)}</select>
+                    <select value={dossierAAjouterAuLot} onChange={e => setDossierAAjouterAuLot(e.target.value)} className="border rounded p-1.5 text-xs bg-white flex-1 outline-none"><option value="">-- Ajouter un dossier libre à ce lot --</option>{dossiersEnAttenteDeLot.map(v => <option key={v.id} value={v.id}>{idsDoublonsProbables.has(v.id) ? '⚠️ ' : ''}{v.nomPatient} — {formatPrix(v.totalGlobal||0)}</option>)}</select>
                     <button onClick={() => { if (dossierAAjouterAuLot) { ajouterDossierAuLot(dossierAAjouterAuLot, lotFocused.numero, lotOngSelectionne); setDossierAAjouterAuLot(""); } }} disabled={!dossierAAjouterAuLot} className="bg-emerald-700 text-white font-bold px-2 py-1.5 rounded text-[10px] disabled:opacity-30 whitespace-nowrap">➕ Ajouter</button>
                   </div>
                 )
