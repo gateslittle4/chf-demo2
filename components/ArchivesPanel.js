@@ -968,20 +968,37 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
   // l'autre (ajoutées à la suite, renumérotées 1..n) et son total est recalculé ; l'autre dossier est supprimé
   // (le serveur en garde une copie complète dans episodes_supprimes). Seulement entre dossiers sans lot,
   // sans ouvrir aucun des deux dossiers.
+  // Clé d'un séjour (fiche d'hébergement) : mêmes dates et même type de lit = même séjour.
+  const cleSejourFiche = (f) => f && f.exeat ? [f.exeat.dateEntree, f.exeat.dateSortie, f.exeat.typeLit, f.exeat.multiPeriode ? [f.exeat.dateEntree2, f.exeat.dateSortie2, f.exeat.typeLit2].join('/') : ''].join('|') : null;
   const fusionnerDossiers = async (garder, retirer) => {
     if (fusionEnCours) return;
     if (garder.numeroLot != null || retirer.numeroLot != null || garder.verrouilleFacture || retirer.verrouilleFacture) { showToast("Fusion impossible : un des dossiers est déjà dans un lot.", "error"); return; }
-    if (!confirm(`Fusionner « ${retirer.nomPatient} » dans « ${garder.nomPatient} » ?\n\nSes ${(retirer.fiches || []).length} fiche(s) passent dans « ${garder.nomPatient} » (nom conservé), puis « ${retirer.nomPatient} » est supprimé.`)) return;
     const parNumero = (a, b) => (a.numeroFiche || 0) - (b.numeroFiche || 0);
-    const fiches = [...[...(garder.fiches || [])].sort(parNumero), ...[...(retirer.fiches || [])].sort(parNumero)].map((f, i) => ({ ...f, numeroFiche: i + 1 }));
+    const fichesGarder = [...(garder.fiches || [])].sort(parNumero);
+    // Même séjour dans les deux dossiers (mêmes dates, même lit) = un seul hébergement facturé : la fiche
+    // d'hébergement du dossier retiré n'est pas reprise. Un séjour différent est gardé (et signalé).
+    const sejoursGardes = new Set(fichesGarder.map(cleSejourFiche).filter(Boolean));
+    const fichesRetirerTriees = [...(retirer.fiches || [])].sort(parNumero);
+    const hebergementsEnDouble = fichesRetirerTriees.filter(f => { const k = cleSejourFiche(f); return k && sejoursGardes.has(k); });
+    const hebergementsDifferents = fichesRetirerTriees.filter(f => { const k = cleSejourFiche(f); return k && !sejoursGardes.has(k); }).length > 0 && sejoursGardes.size > 0;
+    const fichesReprises = fichesRetirerTriees.filter(f => !hebergementsEnDouble.includes(f));
+    const fiches = [...fichesGarder, ...fichesReprises].map((f, i) => ({ ...f, numeroFiche: i + 1 }));
     const total = fiches.reduce((somme, f) => somme + (Number(f.totalGlobal) || 0), 0);
+    const montantDoublon = hebergementsEnDouble.reduce((somme, f) => somme + (Number(f.totalGlobal) || 0), 0);
+    if (!confirm(`Fusionner « ${retirer.nomPatient} » dans « ${garder.nomPatient} » ?\n\n${fichesReprises.length} fiche(s) de « ${retirer.nomPatient} » passent dans « ${garder.nomPatient} » (nom conservé), puis « ${retirer.nomPatient} » est supprimé.`
+      + (hebergementsEnDouble.length > 0 ? `\n\n🛏️ Même séjour dans les deux dossiers : un seul hébergement est gardé (celui de « ${garder.nomPatient} »). La fiche d'hébergement en double de « ${retirer.nomPatient} » (${formatPrix(montantDoublon)}) n'est pas reprise.` : '')
+      + (hebergementsDifferents ? `\n\n⚠️ Les deux dossiers ont un hébergement avec des dates différentes : les deux sont gardés — vérifie après la fusion.` : '')
+      + `\n\nTotal après fusion : ${formatPrix(total)}.`)) return;
+    // Si le dossier gardé n'a pas de date de séjour mais l'autre oui, il hérite de la sienne (tri des lots).
+    const sansDate = (d) => !d || d === '9999-12-31';
+    const champsSejour = (sansDate(garder.dateEntreePourTri) && !sansDate(retirer.dateEntreePourTri)) ? { dateEntreePourTri: retirer.dateEntreePourTri, periodeSejourString: retirer.periodeSejourString } : {};
     setFusionEnCours(true);
     try {
-      await chf.updateEpisode(garder.id, toEpisodeApi({ fiches, totalGlobal: total }));
+      await chf.updateEpisode(garder.id, toEpisodeApi({ fiches, totalGlobal: total, ...champsSejour }));
       await chf.deleteEpisode(retirer.id);
-      setVerifications(prev => prev.filter(v => v.id !== retirer.id).map(v => v.id === garder.id ? { ...v, fiches, totalGlobal: total } : v));
-      enregistrerAudit('fusion_dossiers', { dossierGardeId: garder.id, nomGarde: garder.nomPatient, dossierRetireId: retirer.id, nomRetire: retirer.nomPatient, nombreFiches: fiches.length, totalGlobal: total });
-      showToast(`✅ ${retirer.nomPatient} fusionné dans ${garder.nomPatient} (${fiches.length} fiches, ${formatPrix(total)})`, "success");
+      setVerifications(prev => prev.filter(v => v.id !== retirer.id).map(v => v.id === garder.id ? { ...v, fiches, totalGlobal: total, ...champsSejour } : v));
+      enregistrerAudit('fusion_dossiers', { dossierGardeId: garder.id, nomGarde: garder.nomPatient, dossierRetireId: retirer.id, nomRetire: retirer.nomPatient, nombreFiches: fiches.length, totalGlobal: total, hebergementsEnDoubleIgnores: hebergementsEnDouble.length, montantHebergementIgnore: montantDoublon });
+      showToast(`✅ ${retirer.nomPatient} fusionné dans ${garder.nomPatient} (${fiches.length} fiches, ${formatPrix(total)}${hebergementsEnDouble.length > 0 ? `, hébergement en double ignoré : ${formatPrix(montantDoublon)}` : ''})`, "success");
     } catch (error) {
       showToast("Fusion échouée : " + error.message + " — recharge la page pour vérifier l'état des deux dossiers.", "error");
     }

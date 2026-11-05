@@ -4178,25 +4178,47 @@
           const ignorer = /* @__PURE__ */ React.createElement("button", { onClick: () => setDoublonsIgnores((l) => [...l, cleDoublon(paire)]), className: "border text-[10px] font-bold px-2 py-1 rounded bg-white" }, "Deux personnes diff\xE9rentes");
           return /* @__PURE__ */ React.createElement("div", { key: cleDoublon(paire), className: "border rounded-lg p-2 space-y-1.5 bg-amber-50/40" }, /* @__PURE__ */ React.createElement("div", { className: "flex gap-2" }, carte(a), carte(b)), fusionPossible ? /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap gap-1.5" }, /* @__PURE__ */ React.createElement("button", { disabled: fusionEnCours || !peutModifier, onClick: () => fusionnerDossiers(a, b), className: "bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded disabled:opacity-40" }, "\u{1F517} Fusionner dans \xAB ", a.nomPatient, " \xBB"), /* @__PURE__ */ React.createElement("button", { disabled: fusionEnCours || !peutModifier, onClick: () => fusionnerDossiers(b, a), className: "bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded disabled:opacity-40" }, "\u{1F517} Fusionner dans \xAB ", b.nomPatient, " \xBB"), ignorer) : /* @__PURE__ */ React.createElement("div", { className: "flex flex-wrap items-center gap-2" }, /* @__PURE__ */ React.createElement("p", { className: "text-[10px] text-amber-800" }, "L'un est suspendu ou verrouill\xE9 : fusion impossible ici, v\xE9rifie \xE0 la main."), ignorer));
         };
+        const cleSejourFiche = (f) => f && f.exeat ? [f.exeat.dateEntree, f.exeat.dateSortie, f.exeat.typeLit, f.exeat.multiPeriode ? [f.exeat.dateEntree2, f.exeat.dateSortie2, f.exeat.typeLit2].join("/") : ""].join("|") : null;
         const fusionnerDossiers = async (garder, retirer) => {
           if (fusionEnCours) return;
           if (garder.numeroLot != null || retirer.numeroLot != null || garder.verrouilleFacture || retirer.verrouilleFacture) {
             showToast("Fusion impossible : un des dossiers est d\xE9j\xE0 dans un lot.", "error");
             return;
           }
+          const parNumero = (a, b) => (a.numeroFiche || 0) - (b.numeroFiche || 0);
+          const fichesGarder = [...garder.fiches || []].sort(parNumero);
+          const sejoursGardes = new Set(fichesGarder.map(cleSejourFiche).filter(Boolean));
+          const fichesRetirerTriees = [...retirer.fiches || []].sort(parNumero);
+          const hebergementsEnDouble = fichesRetirerTriees.filter((f) => {
+            const k = cleSejourFiche(f);
+            return k && sejoursGardes.has(k);
+          });
+          const hebergementsDifferents = fichesRetirerTriees.filter((f) => {
+            const k = cleSejourFiche(f);
+            return k && !sejoursGardes.has(k);
+          }).length > 0 && sejoursGardes.size > 0;
+          const fichesReprises = fichesRetirerTriees.filter((f) => !hebergementsEnDouble.includes(f));
+          const fiches = [...fichesGarder, ...fichesReprises].map((f, i) => ({ ...f, numeroFiche: i + 1 }));
+          const total = fiches.reduce((somme, f) => somme + (Number(f.totalGlobal) || 0), 0);
+          const montantDoublon = hebergementsEnDouble.reduce((somme, f) => somme + (Number(f.totalGlobal) || 0), 0);
           if (!confirm(`Fusionner \xAB ${retirer.nomPatient} \xBB dans \xAB ${garder.nomPatient} \xBB ?
 
-Ses ${(retirer.fiches || []).length} fiche(s) passent dans \xAB ${garder.nomPatient} \xBB (nom conserv\xE9), puis \xAB ${retirer.nomPatient} \xBB est supprim\xE9.`)) return;
-          const parNumero = (a, b) => (a.numeroFiche || 0) - (b.numeroFiche || 0);
-          const fiches = [...[...garder.fiches || []].sort(parNumero), ...[...retirer.fiches || []].sort(parNumero)].map((f, i) => ({ ...f, numeroFiche: i + 1 }));
-          const total = fiches.reduce((somme, f) => somme + (Number(f.totalGlobal) || 0), 0);
+${fichesReprises.length} fiche(s) de \xAB ${retirer.nomPatient} \xBB passent dans \xAB ${garder.nomPatient} \xBB (nom conserv\xE9), puis \xAB ${retirer.nomPatient} \xBB est supprim\xE9.` + (hebergementsEnDouble.length > 0 ? `
+
+\u{1F6CF}\uFE0F M\xEAme s\xE9jour dans les deux dossiers : un seul h\xE9bergement est gard\xE9 (celui de \xAB ${garder.nomPatient} \xBB). La fiche d'h\xE9bergement en double de \xAB ${retirer.nomPatient} \xBB (${formatPrix(montantDoublon)}) n'est pas reprise.` : "") + (hebergementsDifferents ? `
+
+\u26A0\uFE0F Les deux dossiers ont un h\xE9bergement avec des dates diff\xE9rentes : les deux sont gard\xE9s \u2014 v\xE9rifie apr\xE8s la fusion.` : "") + `
+
+Total apr\xE8s fusion : ${formatPrix(total)}.`)) return;
+          const sansDate = (d) => !d || d === "9999-12-31";
+          const champsSejour = sansDate(garder.dateEntreePourTri) && !sansDate(retirer.dateEntreePourTri) ? { dateEntreePourTri: retirer.dateEntreePourTri, periodeSejourString: retirer.periodeSejourString } : {};
           setFusionEnCours(true);
           try {
-            await chf.updateEpisode(garder.id, toEpisodeApi({ fiches, totalGlobal: total }));
+            await chf.updateEpisode(garder.id, toEpisodeApi({ fiches, totalGlobal: total, ...champsSejour }));
             await chf.deleteEpisode(retirer.id);
-            setVerifications((prev) => prev.filter((v) => v.id !== retirer.id).map((v) => v.id === garder.id ? { ...v, fiches, totalGlobal: total } : v));
-            enregistrerAudit("fusion_dossiers", { dossierGardeId: garder.id, nomGarde: garder.nomPatient, dossierRetireId: retirer.id, nomRetire: retirer.nomPatient, nombreFiches: fiches.length, totalGlobal: total });
-            showToast(`\u2705 ${retirer.nomPatient} fusionn\xE9 dans ${garder.nomPatient} (${fiches.length} fiches, ${formatPrix(total)})`, "success");
+            setVerifications((prev) => prev.filter((v) => v.id !== retirer.id).map((v) => v.id === garder.id ? { ...v, fiches, totalGlobal: total, ...champsSejour } : v));
+            enregistrerAudit("fusion_dossiers", { dossierGardeId: garder.id, nomGarde: garder.nomPatient, dossierRetireId: retirer.id, nomRetire: retirer.nomPatient, nombreFiches: fiches.length, totalGlobal: total, hebergementsEnDoubleIgnores: hebergementsEnDouble.length, montantHebergementIgnore: montantDoublon });
+            showToast(`\u2705 ${retirer.nomPatient} fusionn\xE9 dans ${garder.nomPatient} (${fiches.length} fiches, ${formatPrix(total)}${hebergementsEnDouble.length > 0 ? `, h\xE9bergement en double ignor\xE9 : ${formatPrix(montantDoublon)}` : ""})`, "success");
           } catch (error) {
             showToast("Fusion \xE9chou\xE9e : " + error.message + " \u2014 recharge la page pour v\xE9rifier l'\xE9tat des deux dossiers.", "error");
           }
