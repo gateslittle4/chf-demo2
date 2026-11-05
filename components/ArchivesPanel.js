@@ -2,7 +2,7 @@
 const React = window.React;
 const { useState, useEffect, useMemo } = React;
 const { CATEGORIES_LISTE, CONFIG_LITS } = require('../utils/constants');
-const { echapperHTML, formaterNomPropre, formatPrix } = require('../utils/helpers');
+const { echapperHTML, formaterNomPropre, formatPrix, formatPrixEtGdes } = require('../utils/helpers');
 const { Eye, Pencil, Trash2, Printer, Clock, FolderOpen, X, Download, Check } = require('../utils/icons');
 const { chf, toEpisodeApi } = require('../api/supabase');
 const { LOGO_CHF_BASE64 } = require('../utils/logoChf');
@@ -862,7 +862,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
         catch (e) { if (!e.isOfflineQueue) echecsVerrou++; }
       }));
 
-      showToast(`✅ Lot ${numeroLot} de ${ongCible} : ${listeDossiersONG.length} dossier(s), ${formatPrix(grandTotalGeneral)}${echecsVerrou > 0 ? ` — ⚠️ ${echecsVerrou} dossier(s) non enregistré(s), réessaie plus tard` : ''}`, "success");
+      showToast(`✅ Lot ${numeroLot} de ${ongCible} : ${listeDossiersONG.length} dossier(s), ${formatPrixEtGdes(grandTotalGeneral)}${echecsVerrou > 0 ? ` — ⚠️ ${echecsVerrou} dossier(s) non enregistré(s), réessaie plus tard` : ''}`, "success");
       setAppliqueRabais10(!!RABAIS_CONTRACTUEL_PAR_ONG[ongCible]);
       setMontantDonIntrants("");
     } catch (error) {
@@ -888,7 +888,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     const totalEstime = eligibles.reduce((s, v) => s + (v.totalGlobal || 0), 0);
     setConfirmModal({
       titre: `📦 Générer le Lot ${prochainNumero} pour ${ongCible} ?`,
-      message: `${eligibles.length} dossier(s) seront inclus, pour un total d'environ ${formatPrix(totalEstime)}, facturés sur ${formaterMoisFr(moisLotChoisi)}. Une fois généré, ce lot sera figé : ces dossiers ne seront plus jamais repris automatiquement dans un futur lot.`,
+      message: `${eligibles.length} dossier(s) seront inclus, pour un total d'environ ${formatPrixEtGdes(totalEstime)}, facturés sur ${formaterMoisFr(moisLotChoisi)}. Une fois généré, ce lot sera figé : ces dossiers ne seront plus jamais repris automatiquement dans un futur lot.`,
       confirmLabel: `📦 Générer le Lot ${prochainNumero}`,
       onConfirm: () => {
         setConfirmModal(null);
@@ -1352,7 +1352,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
             <>
               {dossiersOrphelinsVerrouilles.length > 0 && (
                 <div className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-300 rounded-lg p-3">
-                  <span className="text-amber-800 font-bold">⚠️ {dossiersOrphelinsVerrouilles.length} dossier(s) déjà envoyés à {lotOngSelectionne} avant la mise en place des lots — {formatPrix(dossiersOrphelinsVerrouilles.reduce((s,v)=>s+(v.totalGlobal||0),0))}</span>
+                  <span className="text-amber-800 font-bold">⚠️ {dossiersOrphelinsVerrouilles.length} dossier(s) déjà envoyés à {lotOngSelectionne} avant la mise en place des lots — {formatPrixEtGdes(dossiersOrphelinsVerrouilles.reduce((s,v)=>s+(v.totalGlobal||0),0))}</span>
                   <button onClick={() => rattacherOrphelinsAUnLot(lotOngSelectionne)} className="bg-amber-600 text-white font-bold px-2 py-1.5 rounded text-[10px] whitespace-nowrap">Rattacher au prochain lot</button>
                 </div>
               )}
@@ -1381,7 +1381,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                 </div>
               )}
               <div className="flex flex-wrap gap-4 items-center bg-gray-50 p-3 rounded-lg border border-dashed">
-                <span className="font-bold text-gray-700">🆕 {dossiersEnAttenteDeLot.length} dossier(s) en attente — {formatPrix(dossiersEnAttenteDeLot.reduce((s,v)=>s+(v.totalGlobal||0),0))}</span>
+                <span className="font-bold text-gray-700">🆕 {dossiersEnAttenteDeLot.length} dossier(s) en attente — {formatPrixEtGdes(dossiersEnAttenteDeLot.reduce((s,v)=>s+(v.totalGlobal||0),0))}</span>
                 {RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] ? (
                   <span className="flex items-center gap-1 font-bold text-purple-900" title={`Rabais de ${RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% fixé au contrat avec ${lotOngSelectionne} — toujours appliqué`}>🔒 Rabais {RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% (contractuel)</span>
                 ) : (
@@ -1401,7 +1401,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                       <span className="bg-blue-100 text-blue-800 font-black px-2 py-0.5 rounded-full">{formaterMoisFr(lot.moisLot)}</span>
                     ) : (
                       <span className="bg-gray-200 text-gray-500 font-bold px-2 py-0.5 rounded-full" title="Aucun mois assigné à ce lot">Mois non défini</span>
-                    )} — {lot.dossiers.length} dossier(s) — {formatPrix(lot.total)}{RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] && <span className="text-purple-700" title={`Rabais de ${RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% fixé au contrat — toujours appliqué`}>🔒 {RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% → {formatPrix(lot.total * (1 - RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] / 100))}</span>}{lot.verrouille && <span className="text-red-700" title="Lot approuvé et verrouillé">🔒</span>}</span>
+                    )} — {lot.dossiers.length} dossier(s) — {formatPrixEtGdes(lot.total)}{RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] && <span className="text-purple-700" title={`Rabais de ${RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% fixé au contrat — toujours appliqué`}>🔒 {RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% → {formatPrix(lot.total * (1 - RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] / 100))}</span>}{lot.verrouille && <span className="text-red-700" title="Lot approuvé et verrouillé">🔒</span>}</span>
                     <div className="flex gap-2">
                       <button onClick={() => setLotFocusedNumero(lot.numero)} className="text-blue-600 font-bold underline">Voir</button>
                       <button onClick={() => reimprimerLot(lotOngSelectionne, lot.numero)} className="text-purple-700 font-bold underline">🔄 Réimprimer</button>
@@ -1419,9 +1419,9 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                   <span className="ml-1 bg-blue-100 text-blue-800 font-black px-2 py-0.5 rounded-full">{formaterMoisFr(lotFocused.moisLot)}</span>
                 ) : (
                   <span className="ml-1 bg-gray-200 text-gray-500 font-bold px-2 py-0.5 rounded-full" title="Aucun mois assigné à ce lot">Mois non défini</span>
-                )} — {lotFocused.dossiers.length} dossier{lotFocused.dossiers.length > 1 ? 's' : ''} — {formatPrix(lotFocused.total)}{RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] ? (
-                  <span className="ml-1 text-purple-700" title={`Rabais de ${RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% fixé au contrat — toujours appliqué`}>🔒 {RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% → {formatPrix(lotFocused.total * (1 - RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] / 100))}</span>
-                ) : (appliqueRabais10 && <span className="ml-1 text-purple-700" title="Rabais 10% coché ci-dessous">Rabais 10% → {formatPrix(lotFocused.total * 0.9)}</span>)}{lotFocused.verrouille && <span className="ml-1 text-red-700" title="Lot approuvé et verrouillé — aucun nouveau dossier ne peut y être ajouté">🔒 Verrouillé</span>}</h3>
+                )} — {lotFocused.dossiers.length} dossier{lotFocused.dossiers.length > 1 ? 's' : ''} — {formatPrixEtGdes(lotFocused.total)}{RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] ? (
+                  <span className="ml-1 text-purple-700" title={`Rabais de ${RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% fixé au contrat — toujours appliqué`}>🔒 {RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne]}% → {formatPrixEtGdes(lotFocused.total * (1 - RABAIS_CONTRACTUEL_PAR_ONG[lotOngSelectionne] / 100))}</span>
+                ) : (appliqueRabais10 && <span className="ml-1 text-purple-700" title="Rabais 10% coché ci-dessous">Rabais 10% → {formatPrixEtGdes(lotFocused.total * 0.9)}</span>)}{lotFocused.verrouille && <span className="ml-1 text-red-700" title="Lot approuvé et verrouillé — aucun nouveau dossier ne peut y être ajouté">🔒 Verrouillé</span>}</h3>
                 <div className="flex flex-wrap gap-2 items-center">
                   <button onClick={() => toggleVerrouLot(lotFocused.numero, lotOngSelectionne, !lotFocused.verrouille)} className={`${lotFocused.verrouille ? 'bg-red-700' : 'bg-gray-500'} text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1`} title={lotFocused.verrouille ? "Déverrouiller ce lot (permet à nouveau d'y ajouter un dossier)" : "Verrouiller ce lot une fois approuvé par le partenaire — empêche d'y ajouter un nouveau dossier"}>{lotFocused.verrouille ? '🔒 Verrouillé' : '🔓 Verrouiller'}</button>
                   <button onClick={() => reimprimerLot(lotOngSelectionne, lotFocused.numero)} className="bg-purple-700 text-white font-bold px-2 py-1 rounded text-[10px] flex items-center gap-1"><Download size={12}/> Réimprimer ce lot</button>
@@ -1489,7 +1489,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                       {v.medicamentsSortieManquants && <span title="Séjour sans au moins 2 médicaments de sortie (Ferfolat, Globugen, Tothema, Amox..., Vit C, Paracétamol) dans la fiche du séjour ou une fiche adjacente — vérifie si les médicaments de sortie ont été oubliés" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">💊 Médicaments sortie manquants</span>}
                       {v.oxytocineSansAccouchement && <span title="Oxytocine facturée mais aucun accouchement ni césarienne sur ce dossier — vérifie si l'accouchement/la césarienne a été oublié(e) dans la fiche" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">💊 Oxytocine sans accouchement</span>}
                       <span title="Nombre de fiches dans ce dossier — pour vérifier qu'aucune fiche papier n'a été oubliée" className="inline-flex items-center justify-center h-4 px-1 mr-1 bg-blue-50 text-blue-700 border border-blue-100 rounded text-[10px] font-bold align-middle">{(v.fiches||[]).length} fiche{(v.fiches||[]).length > 1 ? 's' : ''}</span>
-                      <span className="text-gray-400">— {formatPrix(v.totalGlobal||0)} <span className="text-indigo-400">({formatPrix(v.totalGlobal||0)})</span></span>
+                      <span className="text-gray-400">— {formatPrixEtGdes(v.totalGlobal||0)}</span>
                       <div className="flex flex-wrap gap-1 mt-1 pl-2 sm:pl-40">
                         {ventilationDossier(v).map(x => (
                           <span key={x.label} className="bg-indigo-50 text-indigo-700 border border-indigo-100 rounded px-1.5 py-0.5 text-[10px] whitespace-nowrap">{x.label}: {formatPrix(x.montant)}{x.key === 'hospit' && typesLitDossier(v) ? ` (${typesLitDossier(v)})` : ''}</span>
