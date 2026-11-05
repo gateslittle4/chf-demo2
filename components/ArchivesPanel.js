@@ -205,6 +205,10 @@ const construireIndexMeres = (poolRecherche) => {
 //  - mêmes mots dans n'importe quel ordre, à 1 lettre près (noms de 6+ lettres) ou 2 lettres près (10+) ;
 //  - ou, le même jour d'entrée, au moins 2 mots du nom en commun (ex. "Rene Marie Carmel" / "Rene Marie Canose").
 // Les bébés ne sont comparés qu'entre noms identiques : Bb1/Bb2 sont des jumeaux, pas des doublons.
+// Partenaires pour lesquels on cherche les doublons (un même patient enregistré en 2 dossiers, ex. labo
+// d'un côté et sono de l'autre) -- AVSI saisit ses examens séparément. Ajouter un partenaire ici suffit.
+const ONG_AVEC_DETECTION_DOUBLONS = ['AVSI'];
+const cleDoublon = (paire) => [paire.a.id, paire.b.id].sort().join('|');
 const trouverDoublonsProbables = (dossiersSansLot, tousLesDossiersDuPartenaire) => {
   const cle = (v) => cleMotsTries(normaliserTexte(v.nomPatient));
   const dateValide = (v) => v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? v.dateEntreePourTri : null;
@@ -518,10 +522,17 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     return verifications.filter(v => v.ongPartenaire === lotOngSelectionne && (v.status || 'archived') === 'archived' && v.numeroLot == null && !v.verrouilleFacture);
   }, [verifications, lotOngSelectionne]);
 
+  // Paires de dossiers au nom proche (même personne ?) pour les partenaires de ONG_AVEC_DETECTION_DOUBLONS :
+  // un dossier sans lot comparé à tous les dossiers du partenaire. Les paires que l'utilisateur a marquées
+  // "deux personnes différentes" sont masquées jusqu'au prochain rechargement de la page.
+  const [doublonsIgnores, setDoublonsIgnores] = useState([]);
+  const [modalDoublonsOuvert, setModalDoublonsOuvert] = useState(false);
+  const [fusionEnCours, setFusionEnCours] = useState(false);
   const doublonsProbables = useMemo(() => {
-    if (!lotOngSelectionne) return [];
-    return trouverDoublonsProbables(dossiersEnAttenteDeLot, verifications.filter(v => v.ongPartenaire === lotOngSelectionne && (v.status || 'archived') !== 'brouillon'));
-  }, [dossiersEnAttenteDeLot, verifications, lotOngSelectionne]);
+    if (!lotOngSelectionne || !ONG_AVEC_DETECTION_DOUBLONS.includes(lotOngSelectionne)) return [];
+    return trouverDoublonsProbables(dossiersEnAttenteDeLot, verifications.filter(v => v.ongPartenaire === lotOngSelectionne))
+      .filter(p => !doublonsIgnores.includes(cleDoublon(p)));
+  }, [dossiersEnAttenteDeLot, verifications, lotOngSelectionne, doublonsIgnores]);
   const idsDoublonsProbables = useMemo(() => new Set(doublonsProbables.flatMap(p => [p.a.id, p.b.id])), [doublonsProbables]);
 
   // Le mois du lot suit automatiquement le mois où sont datés le plus de dossiers en attente --
@@ -857,7 +868,16 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     }
   };
 
+  // Avant de figer un lot, propose de combiner les dossiers au nom presque identique (AVSI) : une fois le lot
+  // généré, ces dossiers sont verrouillés et ne peuvent plus être fusionnés.
   const genererProchainLot = (ongCible) => {
+    const eligibles = verifications.filter(v => v.ongPartenaire === ongCible && (v.status || 'archived') === 'archived' && v.numeroLot == null && !v.verrouilleFacture);
+    if (eligibles.length === 0) { showToast(`Aucun nouveau dossier en attente pour ${ongCible}.`, "error"); return; }
+    if (doublonsProbables.length > 0) { setModalDoublonsOuvert(true); return; }
+    confirmerGenerationLot(ongCible);
+  };
+
+  const confirmerGenerationLot = (ongCible) => {
     const eligibles = verifications.filter(v => v.ongPartenaire === ongCible && (v.status || 'archived') === 'archived' && v.numeroLot == null && !v.verrouilleFacture);
     if (eligibles.length === 0) { showToast(`Aucun nouveau dossier en attente pour ${ongCible}.`, "error"); return; }
     const numerosExistants = verifications.filter(v => v.ongPartenaire === ongCible && v.numeroLot != null).map(v => v.numeroLot);
@@ -910,6 +930,29 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
 
   // Retire un dossier de son lot : redevient libre, sera repris au prochain "Générer le prochain
   // lot" pour ce partenaire — jamais automatiquement dans un autre lot déjà existant.
+  // Fusionne `retirer` dans `garder` : le dossier gardé conserve son nom et son identifiant, reçoit les fiches de
+  // l'autre (ajoutées à la suite, renumérotées 1..n) et son total est recalculé ; l'autre dossier est supprimé
+  // (le serveur en garde une copie complète dans episodes_supprimes). Seulement entre dossiers sans lot.
+  const fusionnerDossiers = async (garder, retirer) => {
+    if (fusionEnCours) return;
+    if (garder.numeroLot != null || retirer.numeroLot != null || garder.verrouilleFacture || retirer.verrouilleFacture) { showToast("Fusion impossible : un des dossiers est déjà dans un lot.", "error"); return; }
+    if (!confirm(`Fusionner « ${retirer.nomPatient} » dans « ${garder.nomPatient} » ?\n\nSes ${(retirer.fiches || []).length} fiche(s) passent dans « ${garder.nomPatient} » (nom conservé), puis « ${retirer.nomPatient} » est supprimé.`)) return;
+    const parNumero = (a, b) => (a.numeroFiche || 0) - (b.numeroFiche || 0);
+    const fiches = [...[...(garder.fiches || [])].sort(parNumero), ...[...(retirer.fiches || [])].sort(parNumero)].map((f, i) => ({ ...f, numeroFiche: i + 1 }));
+    const total = fiches.reduce((somme, f) => somme + (Number(f.totalGlobal) || 0), 0);
+    setFusionEnCours(true);
+    try {
+      await chf.updateEpisode(garder.id, toEpisodeApi({ fiches, totalGlobal: total }));
+      await chf.deleteEpisode(retirer.id);
+      setVerifications(prev => prev.filter(v => v.id !== retirer.id).map(v => v.id === garder.id ? { ...v, fiches, totalGlobal: total } : v));
+      enregistrerAudit('fusion_dossiers', { dossierGardeId: garder.id, nomGarde: garder.nomPatient, dossierRetireId: retirer.id, nomRetire: retirer.nomPatient, nombreFiches: fiches.length, totalGlobal: total });
+      showToast(`✅ ${retirer.nomPatient} fusionné dans ${garder.nomPatient} (${fiches.length} fiches, ${formatPrix(total)})`, "success");
+    } catch (error) {
+      showToast("Fusion échouée : " + error.message + " — recharge la page pour vérifier l'état des deux dossiers.", "error");
+    }
+    setFusionEnCours(false);
+  };
+
   const retirerDossierDuLot = (dossier) => {
     setConfirmModal({
       titre: `Retirer ${dossier.nomPatient} du Lot ${dossier.numeroLot} ?`,
@@ -1257,6 +1300,51 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                 <div className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-300 rounded-lg p-3">
                   <span className="text-amber-800 font-bold">⚠️ {dossiersOrphelinsVerrouilles.length} dossier(s) déjà envoyés à {lotOngSelectionne} avant la mise en place des lots — {formatPrix(dossiersOrphelinsVerrouilles.reduce((s,v)=>s+(v.totalGlobal||0),0))}</span>
                   <button onClick={() => rattacherOrphelinsAUnLot(lotOngSelectionne)} className="bg-amber-600 text-white font-bold px-2 py-1.5 rounded text-[10px] whitespace-nowrap">Rattacher au prochain lot</button>
+                </div>
+              )}
+              {modalDoublonsOuvert && (
+                <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-3" onClick={() => setModalDoublonsOuvert(false)}>
+                  <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[88vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                    <div className="p-3 border-b">
+                      <p className="font-black text-sm text-gray-800">⚠️ Même personne en deux dossiers ? — avant de générer le lot</p>
+                      <p className="text-[10px] text-gray-500">Une fois le lot généré, ces dossiers sont verrouillés. Fusionne ceux qui sont la même personne : les fiches de l'un passent dans l'autre, qui garde son nom.</p>
+                    </div>
+                    <div className="overflow-y-auto p-2 space-y-2">
+                      {doublonsProbables.length === 0 && <p className="text-center text-emerald-700 font-bold text-xs py-4">✅ Plus aucun nom proche à vérifier.</p>}
+                      {doublonsProbables.map(paire => {
+                        const { a, b } = paire;
+                        const fusionPossible = [a, b].every(v => v.numeroLot == null && !v.verrouilleFacture && (v.status || 'archived') === 'archived');
+                        const carte = (v) => (
+                          <div className="flex-1 min-w-0 bg-gray-50 border rounded-lg p-2 text-[11px]">
+                            <p className="font-black text-gray-800 truncate">{v.nomPatient}</p>
+                            <p className="text-gray-600">{ventilationDossier(v).map(x => x.label).join(' + ') || 'vide'} — {(v.fiches || []).length} fiche{(v.fiches || []).length > 1 ? 's' : ''}</p>
+                            <p className="font-mono text-gray-700">{formatPrix(v.totalGlobal || 0)} · {v.numeroLot != null ? `Lot ${v.numeroLot}` : 'sans lot'}{v.dateEntreePourTri && v.dateEntreePourTri !== '9999-12-31' ? ` · ${v.dateEntreePourTri.split('-').reverse().slice(0, 2).join('/')}` : ''}</p>
+                          </div>
+                        );
+                        return (
+                          <div key={cleDoublon(paire)} className="border rounded-lg p-2 space-y-1.5">
+                            <div className="flex gap-2">{carte(a)}{carte(b)}</div>
+                            {fusionPossible ? (
+                              <div className="flex flex-wrap gap-1.5">
+                                <button disabled={fusionEnCours || !peutModifier} onClick={() => fusionnerDossiers(a, b)} className="bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded disabled:opacity-40">🔗 Fusionner dans « {a.nomPatient} »</button>
+                                <button disabled={fusionEnCours || !peutModifier} onClick={() => fusionnerDossiers(b, a)} className="bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded disabled:opacity-40">🔗 Fusionner dans « {b.nomPatient} »</button>
+                                <button onClick={() => setDoublonsIgnores(l => [...l, cleDoublon(paire)])} className="border text-[10px] font-bold px-2 py-1 rounded">Deux personnes différentes</button>
+                              </div>
+                            ) : (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-[10px] text-amber-800">L'un est déjà dans un lot (ou suspendu) : fusion impossible ici, vérifie à la main.</p>
+                                <button onClick={() => setDoublonsIgnores(l => [...l, cleDoublon(paire)])} className="border text-[10px] font-bold px-2 py-1 rounded">Deux personnes différentes</button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="p-3 border-t flex justify-end gap-2">
+                      <button onClick={() => setModalDoublonsOuvert(false)} className="border text-xs font-bold px-3 py-1.5 rounded-lg">Annuler</button>
+                      <button onClick={() => { setModalDoublonsOuvert(false); confirmerGenerationLot(lotOngSelectionne); }} className="bg-purple-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg">{doublonsProbables.length > 0 ? 'Continuer sans fusionner' : 'Continuer'} → générer le lot</button>
+                    </div>
+                  </div>
                 </div>
               )}
               {doublonsProbables.length > 0 && (
