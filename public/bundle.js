@@ -78,10 +78,17 @@
       var CLE_PENDING = "pending_ops";
       var CLE_FAILED = "failed_ops";
       var CLE_ID_MAP = "local_id_map";
+      var CLE_VERSIONS = "versions_dossiers";
+      var MAX_VERSIONS_GARDEES = 100;
       var MAX_ECHECS_SERVEUR = 5;
       var CHF_API = class {
         constructor() {
           this._versionsDossiers = {};
+          try {
+            this._versionsDossiers = JSON.parse(localStorage.getItem(CLE_VERSIONS) || "{}") || {};
+          } catch (e) {
+            this._versionsDossiers = {};
+          }
           this._fileDossiers = {};
           try {
             const brutes = this._lirePendingQueue();
@@ -317,6 +324,7 @@
           this.syncEnCours = true;
           console.log(`\u{1F504} Sync de ${queue.length} op\xE9rations...`);
           try {
+            const versionsDuPassage = {};
             for (const op of queue) {
               let endpoint = op.endpoint;
               for (const [localId, realId] of Object.entries(this.localIdMap)) {
@@ -339,8 +347,16 @@
               const referenceIdLocalNonResolu = (s) => typeof s === "string" && s.includes("local-") && !Object.keys(this.localIdMap).some((l) => s.includes(l));
               const bloque = referenceIdLocalNonResolu(endpoint) || data && typeof data === "object" && Object.values(data).some(referenceIdLocalNonResolu);
               if (bloque) continue;
+              const idDossierOp = (endpoint.match(/^\/episodes\/([^/?]+)$/) || [])[1];
+              if (op.method === "PUT" && idDossierOp && data && data.fiches && versionsDuPassage[idDossierOp]) {
+                data = { ...data, expected_updated_at: versionsDuPassage[idDossierOp] };
+              }
               try {
                 const result = await this.request(endpoint, op.method, data, { isRetry: true });
+                if (result && result.id && result.updated_at && endpoint.startsWith("/episodes")) {
+                  versionsDuPassage[result.id] = result.updated_at;
+                  this.noterVersionDossier(result.id, result.updated_at);
+                }
                 if (op.localId && !(result && result.id)) throw new Error("R\xE9ponse de cr\xE9ation sans id \u2014 nouvelle tentative");
                 if (op.localId && result && result.id) {
                   this.localIdMap[op.localId] = result.id;
@@ -359,7 +375,7 @@
                   continue;
                 }
                 const echecs = (op.echecsServeur || 0) + 1;
-                const definitif = e.status >= 400 && e.status < 500 && echecs >= MAX_ECHECS_SERVEUR;
+                const definitif = e.conflit || e.status >= 400 && e.status < 500 && echecs >= MAX_ECHECS_SERVEUR;
                 if (definitif) await this._mettreEnQuarantaine(op, `${e.message} (refus\xE9 ${echecs} fois par le serveur)`);
                 else await this._modifierPendingQueue((file) => file.map((o) => o.opId === op.opId ? { ...o, echecsServeur: echecs, dernierEchec: e.message } : o));
               }
@@ -377,7 +393,15 @@
         // le travail d'un autre navigateur. Volontairement PAS mise à jour par les rechargements automatiques de la
         // liste : une fiche déjà ouverte à l'écran reste basée sur la version qu'on a ouverte.
         noterVersionDossier(id, updatedAt) {
-          if (id && updatedAt) this._versionsDossiers[id] = updatedAt;
+          if (!id || !updatedAt) return;
+          delete this._versionsDossiers[id];
+          this._versionsDossiers[id] = updatedAt;
+          const cles = Object.keys(this._versionsDossiers);
+          if (cles.length > MAX_VERSIONS_GARDEES) cles.slice(0, cles.length - MAX_VERSIONS_GARDEES).forEach((c) => delete this._versionsDossiers[c]);
+          try {
+            localStorage.setItem(CLE_VERSIONS, JSON.stringify(this._versionsDossiers));
+          } catch (e) {
+          }
         }
         versionDossierConnue(id) {
           return this._versionsDossiers[id] || null;

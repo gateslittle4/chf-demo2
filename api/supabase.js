@@ -20,13 +20,18 @@ function genererOpId() {
 const CLE_PENDING = 'pending_ops';
 const CLE_FAILED = 'failed_ops';
 const CLE_ID_MAP = 'local_id_map';
+const CLE_VERSIONS = 'versions_dossiers';
+const MAX_VERSIONS_GARDEES = 100;
 // Au-delà de ce nombre d'échecs consécutifs NON réseau (le serveur répond mais refuse), on arrête de
 // rejouer en boucle silencieuse et on met l'opération en quarantaine pour qu'un humain la voie.
 const MAX_ECHECS_SERVEUR = 5;
 
 class CHF_API {
   constructor() {
-    this._versionsDossiers = {}; // id dossier -> updated_at tel qu'ouvert/enregistré ici (voir noterVersionDossier)
+    // id dossier -> updated_at tel qu'ouvert/enregistré ici (voir noterVersionDossier). Gardé dans le navigateur pour
+    // qu'un dossier restauré après un rechargement de la page garde sa version d'origine.
+    this._versionsDossiers = {};
+    try { this._versionsDossiers = JSON.parse(localStorage.getItem(CLE_VERSIONS) || '{}') || {}; } catch (e) { this._versionsDossiers = {}; }
     this._fileDossiers = {};     // id dossier -> dernière écriture en cours (écritures d'un même dossier en série)
     // Migration : les opérations mises en file par les anciennes versions n'ont pas d'identifiant
     // propre. Sans identifiant, impossible de retirer précisément UNE opération de la file : il
@@ -309,6 +314,10 @@ class CHF_API {
       // ne l'a pas confirmée. On ne vide plus la file d'avance : si la page est rechargée ou le
       // portable fermé au milieu de la synchronisation, rien n'est perdu, et rien n'est rejoué en
       // double non plus puisque ce qui est passé a déjà été retiré une par une.
+      // Versions des dossiers telles que NOS PROPRES opérations précédentes de ce passage les ont laissées sur le
+      // serveur (dossier créé hors ligne, ou plusieurs modifications hors ligne du même dossier à la suite) :
+      // la modification suivante part de cette version-là, sinon elle serait refusée à tort comme "modifiée ailleurs".
+      const versionsDuPassage = {};
       for (const op of queue) {
         // Si cette opération vise ou contient encore un ID local déjà résolu (sa création a
         // synchronisé plus tôt dans cette même file, ou lors d'un passage précédent), on la réécrit
@@ -340,8 +349,17 @@ class CHF_API {
         const referenceIdLocalNonResolu = (s) => typeof s === 'string' && s.includes('local-') && !Object.keys(this.localIdMap).some(l => s.includes(l));
         const bloque = referenceIdLocalNonResolu(endpoint) || (data && typeof data === 'object' && Object.values(data).some(referenceIdLocalNonResolu));
         if (bloque) continue; // reste en file telle quelle : sa création doit passer avant elle
+        // Modification de fiches d'un dossier déjà passée plus haut dans CE passage : on repart de la version
+        // qu'elle a laissée. Sinon la version jointe est celle de la mise en file (ou aucune pour une très
+        // ancienne opération), et le serveur refuse si le dossier a été modifié ailleurs depuis : l'opération
+        // est alors mise en quarantaine au lieu d'écraser le travail fait entre-temps.
+        const idDossierOp = (endpoint.match(/^\/episodes\/([^/?]+)$/) || [])[1];
+        if (op.method === 'PUT' && idDossierOp && data && data.fiches && versionsDuPassage[idDossierOp]) {
+          data = { ...data, expected_updated_at: versionsDuPassage[idDossierOp] };
+        }
         try {
           const result = await this.request(endpoint, op.method, data, { isRetry: true });
+          if (result && result.id && result.updated_at && endpoint.startsWith('/episodes')) { versionsDuPassage[result.id] = result.updated_at; this.noterVersionDossier(result.id, result.updated_at); }
           // Une création (op.localId défini) qui répond sans erreur HTTP mais sans id exploitable ne
           // doit jamais être abandonnée silencieusement : sans correspondance local -> réel enregistrée,
           // toute opération suivante référençant ce même id local (fiches ajoutées, archivage...) reste
@@ -370,7 +388,9 @@ class CHF_API {
           // la laisser tourner pour toujours sans que personne ne le sache (incident Tresalus Mylove,
           // où 17 opérations sont restées coincées des jours sans alerte).
           const echecs = (op.echecsServeur || 0) + 1;
-          const definitif = e.status >= 400 && e.status < 500 && echecs >= MAX_ECHECS_SERVEUR;
+          // 409 = le dossier a changé ailleurs (ou version trop ancienne) : rejouer ne changera jamais rien, on met
+          // tout de suite en quarantaine VISIBLE (rien n'est perdu) pour que quelqu'un décide, sans réessayer en boucle.
+          const definitif = e.conflit || (e.status >= 400 && e.status < 500 && echecs >= MAX_ECHECS_SERVEUR);
           if (definitif) await this._mettreEnQuarantaine(op, `${e.message} (refusé ${echecs} fois par le serveur)`);
           else await this._modifierPendingQueue(file => file.map(o => o.opId === op.opId ? { ...o, echecsServeur: echecs, dernierEchec: e.message } : o));
         }
@@ -386,7 +406,14 @@ class CHF_API {
   // refuser (409) l'enregistrement des fiches si le dossier a changé ailleurs entre-temps, au lieu d'écraser
   // le travail d'un autre navigateur. Volontairement PAS mise à jour par les rechargements automatiques de la
   // liste : une fiche déjà ouverte à l'écran reste basée sur la version qu'on a ouverte.
-  noterVersionDossier(id, updatedAt) { if (id && updatedAt) this._versionsDossiers[id] = updatedAt; }
+  noterVersionDossier(id, updatedAt) {
+    if (!id || !updatedAt) return;
+    delete this._versionsDossiers[id]; // ré-insère en dernier : on garde les plus récents
+    this._versionsDossiers[id] = updatedAt;
+    const cles = Object.keys(this._versionsDossiers);
+    if (cles.length > MAX_VERSIONS_GARDEES) cles.slice(0, cles.length - MAX_VERSIONS_GARDEES).forEach(c => delete this._versionsDossiers[c]);
+    try { localStorage.setItem(CLE_VERSIONS, JSON.stringify(this._versionsDossiers)); } catch (e) { /* mémoire pleine : la version reste en mémoire pour cette session */ }
+  }
   versionDossierConnue(id) { return this._versionsDossiers[id] || null; }
   // Version à joindre à une écriture faite depuis la liste des dossiers : la plus RÉCENTE entre celle de la liste
   // (chargée il y a un moment) et celle de nos propres enregistrements ici (qui ne sont pas dans la liste).
