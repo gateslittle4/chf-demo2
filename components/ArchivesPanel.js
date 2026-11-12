@@ -72,6 +72,9 @@ const estMedicamentSortie = (nomLigne) => { const n = normaliserTexte(nomLigne);
 // si elle est facturée mais qu'aucun accouchement ni césarienne n'apparaît sur le dossier, l'acte a
 // probablement été oublié dans la fiche : signale pour aller vérifier le dossier.
 const estOxytocine = (nomLigne) => normaliserTexte(nomLigne).includes('oxytocin');
+// Un patient opéré (catégorie Chirurgie) doit aussi avoir une "Consultation Chirurgie" facturée : sans elle, la
+// consultation a probablement été oubliée -- rappel affiché dans la liste du lot (pas dans l'export Excel).
+const dossierAConsultationChirurgie = (dossier) => (dossier.fiches || []).some(f => (f.rawState?.lignesCalcul || []).some(l => l.itemId === 'a23' || normaliserTexte(l.nom).includes('consultation chirurgie')));
 const dossierAOxytocine = (dossier) => (dossier.fiches || []).some(f => (f.rawState?.lignesCalcul || []).some(l => l.type === 'med' && estOxytocine(l.nom)));
 
 // Distance de Levenshtein (nombre minimal de lettres à ajouter/retirer/changer pour passer de a à b)
@@ -327,6 +330,7 @@ const trierAvecRegroupementMereBebe = (dossiersDuLot, tousLesDossiers) => {
       sansExeat: !(v.fiches || []).some(f => f.exeat) && !((cumul.hospit || 0) > 0),
       sansAdmission: !estBebeAvecMere && !((cumul.service || 0) > 0),
       medicamentsSortieManquants: medicamentsSortieManquants(v),
+      chirurgieSansConsultation: ((cumul.chirurgie || 0) > 0) && !dossierAConsultationChirurgie(v),
       oxytocineSansAccouchement: dossierAOxytocine(v) && !((cumul.accouchement || 0) > 0) && !((cumul.cesarienne || 0) > 0),
       nomsBebesRattaches: bebe ? [] : (bebesParMere[v.id] || []).map(b => b.nomPatient),
       jumeauxProbables: !bebe && (bebesParMere[v.id] || []).length >= 2,
@@ -1488,6 +1492,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
                       {v.cesarienneSansSono && <span title="Césarienne ou accouchement facturé, mais aucune sonographie sur ce dossier — vérifie si elle a été oubliée" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">⚠️ Sono manquante</span>}
                       {v.sansAdmission && <span title="Aucune Admission / Consultation facturée sur ce dossier — vérifie si elle a été oubliée" className="bg-orange-100 text-orange-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">⚠️ Admission manquante</span>}
                       {v.medicamentsSortieManquants && <span title="Séjour sans au moins 2 médicaments de sortie (Ferfolat, Globugen, Tothema, Amox..., Vit C, Paracétamol) dans la fiche du séjour ou une fiche adjacente — vérifie si les médicaments de sortie ont été oubliés" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">💊 Médicaments sortie manquants</span>}
+                      {v.chirurgieSansConsultation && <span title="Chirurgie facturée mais aucune « Consultation Chirurgie » sur ce dossier — pense à l'ajouter dans la fiche" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">🩺 Ajouter consultation chirurgie</span>}
                       {v.oxytocineSansAccouchement && <span title="Oxytocine facturée mais aucun accouchement ni césarienne sur ce dossier — vérifie si l'accouchement/la césarienne a été oublié(e) dans la fiche" className="bg-amber-100 text-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded mr-1">💊 Oxytocine sans accouchement</span>}
                       <span title="Nombre de fiches dans ce dossier — pour vérifier qu'aucune fiche papier n'a été oubliée" className="inline-flex items-center justify-center h-4 px-1 mr-1 bg-blue-50 text-blue-700 border border-blue-100 rounded text-[10px] font-bold align-middle">{(v.fiches||[]).length} fiche{(v.fiches||[]).length > 1 ? 's' : ''}</span>
                       <span className="text-gray-400">— {formatPrixEtGdes(v.totalGlobal||0)}</span>
