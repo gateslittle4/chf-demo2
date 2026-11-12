@@ -81,6 +81,8 @@
       var MAX_ECHECS_SERVEUR = 5;
       var CHF_API = class {
         constructor() {
+          this._versionsDossiers = {};
+          this._fileDossiers = {};
           try {
             const brutes = this._lirePendingQueue();
             if (brutes.some((op) => !op.opId)) {
@@ -197,6 +199,7 @@
               }
               const httpError = new Error(messageServeur);
               httpError.status = response.status;
+              if (response.status === 409) httpError.conflit = true;
               throw httpError;
             }
             if (method === "DELETE") return { success: true };
@@ -369,11 +372,43 @@
         async getEpisodes() {
           return this.request("/episodes");
         }
-        async createEpisode(data, localId) {
-          return this.request("/episodes", "POST", data, { localId });
+        // Version (updated_at) de chaque dossier TEL QU'IL A ÉTÉ OUVERT ou enregistré par CE navigateur. Elle sert à
+        // refuser (409) l'enregistrement des fiches si le dossier a changé ailleurs entre-temps, au lieu d'écraser
+        // le travail d'un autre navigateur. Volontairement PAS mise à jour par les rechargements automatiques de la
+        // liste : une fiche déjà ouverte à l'écran reste basée sur la version qu'on a ouverte.
+        noterVersionDossier(id, updatedAt) {
+          if (id && updatedAt) this._versionsDossiers[id] = updatedAt;
         }
-        async updateEpisode(id, data) {
-          return this.request(`/episodes/${id}`, "PUT", data);
+        versionDossierConnue(id) {
+          return this._versionsDossiers[id] || null;
+        }
+        // Version à joindre à une écriture faite depuis la liste des dossiers : la plus RÉCENTE entre celle de la liste
+        // (chargée il y a un moment) et celle de nos propres enregistrements ici (qui ne sont pas dans la liste).
+        versionPour(id, versionListe) {
+          const propre = this._versionsDossiers[id];
+          if (!propre) return versionListe || null;
+          if (!versionListe) return propre;
+          return propre > versionListe ? propre : versionListe;
+        }
+        async createEpisode(data, localId) {
+          const ligne = await this.request("/episodes", "POST", data, { localId });
+          if (ligne && ligne.id) this.noterVersionDossier(ligne.id, ligne.updated_at);
+          return ligne;
+        }
+        // Les enregistrements d'un même dossier partent l'un après l'autre : sinon la 2e sauvegarde (rapide) partirait
+        // avec la version d'avant la 1re et serait refusée à tort.
+        updateEpisode(id, data) {
+          const precedente = this._fileDossiers[id] || Promise.resolve();
+          const suite = precedente.catch(() => {
+          }).then(async () => {
+            let corps = data;
+            if (data && data.fiches && !data.expected_updated_at && this._versionsDossiers[id]) corps = { ...data, expected_updated_at: this._versionsDossiers[id] };
+            const ligne = await this.request(`/episodes/${id}`, "PUT", corps);
+            if (ligne && ligne.updated_at) this.noterVersionDossier(id, ligne.updated_at);
+            return ligne;
+          });
+          this._fileDossiers[id] = suite;
+          return suite;
         }
         async deleteEpisode(id) {
           return this.request(`/episodes/${id}`, "DELETE");
@@ -4214,9 +4249,9 @@ Total apr\xE8s fusion : ${formatPrix(total)}.`)) return;
           const champsSejour = sansDate(garder.dateEntreePourTri) && !sansDate(retirer.dateEntreePourTri) ? { dateEntreePourTri: retirer.dateEntreePourTri, periodeSejourString: retirer.periodeSejourString } : {};
           setFusionEnCours(true);
           try {
-            await chf.updateEpisode(garder.id, toEpisodeApi({ fiches, totalGlobal: total, ...champsSejour }));
+            const maj = await chf.updateEpisode(garder.id, toEpisodeApi({ fiches, totalGlobal: total, ...champsSejour, expected_updated_at: chf.versionPour(garder.id, garder.updatedAt) }));
             await chf.deleteEpisode(retirer.id);
-            setVerifications((prev) => prev.filter((v) => v.id !== retirer.id).map((v) => v.id === garder.id ? { ...v, fiches, totalGlobal: total, ...champsSejour } : v));
+            setVerifications((prev) => prev.filter((v) => v.id !== retirer.id).map((v) => v.id === garder.id ? { ...v, fiches, totalGlobal: total, ...champsSejour, updatedAt: maj && maj.updated_at || v.updatedAt } : v));
             enregistrerAudit("fusion_dossiers", { dossierGardeId: garder.id, nomGarde: garder.nomPatient, dossierRetireId: retirer.id, nomRetire: retirer.nomPatient, nombreFiches: fiches.length, totalGlobal: total, hebergementsEnDoubleIgnores: hebergementsEnDouble.length, montantHebergementIgnore: montantDoublon });
             showToast(`\u2705 ${retirer.nomPatient} fusionn\xE9 dans ${garder.nomPatient} (${fiches.length} fiches, ${formatPrix(total)}${hebergementsEnDouble.length > 0 ? `, h\xE9bergement en double ignor\xE9 : ${formatPrix(montantDoublon)}` : ""})`, "success");
           } catch (error) {
@@ -4514,7 +4549,8 @@ ${dossier.noteSuspension}` : ""}`)) return;
           const fichesNettoyees = (dossier.fiches || []).map((f) => f.probleme ? { ...f, probleme: false, noteProbleme: "" } : f);
           setVerifications((prev) => prev.map((v) => v.id === dossier.id ? { ...v, fiches: fichesNettoyees } : v));
           try {
-            await chf.updateEpisode(dossier.id, toEpisodeApi({ fiches: fichesNettoyees }));
+            const maj = await chf.updateEpisode(dossier.id, toEpisodeApi({ fiches: fichesNettoyees, expected_updated_at: chf.versionPour(dossier.id, dossier.updatedAt) }));
+            if (maj && maj.updated_at) setVerifications((prev) => prev.map((v) => v.id === dossier.id ? { ...v, updatedAt: maj.updated_at } : v));
             showToast(`Marquage retir\xE9 pour ${dossier.nomPatient}`, "success");
           } catch (error) {
             if (error.isOfflineQueue) showToast("\u{1F4F4} Changement enregistr\xE9 hors ligne", "info");
@@ -6834,6 +6870,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           try {
             await chf.updateEpisode(dossierId, toEpisodeApi({ fiches: fichesMaJour, totalGlobal: somme }));
           } catch (e) {
+            if (e.conflit) showToast("\u26A0\uFE0F " + e.message + " (Tes derni\xE8res saisies restent \xE0 l'\xE9cran mais ne sont pas enregistr\xE9es : note-les, ferme ce dossier sans l'archiver, puis rouvre-le depuis les Archives.)", "error");
           }
         };
         const enregistrerFicheModifiee = (nouvelleFiche) => {
@@ -6947,6 +6984,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           setOrigineLotEdition(origineLot || null);
           setDossierId(patientDoc.id);
           setDossierUpdatedAtOuverture(patientDoc.updatedAt || null);
+          chf.noterVersionDossier(patientDoc.id, patientDoc.updatedAt);
           setNomPatient(patientDoc.nomPatient);
           setSelectedOng(patientDoc.ongPartenaire || "");
           setTypePatient(patientDoc.typePatient || "ONG");
@@ -7096,7 +7134,8 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           try {
             const episodes = await chf.getEpisodes();
             const actuel = episodes.map((ep) => fromEpisodeApi(ep)).find((ep) => ep.id === dossierId);
-            if (actuel && actuel.updatedAt && actuel.updatedAt !== dossierUpdatedAtOuverture) return true;
+            const attendu = chf.versionDossierConnue(dossierId) || dossierUpdatedAtOuverture;
+            if (actuel && actuel.updatedAt && actuel.updatedAt !== attendu) return true;
           } catch (e) {
           }
           return false;

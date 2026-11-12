@@ -26,6 +26,8 @@ const MAX_ECHECS_SERVEUR = 5;
 
 class CHF_API {
   constructor() {
+    this._versionsDossiers = {}; // id dossier -> updated_at tel qu'ouvert/enregistré ici (voir noterVersionDossier)
+    this._fileDossiers = {};     // id dossier -> dernière écriture en cours (écritures d'un même dossier en série)
     // Migration : les opérations mises en file par les anciennes versions n'ont pas d'identifiant
     // propre. Sans identifiant, impossible de retirer précisément UNE opération de la file : il
     // fallait vider puis réécrire toute la file, ce qui perdait des opérations quand deux onglets
@@ -152,6 +154,8 @@ class CHF_API {
         try { const err = await response.json(); if (err && err.error) messageServeur = err.error; } catch (_) {}
         const httpError = new Error(messageServeur);
         httpError.status = response.status;
+        // 409 = le dossier a été modifié ailleurs depuis qu'on l'a ouvert : rien n'a été écrit.
+        if (response.status === 409) httpError.conflit = true;
         throw httpError;
       }
       if (method === 'DELETE') return { success: true };
@@ -378,8 +382,39 @@ class CHF_API {
   }
 
   async getEpisodes() { return this.request('/episodes'); }
-  async createEpisode(data, localId) { return this.request('/episodes', 'POST', data, { localId }); }
-  async updateEpisode(id, data) { return this.request(`/episodes/${id}`, 'PUT', data); }
+  // Version (updated_at) de chaque dossier TEL QU'IL A ÉTÉ OUVERT ou enregistré par CE navigateur. Elle sert à
+  // refuser (409) l'enregistrement des fiches si le dossier a changé ailleurs entre-temps, au lieu d'écraser
+  // le travail d'un autre navigateur. Volontairement PAS mise à jour par les rechargements automatiques de la
+  // liste : une fiche déjà ouverte à l'écran reste basée sur la version qu'on a ouverte.
+  noterVersionDossier(id, updatedAt) { if (id && updatedAt) this._versionsDossiers[id] = updatedAt; }
+  versionDossierConnue(id) { return this._versionsDossiers[id] || null; }
+  // Version à joindre à une écriture faite depuis la liste des dossiers : la plus RÉCENTE entre celle de la liste
+  // (chargée il y a un moment) et celle de nos propres enregistrements ici (qui ne sont pas dans la liste).
+  versionPour(id, versionListe) {
+    const propre = this._versionsDossiers[id];
+    if (!propre) return versionListe || null;
+    if (!versionListe) return propre;
+    return propre > versionListe ? propre : versionListe;
+  }
+  async createEpisode(data, localId) {
+    const ligne = await this.request('/episodes', 'POST', data, { localId });
+    if (ligne && ligne.id) this.noterVersionDossier(ligne.id, ligne.updated_at);
+    return ligne;
+  }
+  // Les enregistrements d'un même dossier partent l'un après l'autre : sinon la 2e sauvegarde (rapide) partirait
+  // avec la version d'avant la 1re et serait refusée à tort.
+  updateEpisode(id, data) {
+    const precedente = this._fileDossiers[id] || Promise.resolve();
+    const suite = precedente.catch(() => {}).then(async () => {
+      let corps = data;
+      if (data && data.fiches && !data.expected_updated_at && this._versionsDossiers[id]) corps = { ...data, expected_updated_at: this._versionsDossiers[id] };
+      const ligne = await this.request(`/episodes/${id}`, 'PUT', corps);
+      if (ligne && ligne.updated_at) this.noterVersionDossier(id, ligne.updated_at);
+      return ligne;
+    });
+    this._fileDossiers[id] = suite;
+    return suite;
+  }
   async deleteEpisode(id) { return this.request(`/episodes/${id}`, 'DELETE'); }
 
   async getPaiements() { return this.request('/paiements'); }

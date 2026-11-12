@@ -994,9 +994,9 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     const champsSejour = (sansDate(garder.dateEntreePourTri) && !sansDate(retirer.dateEntreePourTri)) ? { dateEntreePourTri: retirer.dateEntreePourTri, periodeSejourString: retirer.periodeSejourString } : {};
     setFusionEnCours(true);
     try {
-      await chf.updateEpisode(garder.id, toEpisodeApi({ fiches, totalGlobal: total, ...champsSejour }));
+      const maj = await chf.updateEpisode(garder.id, toEpisodeApi({ fiches, totalGlobal: total, ...champsSejour, expected_updated_at: chf.versionPour(garder.id, garder.updatedAt) }));
       await chf.deleteEpisode(retirer.id);
-      setVerifications(prev => prev.filter(v => v.id !== retirer.id).map(v => v.id === garder.id ? { ...v, fiches, totalGlobal: total, ...champsSejour } : v));
+      setVerifications(prev => prev.filter(v => v.id !== retirer.id).map(v => v.id === garder.id ? { ...v, fiches, totalGlobal: total, ...champsSejour, updatedAt: (maj && maj.updated_at) || v.updatedAt } : v));
       enregistrerAudit('fusion_dossiers', { dossierGardeId: garder.id, nomGarde: garder.nomPatient, dossierRetireId: retirer.id, nomRetire: retirer.nomPatient, nombreFiches: fiches.length, totalGlobal: total, hebergementsEnDoubleIgnores: hebergementsEnDouble.length, montantHebergementIgnore: montantDoublon });
       showToast(`✅ ${retirer.nomPatient} fusionné dans ${garder.nomPatient} (${fiches.length} fiches, ${formatPrix(total)}${hebergementsEnDouble.length > 0 ? `, hébergement en double ignoré : ${formatPrix(montantDoublon)}` : ''})`, "success");
     } catch (error) {
@@ -1302,7 +1302,8 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
     const fichesNettoyees = (dossier.fiches || []).map(f => f.probleme ? { ...f, probleme: false, noteProbleme: '' } : f);
     setVerifications(prev => prev.map(v => v.id === dossier.id ? { ...v, fiches: fichesNettoyees } : v));
     try {
-      await chf.updateEpisode(dossier.id, toEpisodeApi({ fiches: fichesNettoyees }));
+      const maj = await chf.updateEpisode(dossier.id, toEpisodeApi({ fiches: fichesNettoyees, expected_updated_at: chf.versionPour(dossier.id, dossier.updatedAt) }));
+      if (maj && maj.updated_at) setVerifications(prev => prev.map(v => v.id === dossier.id ? { ...v, updatedAt: maj.updated_at } : v));
       showToast(`Marquage retiré pour ${dossier.nomPatient}`, "success");
     } catch (error) {
       if (error.isOfflineQueue) showToast("📴 Changement enregistré hors ligne", "info");
