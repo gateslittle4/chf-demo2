@@ -163,9 +163,6 @@ class CHF_API {
         if (response.status === 409) httpError.conflit = true;
         throw httpError;
       }
-      // Écart entre l'horloge de cet appareil et celle du serveur (en-tête Date) : sert à dater correctement une
-      // modification faite hors ligne avant de la comparer aux modifications du serveur (voir syncPending).
-      try { const dateServeur = response.headers && response.headers.get && response.headers.get('Date'); if (dateServeur) this._decalageHorloge = Date.parse(dateServeur) - Date.now(); } catch (_) {}
       if (method === 'DELETE') return { success: true };
       return await response.json();
     } catch (error) {
@@ -361,22 +358,6 @@ class CHF_API {
           data = { ...data, expected_updated_at: versionsDuPassage[idDossierOp] };
         }
         try {
-          // Ancienne opération en file SANS version (faite par une version de l'appli d'avant le contrôle, ou dossier
-          // jamais ouvert ici) : on ne l'envoie que si le dossier n'a PAS changé depuis qu'elle a été faite
-          // (heure de la modification hors ligne, corrigée de l'écart d'horloge avec le serveur). Sinon elle
-          // écraserait du travail plus récent : on la met en quarantaine à la place, sans rien écrire.
-          if (op.method === 'PUT' && idDossierOp && data && data.fiches && !data.expected_updated_at && op.timestamp) {
-            const courant = await this.request(`/episodes/${idDossierOp}/version`, 'GET', null, { isRetry: true }).catch(e => { if (e.status === 404) return null; throw e; });
-            if (courant && courant.updated_at) {
-              const heureModif = op.timestamp + (this._decalageHorloge || 0);
-              if (Date.parse(courant.updated_at) > heureModif) {
-                const conflit = new Error(`Ce dossier a été modifié ailleurs${courant.modifie_par ? ` (par ${courant.modifie_par})` : ''} après cette modification faite hors ligne le ${new Date(op.timestamp).toLocaleString('fr-FR')} : elle n'a PAS été appliquée pour ne pas écraser ce travail plus récent.`);
-                conflit.status = 409; conflit.conflit = true;
-                throw conflit;
-              }
-              data = { ...data, expected_updated_at: courant.updated_at }; // inchangé depuis : on rejoue, sous contrôle du serveur
-            }
-          }
           const result = await this.request(endpoint, op.method, data, { isRetry: true });
           if (result && result.id && result.updated_at && endpoint.startsWith('/episodes')) { versionsDuPassage[result.id] = result.updated_at; this.noterVersionDossier(result.id, result.updated_at); }
           // Une création (op.localId défini) qui répond sans erreur HTTP mais sans id exploitable ne

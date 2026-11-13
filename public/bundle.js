@@ -209,11 +209,6 @@
               if (response.status === 409) httpError.conflit = true;
               throw httpError;
             }
-            try {
-              const dateServeur = response.headers && response.headers.get && response.headers.get("Date");
-              if (dateServeur) this._decalageHorloge = Date.parse(dateServeur) - Date.now();
-            } catch (_) {
-            }
             if (method === "DELETE") return { success: true };
             return await response.json();
           } catch (error) {
@@ -357,22 +352,6 @@
                 data = { ...data, expected_updated_at: versionsDuPassage[idDossierOp] };
               }
               try {
-                if (op.method === "PUT" && idDossierOp && data && data.fiches && !data.expected_updated_at && op.timestamp) {
-                  const courant = await this.request(`/episodes/${idDossierOp}/version`, "GET", null, { isRetry: true }).catch((e) => {
-                    if (e.status === 404) return null;
-                    throw e;
-                  });
-                  if (courant && courant.updated_at) {
-                    const heureModif = op.timestamp + (this._decalageHorloge || 0);
-                    if (Date.parse(courant.updated_at) > heureModif) {
-                      const conflit = new Error(`Ce dossier a \xE9t\xE9 modifi\xE9 ailleurs${courant.modifie_par ? ` (par ${courant.modifie_par})` : ""} apr\xE8s cette modification faite hors ligne le ${new Date(op.timestamp).toLocaleString("fr-FR")} : elle n'a PAS \xE9t\xE9 appliqu\xE9e pour ne pas \xE9craser ce travail plus r\xE9cent.`);
-                      conflit.status = 409;
-                      conflit.conflit = true;
-                      throw conflit;
-                    }
-                    data = { ...data, expected_updated_at: courant.updated_at };
-                  }
-                }
                 const result = await this.request(endpoint, op.method, data, { isRetry: true });
                 if (result && result.id && result.updated_at && endpoint.startsWith("/episodes")) {
                   versionsDuPassage[result.id] = result.updated_at;
