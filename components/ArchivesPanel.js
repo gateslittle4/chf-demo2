@@ -211,6 +211,9 @@ const construireIndexMeres = (poolRecherche) => {
 // Partenaires pour lesquels on cherche les doublons (un même patient enregistré en 2 dossiers, ex. labo
 // d'un côté et sono de l'autre) -- AVSI saisit ses examens séparément. Ajouter un partenaire ici suffit.
 const ONG_AVEC_DETECTION_DOUBLONS = ['AVSI'];
+// Plancher du numéro de lot (= numéro de facture) par partenaire : le prochain lot ne portera jamais un numéro
+// inférieur. MSF-H : la facture suivante est la n° 18. Une fois le lot 18 généré, le suivant est 19, etc.
+const NUMERO_LOT_MINIMUM_PAR_ONG = { 'MSF-H': 18 };
 const cleDoublon = (paire) => [paire.a.id, paire.b.id].sort().join('|');
 const trouverDoublonsProbables = (dossiersSansLot, tousLesDossiersDuPartenaire) => {
   const cle = (v) => cleMotsTries(normaliserTexte(v.nomPatient));
@@ -474,7 +477,14 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
 
   const numeroDepartConfigure = (ongCible) => {
     const doc = (listeOngDocs || []).find(o => o.nom === ongCible);
-    return doc?.prochainNumero || 1;
+    return Math.max(doc?.prochainNumero || 1, NUMERO_LOT_MINIMUM_PAR_ONG[ongCible] || 1);
+  };
+  // Numéro du prochain lot = le plus grand numéro existant + 1, mais jamais en dessous du "Prochain N°" réglé pour
+  // ce partenaire (écran Partenaires) ni du plancher NUMERO_LOT_MINIMUM_PAR_ONG -- avant, ce réglage était ignoré
+  // dès qu'un lot existait déjà, donc impossible de caler la numérotation sur celle des factures du partenaire.
+  const prochainNumeroLot = (ongCible) => {
+    const existants = verifications.filter(v => v.ongPartenaire === ongCible && v.numeroLot != null).map(v => v.numeroLot);
+    return Math.max(existants.length > 0 ? Math.max(...existants) + 1 : 1, numeroDepartConfigure(ongCible));
   };
 
   const ventilationDossier = (v) => {
@@ -887,8 +897,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
   const confirmerGenerationLot = (ongCible) => {
     const eligibles = verifications.filter(v => v.ongPartenaire === ongCible && (v.status || 'archived') === 'archived' && v.numeroLot == null && !v.verrouilleFacture);
     if (eligibles.length === 0) { showToast(`Aucun nouveau dossier en attente pour ${ongCible}.`, "error"); return; }
-    const numerosExistants = verifications.filter(v => v.ongPartenaire === ongCible && v.numeroLot != null).map(v => v.numeroLot);
-    const prochainNumero = numerosExistants.length > 0 ? Math.max(...numerosExistants) + 1 : numeroDepartConfigure(ongCible);
+    const prochainNumero = prochainNumeroLot(ongCible);
     const totalEstime = eligibles.reduce((s, v) => s + (v.totalGlobal || 0), 0);
     setConfirmModal({
       titre: `📦 Générer le Lot ${prochainNumero} pour ${ongCible} ?`,
@@ -909,8 +918,7 @@ function HistoriqueVerifPanel({ verifications, setVerifications, onChargerPourMo
   const rattacherOrphelinsAUnLot = (ongCible) => {
     const orphelins = verifications.filter(v => v.ongPartenaire === ongCible && (v.status || 'archived') === 'archived' && v.numeroLot == null && v.verrouilleFacture);
     if (orphelins.length === 0) return;
-    const numerosExistants = verifications.filter(v => v.ongPartenaire === ongCible && v.numeroLot != null).map(v => v.numeroLot);
-    const numero = numerosExistants.length > 0 ? Math.max(...numerosExistants) + 1 : numeroDepartConfigure(ongCible);
+    const numero = prochainNumeroLot(ongCible);
     setConfirmModal({
       titre: `Rattacher ces ${orphelins.length} dossier(s) déjà envoyés au Lot ${numero} ?`,
       message: `Ces dossiers ont déjà été envoyés à ${ongCible} avant la mise en place des lots. Aucun fichier ne sera regénéré ni téléchargé ici — on marque juste qu'ils correspondent au Lot ${numero}, pour que le prochain lot généré démarre à ${numero + 1}.`,

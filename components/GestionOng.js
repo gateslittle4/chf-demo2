@@ -98,7 +98,7 @@ function GestionOngPanel({ listeOngDocs, showToast }) {
             <span className="font-medium text-gray-700">{o.nom}</span>
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-1.5 text-[10px] text-gray-500">
-                Prochain N°
+                Prochain N° de lot
                 <input
                   type="number" min="1" defaultValue={o.prochainNumero || 1} key={o.id + '-' + (o.prochainNumero || 1)}
                   onBlur={e => { if (parseInt(e.target.value, 10) !== (o.prochainNumero || 1)) modifierProchainNumero(o.id, o.nom, e.target.value); }}

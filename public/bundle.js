@@ -3488,6 +3488,7 @@
         return { resoudre };
       };
       var ONG_AVEC_DETECTION_DOUBLONS = ["AVSI"];
+      var NUMERO_LOT_MINIMUM_PAR_ONG = { "MSF-H": 18 };
       var cleDoublon = (paire) => [paire.a.id, paire.b.id].sort().join("|");
       var trouverDoublonsProbables = (dossiersSansLot, tousLesDossiersDuPartenaire) => {
         const cle = (v) => cleMotsTries(normaliserTexte(v.nomPatient));
@@ -3721,7 +3722,11 @@
         }, [filtreType, filtreOng, rechercheNomPatient, filtreDateDebut, filtreDateFin, filtreCategorie, filtreStatut]);
         const numeroDepartConfigure = (ongCible) => {
           const doc = (listeOngDocs || []).find((o) => o.nom === ongCible);
-          return (doc == null ? void 0 : doc.prochainNumero) || 1;
+          return Math.max((doc == null ? void 0 : doc.prochainNumero) || 1, NUMERO_LOT_MINIMUM_PAR_ONG[ongCible] || 1);
+        };
+        const prochainNumeroLot = (ongCible) => {
+          const existants = verifications.filter((v) => v.ongPartenaire === ongCible && v.numeroLot != null).map((v) => v.numeroLot);
+          return Math.max(existants.length > 0 ? Math.max(...existants) + 1 : 1, numeroDepartConfigure(ongCible));
         };
         const ventilationDossier = (v) => {
           const totaux = cumulCategoriesDossier(v);
@@ -4128,8 +4133,7 @@
             showToast(`Aucun nouveau dossier en attente pour ${ongCible}.`, "error");
             return;
           }
-          const numerosExistants = verifications.filter((v) => v.ongPartenaire === ongCible && v.numeroLot != null).map((v) => v.numeroLot);
-          const prochainNumero = numerosExistants.length > 0 ? Math.max(...numerosExistants) + 1 : numeroDepartConfigure(ongCible);
+          const prochainNumero = prochainNumeroLot(ongCible);
           const totalEstime = eligibles.reduce((s, v) => s + (v.totalGlobal || 0), 0);
           setConfirmModal({
             titre: `\u{1F4E6} G\xE9n\xE9rer le Lot ${prochainNumero} pour ${ongCible} ?`,
@@ -4146,8 +4150,7 @@
         const rattacherOrphelinsAUnLot = (ongCible) => {
           const orphelins = verifications.filter((v) => v.ongPartenaire === ongCible && (v.status || "archived") === "archived" && v.numeroLot == null && v.verrouilleFacture);
           if (orphelins.length === 0) return;
-          const numerosExistants = verifications.filter((v) => v.ongPartenaire === ongCible && v.numeroLot != null).map((v) => v.numeroLot);
-          const numero = numerosExistants.length > 0 ? Math.max(...numerosExistants) + 1 : numeroDepartConfigure(ongCible);
+          const numero = prochainNumeroLot(ongCible);
           setConfirmModal({
             titre: `Rattacher ces ${orphelins.length} dossier(s) d\xE9j\xE0 envoy\xE9s au Lot ${numero} ?`,
             message: `Ces dossiers ont d\xE9j\xE0 \xE9t\xE9 envoy\xE9s \xE0 ${ongCible} avant la mise en place des lots. Aucun fichier ne sera reg\xE9n\xE9r\xE9 ni t\xE9l\xE9charg\xE9 ici \u2014 on marque juste qu'ils correspondent au Lot ${numero}, pour que le prochain lot g\xE9n\xE9r\xE9 d\xE9marre \xE0 ${numero + 1}.`,
@@ -6523,7 +6526,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
             placeholder: "Nom du partenaire...",
             className: "border rounded-lg p-2 flex-1 outline-none"
           }
-        ), /* @__PURE__ */ React.createElement("button", { onClick: ajouter, className: "bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold" }, "Ajouter")), groupesDoublons.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg p-2 mt-1" }, /* @__PURE__ */ React.createElement("span", { className: "text-amber-800 font-semibold" }, "\u26A0\uFE0F ", groupesDoublons.length, " partenaire(s) en double d\xE9tect\xE9(s) dans la liste ci-dessous."), /* @__PURE__ */ React.createElement("button", { onClick: nettoyerDoublons, className: "bg-amber-600 text-white px-3 py-1.5 rounded-lg font-bold whitespace-nowrap" }, "\u{1F9F9} Nettoyer les doublons"))), /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl border overflow-hidden divide-y" }, listeOngDocs.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "text-gray-500 p-3" }, "Aucun partenaire enregistr\xE9."), listeOngDocs.map((o) => /* @__PURE__ */ React.createElement("div", { key: o.id, className: "p-3 flex justify-between items-center hover:bg-gray-50" }, /* @__PURE__ */ React.createElement("span", { className: "font-medium text-gray-700" }, o.nom), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-3" }, /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1.5 text-[10px] text-gray-500" }, "Prochain N\xB0", /* @__PURE__ */ React.createElement(
+        ), /* @__PURE__ */ React.createElement("button", { onClick: ajouter, className: "bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold" }, "Ajouter")), groupesDoublons.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg p-2 mt-1" }, /* @__PURE__ */ React.createElement("span", { className: "text-amber-800 font-semibold" }, "\u26A0\uFE0F ", groupesDoublons.length, " partenaire(s) en double d\xE9tect\xE9(s) dans la liste ci-dessous."), /* @__PURE__ */ React.createElement("button", { onClick: nettoyerDoublons, className: "bg-amber-600 text-white px-3 py-1.5 rounded-lg font-bold whitespace-nowrap" }, "\u{1F9F9} Nettoyer les doublons"))), /* @__PURE__ */ React.createElement("div", { className: "bg-white rounded-xl border overflow-hidden divide-y" }, listeOngDocs.length === 0 && /* @__PURE__ */ React.createElement("p", { className: "text-gray-500 p-3" }, "Aucun partenaire enregistr\xE9."), listeOngDocs.map((o) => /* @__PURE__ */ React.createElement("div", { key: o.id, className: "p-3 flex justify-between items-center hover:bg-gray-50" }, /* @__PURE__ */ React.createElement("span", { className: "font-medium text-gray-700" }, o.nom), /* @__PURE__ */ React.createElement("div", { className: "flex items-center gap-3" }, /* @__PURE__ */ React.createElement("label", { className: "flex items-center gap-1.5 text-[10px] text-gray-500" }, "Prochain N\xB0 de lot", /* @__PURE__ */ React.createElement(
           "input",
           {
             type: "number",
