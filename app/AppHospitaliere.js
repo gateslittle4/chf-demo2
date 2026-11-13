@@ -289,12 +289,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
     if (!dossierId) return;
     const somme = fichesMaJour.reduce((s, f) => s + f.totalGlobal, 0);
     try { await chf.updateEpisode(dossierId, toEpisodeApi({ fiches: fichesMaJour, totalGlobal: somme })); }
-    catch (e) {
-      // 409 : le serveur a refusé car le dossier a été modifié ailleurs depuis son ouverture ici -- rien n'a été
-      // écrasé là-bas, mais ce qu'on vient de saisir n'est PAS enregistré : il faut le dire clairement.
-      if (e.conflit) showToast("⚠️ " + e.message + " (Tes dernières saisies restent à l'écran mais ne sont pas enregistrées : note-les, ferme ce dossier sans l'archiver, puis rouvre-le depuis les Archives.)", "error");
-      /* sinon hors ligne : brouillon local + file d'attente prennent déjà le relais */
-    }
+    catch (e) { /* hors ligne : brouillon local + file d'attente prennent déjà le relais */ }
   };
 
   // --- NOUVEAU : Enregistrer une fiche modifiée (remplace l'ancienne) ---
@@ -414,7 +409,6 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
     setOrigineLotEdition(origineLot || null);
     setDossierId(patientDoc.id);
     setDossierUpdatedAtOuverture(patientDoc.updatedAt || null);
-    chf.noterVersionDossier(patientDoc.id, patientDoc.updatedAt); // base du contrôle "modifié ailleurs ?" à chaque enregistrement
     setNomPatient(patientDoc.nomPatient);
     setSelectedOng(patientDoc.ongPartenaire || "");
     setTypePatient(patientDoc.typePatient || "ONG");
@@ -529,8 +523,7 @@ function AppHospitaliere({ onQuitter, userRole, userDisplayName, userEmail, role
     try {
       const episodes = await chf.getEpisodes();
       const actuel = episodes.map(ep => fromEpisodeApi(ep)).find(ep => ep.id === dossierId);
-      const attendu = chf.versionDossierConnue(dossierId) || dossierUpdatedAtOuverture; // inclut nos propres enregistrements
-      if (actuel && actuel.updatedAt && actuel.updatedAt !== attendu) return true;
+      if (actuel && actuel.updatedAt && actuel.updatedAt !== dossierUpdatedAtOuverture) return true;
     } catch (e) { /* hors ligne */ }
     return false;
   };
