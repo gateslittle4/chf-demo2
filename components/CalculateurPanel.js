@@ -62,6 +62,9 @@ function CalculateurPanel({
   const [inputDateNaissance, setInputDateNaissance] = useState("");
   const [inputTelephone, setInputTelephone] = useState("");
   const [categorie, setCategorie] = useState("med");
+  // Impression automatique du reçu dès qu'on enregistre une fiche (moins de clics) — réglage mémorisé sur ce poste
+  const [impressionAuto, setImpressionAuto] = useState(() => { try { return localStorage.getItem('chf-impression-auto') !== '0'; } catch { return true; } });
+  useEffect(() => { try { localStorage.setItem('chf-impression-auto', impressionAuto ? '1' : '0'); } catch {} }, [impressionAuto]);
   const [detailOuvert, setDetailOuvert] = useState(false); // mobile : affiche le récapitulatif complet en plein écran au tap
   const [recherche, setRecherche] = useState("");
   const [ouvert, setOuvert] = useState(false);
@@ -384,6 +387,12 @@ function CalculateurPanel({
     win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 400);
   };
 
+  // Impression d'un reçu dans une fenêtre déjà ouverte (ouverte pendant le clic, pour ne pas être bloquée par le navigateur)
+  const imprimerFicheDansFenetre = (win, fiche, optionsCorps) => {
+    const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N°${fiche.numeroFiche}</title><style>${STYLE_TICKET}</style></head><body>${genererCorpsTicket(fiche, optionsCorps)}</body></html>`;
+    win.document.write(contenu); win.document.close(); win.focus(); setTimeout(() => win.print(), 400);
+  };
+
   // --- NOUVEAU : Imprimer toutes les fiches du dossier d'affilée, en un seul clic ---
   const imprimerToutesLesFichesDuDossier = () => {
     if (fichesDossier.length === 0) { showToast("Aucune fiche à imprimer.", "error"); return; }
@@ -605,7 +614,18 @@ function CalculateurPanel({
       prescritPar: prescritPar.trim() || '',
       rawState: { lignesCalcul: [...lignes], dateEntree1: dateEntree1Eff, dateSortie1: dateSortie1Eff, typeLit1, multiPeriode, dateEntree2: dateEntree2Eff, dateSortie2: dateSortie2Eff, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
     };
+    // Impression automatique : la fenêtre doit être ouverte maintenant, pendant le clic, sinon le navigateur la bloque.
+    let winAuto = null;
+    if (impressionAuto) {
+      winAuto = window.open('', '_blank', 'width=500,height=700');
+      if (!winAuto) showToast("Impression automatique bloquée par le navigateur : autorise les fenêtres pop-up pour ce site, ou utilise le bouton Ticket.", "error");
+    }
+    const ajoutEnFin = !idFicheEnCoursDEdition && !idFicheApresLaquelleInserer;
     onEnregistrerFiche(fiche);
+    if (winAuto) {
+      try { imprimerFicheDansFenetre(winAuto, fiche, { afficherTotalDossier: ajoutEnFin, totalDossier: (totalDossierGourdes || 0) + (grandTotal || 0) }); }
+      catch (e) { try { winAuto.close(); } catch {} showToast("Impression automatique impossible : " + e.message, "error"); }
+    }
     // Le parent (AppHospitaliere) gère la mise à jour ou l'ajout et vide le calculateur
     if (idEntreeChargee) { retirerDeLaFile(idEntreeChargee); setIdEntreeChargee(null); }
     setPaiementEffectue(true);
@@ -988,6 +1008,10 @@ function CalculateurPanel({
             <button onClick={onViderFicheActive} className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl py-3 text-xs font-bold">🧹 Vider l'écran</button>
             <button onClick={imprimerFicheA4} disabled={!paiementEffectue} className={`flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>🖨️ A4</button>
             <button onClick={imprimerTicket} disabled={!paiementEffectue} className={`flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>🧾 Ticket</button>
+            <label className="basis-full flex items-center gap-2 text-[11px] text-gray-600 font-bold cursor-pointer select-none">
+              <input type="checkbox" checked={impressionAuto} onChange={e => setImpressionAuto(e.target.checked)} className="w-4 h-4 accent-emerald-700" />
+              🖨️ Imprimer le reçu automatiquement à l'enregistrement
+            </label>
             <button onClick={enregistrerFicheActive} disabled={!peutArchiver} className="flex-[2] bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl py-3 text-xs font-black shadow-md disabled:opacity-50">
               {idFicheEnCoursDEdition ? '💾 Mettre à jour la Fiche' : idFicheApresLaquelleInserer ? `💾 Insérer la Fiche N°${numeroFicheCourante} au Dossier` : `💾 Enregistrer la Fiche N°${numeroFicheCourante} au Dossier`}
             </button>
