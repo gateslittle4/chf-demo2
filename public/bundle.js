@@ -4971,19 +4971,6 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
         const [inputDateNaissance, setInputDateNaissance] = useState("");
         const [inputTelephone, setInputTelephone] = useState("");
         const [categorie, setCategorie] = useState("med");
-        const [impressionAuto, setImpressionAuto] = useState(() => {
-          try {
-            return localStorage.getItem("chf-impression-auto") !== "0";
-          } catch (e) {
-            return true;
-          }
-        });
-        useEffect(() => {
-          try {
-            localStorage.setItem("chf-impression-auto", impressionAuto ? "1" : "0");
-          } catch (e) {
-          }
-        }, [impressionAuto]);
         const [detailOuvert, setDetailOuvert] = useState(false);
         const [recherche, setRecherche] = useState("");
         const [ouvert, setOuvert] = useState(false);
@@ -5334,13 +5321,6 @@ Continuer quand m\xEAme pour corriger ce dossier ?`)) return;
           win.focus();
           setTimeout(() => win.print(), 400);
         };
-        const imprimerFicheDansFenetre = (win, fiche, optionsCorps) => {
-          const contenu = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fiche N\xB0${fiche.numeroFiche}</title><style>${STYLE_TICKET}</style></head><body>${genererCorpsTicket(fiche, optionsCorps)}</body></html>`;
-          win.document.write(contenu);
-          win.document.close();
-          win.focus();
-          setTimeout(() => win.print(), 400);
-        };
         const imprimerToutesLesFichesDuDossier = () => {
           if (fichesDossier.length === 0) {
             showToast("Aucune fiche \xE0 imprimer.", "error");
@@ -5650,24 +5630,7 @@ Mode de paiement : ${libellesMode[modePaiement] || modePaiement}`,
             prescritPar: prescritPar.trim() || "",
             rawState: { lignesCalcul: [...lignes], dateEntree1: dateEntree1Eff, dateSortie1: dateSortie1Eff, typeLit1, multiPeriode, dateEntree2: dateEntree2Eff, dateSortie2: dateSortie2Eff, typeLit2, hasChirSpec, nomChirSpec, prixChirSpec }
           };
-          let winAuto = null;
-          if (impressionAuto) {
-            winAuto = window.open("", "_blank", "width=500,height=700");
-            if (!winAuto) showToast("Impression automatique bloqu\xE9e par le navigateur : autorise les fen\xEAtres pop-up pour ce site, ou utilise le bouton Ticket.", "error");
-          }
-          const ajoutEnFin = !idFicheEnCoursDEdition && !idFicheApresLaquelleInserer;
           onEnregistrerFiche(fiche);
-          if (winAuto) {
-            try {
-              imprimerFicheDansFenetre(winAuto, fiche, { afficherTotalDossier: ajoutEnFin, totalDossier: (totalDossierGourdes || 0) + (grandTotal || 0) });
-            } catch (e) {
-              try {
-                winAuto.close();
-              } catch (e2) {
-              }
-              showToast("Impression automatique impossible : " + e.message, "error");
-            }
-          }
           if (idEntreeChargee) {
             retirerDeLaFile(idEntreeChargee);
             setIdEntreeChargee(null);
@@ -5909,7 +5872,7 @@ Cr\xE9er quand m\xEAme un NOUVEAU dossier s\xE9par\xE9 pour ce nom ?
           const m = totalsParService[srv.key];
           if (m === 0) return null;
           return /* @__PURE__ */ React.createElement("div", { key: srv.key, className: "grid grid-cols-2 py-0.5" }, /* @__PURE__ */ React.createElement("span", null, "\u2022 ", srv.label), /* @__PURE__ */ React.createElement("span", { className: "text-right" }, formatPrix(m)));
-        })), /* @__PURE__ */ React.createElement("div", { className: "bg-[#1E2A24] text-white p-4 flex justify-between items-center font-bold text-sm font-mono" }, /* @__PURE__ */ React.createElement("span", null, "SOUS-TOTAL FICHE ", idFicheEnCoursDEdition ? "EN MODIFICATION" : `N\xB0${numeroFicheCourante}`, " :"), /* @__PURE__ */ React.createElement("span", null, formatPrix(grandTotal))), /* @__PURE__ */ React.createElement("button", { onClick: () => setDetailOuvert(false), className: "w-full py-3 text-center text-gray-500 text-xs font-bold border-t" }, "Fermer"))), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 flex-wrap" }, /* @__PURE__ */ React.createElement("button", { onClick: onViderFicheActive, className: "flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl py-3 text-xs font-bold" }, "\u{1F9F9} Vider l'\xE9cran"), /* @__PURE__ */ React.createElement("button", { onClick: imprimerFicheA4, disabled: !paiementEffectue, className: `flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}` }, "\u{1F5A8}\uFE0F A4"), /* @__PURE__ */ React.createElement("button", { onClick: imprimerTicket, disabled: !paiementEffectue, className: `flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? "bg-green-600 hover:bg-green-700 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}` }, "\u{1F9FE} Ticket"), /* @__PURE__ */ React.createElement("label", { className: "basis-full flex items-center gap-2 text-[11px] text-gray-600 font-bold cursor-pointer select-none" }, /* @__PURE__ */ React.createElement("input", { type: "checkbox", checked: impressionAuto, onChange: (e) => setImpressionAuto(e.target.checked), className: "w-4 h-4 accent-emerald-700" }), "\u{1F5A8}\uFE0F Imprimer le re\xE7u automatiquement \xE0 l'enregistrement"), /* @__PURE__ */ React.createElement("button", { onClick: enregistrerFicheActive, disabled: !peutArchiver, className: "flex-[2] bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl py-3 text-xs font-black shadow-md disabled:opacity-50" }, idFicheEnCoursDEdition ? "\u{1F4BE} Mettre \xE0 jour la Fiche" : idFicheApresLaquelleInserer ? `\u{1F4BE} Ins\xE9rer la Fiche N\xB0${numeroFicheCourante} au Dossier` : `\u{1F4BE} Enregistrer la Fiche N\xB0${numeroFicheCourante} au Dossier`)), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 flex-wrap justify-end" }, peutAnnulerDossier && /* @__PURE__ */ React.createElement("button", { onClick: onAnnulerDossier, className: "bg-red-50 text-red-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-red-200" }, "Abandonner"), peutSuspendre && /* @__PURE__ */ React.createElement("button", { onClick: onSuspendreDossier, className: "bg-amber-50 text-amber-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-amber-200 flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Clock, { size: 12 }), " Suspendre"), peutSuspendre && onReporterDossier && /* @__PURE__ */ React.createElement("button", { onClick: onReporterDossier, className: "bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-indigo-200 flex items-center gap-1" }, "\u{1F4C5} Reporter au mois suivant"), peutArchiver && /* @__PURE__ */ React.createElement("button", { onClick: onCloturerDossier, className: "bg-emerald-700 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg" }, "\u{1F3C1} Cl\xF4turer"))));
+        })), /* @__PURE__ */ React.createElement("div", { className: "bg-[#1E2A24] text-white p-4 flex justify-between items-center font-bold text-sm font-mono" }, /* @__PURE__ */ React.createElement("span", null, "SOUS-TOTAL FICHE ", idFicheEnCoursDEdition ? "EN MODIFICATION" : `N\xB0${numeroFicheCourante}`, " :"), /* @__PURE__ */ React.createElement("span", null, formatPrix(grandTotal))), /* @__PURE__ */ React.createElement("button", { onClick: () => setDetailOuvert(false), className: "w-full py-3 text-center text-gray-500 text-xs font-bold border-t" }, "Fermer"))), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 flex-wrap" }, /* @__PURE__ */ React.createElement("button", { onClick: onViderFicheActive, className: "flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl py-3 text-xs font-bold" }, "\u{1F9F9} Vider l'\xE9cran"), /* @__PURE__ */ React.createElement("button", { onClick: imprimerFicheA4, disabled: !paiementEffectue, className: `flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}` }, "\u{1F5A8}\uFE0F A4"), /* @__PURE__ */ React.createElement("button", { onClick: imprimerTicket, disabled: !paiementEffectue, className: `flex-1 rounded-xl py-3 text-xs font-bold flex items-center justify-center gap-1 ${paiementEffectue ? "bg-green-600 hover:bg-green-700 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}` }, "\u{1F9FE} Ticket"), /* @__PURE__ */ React.createElement("button", { onClick: enregistrerFicheActive, disabled: !peutArchiver, className: "flex-[2] bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl py-3 text-xs font-black shadow-md disabled:opacity-50" }, idFicheEnCoursDEdition ? "\u{1F4BE} Mettre \xE0 jour la Fiche" : idFicheApresLaquelleInserer ? `\u{1F4BE} Ins\xE9rer la Fiche N\xB0${numeroFicheCourante} au Dossier` : `\u{1F4BE} Enregistrer la Fiche N\xB0${numeroFicheCourante} au Dossier`)), /* @__PURE__ */ React.createElement("div", { className: "flex gap-2 flex-wrap justify-end" }, peutAnnulerDossier && /* @__PURE__ */ React.createElement("button", { onClick: onAnnulerDossier, className: "bg-red-50 text-red-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-red-200" }, "Abandonner"), peutSuspendre && /* @__PURE__ */ React.createElement("button", { onClick: onSuspendreDossier, className: "bg-amber-50 text-amber-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-amber-200 flex items-center gap-1" }, /* @__PURE__ */ React.createElement(Clock, { size: 12 }), " Suspendre"), peutSuspendre && onReporterDossier && /* @__PURE__ */ React.createElement("button", { onClick: onReporterDossier, className: "bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2.5 py-1.5 rounded-lg border border-indigo-200 flex items-center gap-1" }, "\u{1F4C5} Reporter au mois suivant"), peutArchiver && /* @__PURE__ */ React.createElement("button", { onClick: onCloturerDossier, className: "bg-emerald-700 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg" }, "\u{1F3C1} Cl\xF4turer"))));
       }
       module.exports = CalculateurPanel;
     }
