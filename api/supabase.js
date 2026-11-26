@@ -385,8 +385,27 @@ class CHF_API {
   async getPaiements() { return this.request('/paiements'); }
   async createPaiement(data, localId) { return this.request('/paiements', 'POST', data, { localId }); }
 
-  async getCatalog(type) { return this.request(`/catalog/${type}`); }
-  async updateCatalog(type, items) { return this.request(`/catalog/${type}`, 'PUT', { items }); }
+  // Le serveur FUSIONNE les envois de catalogue (il ne remplace plus tout en bloc) : pour savoir ce
+  // que cette personne a réellement changé, il lui faut la copie que le navigateur avait chargée
+  // (`base`). On la garde ici, et elle est jointe à l'envoi -- donc aussi à une sauvegarde mise en
+  // file hors ligne, rejouée plus tard sans écraser ce que d'autres ont modifié entre-temps.
+  async getCatalog(type) {
+    const items = await this.request(`/catalog/${type}`);
+    if (Array.isArray(items)) { this._catalogBase = this._catalogBase || {}; this._catalogBase[type] = JSON.parse(JSON.stringify(items)); }
+    return items;
+  }
+  async updateCatalog(type, items) {
+    this._catalogBase = this._catalogBase || {};
+    const base = this._catalogBase[type];
+    if (!Array.isArray(base)) throw new Error("Catalogue pas encore chargé : recharge la page avant de le modifier.");
+    const copieEnvoyee = JSON.parse(JSON.stringify(items));
+    const envoi = () => { this._catalogBase[type] = copieEnvoyee; }; // la copie de l'écran devient la nouvelle référence
+    try {
+      const res = await this.request(`/catalog/${type}`, 'PUT', { items, base });
+      envoi();
+      return res;
+    } catch (e) { if (e && e.isOfflineQueue) envoi(); throw e; }
+  }
 }
 
 // ======== CONVERSIONS ========
